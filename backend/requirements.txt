@@ -4,7 +4,7 @@ python-dotenv==1.0.0
 anthropic==0.40.0
 langgraph==0.2.50
 langchain-anthropic==0.3.0
-langchain-core==0.3.20
+langchain-core==0.3.29
 sqlalchemy[asyncio]==2.0.35
 asyncpg==0.30.0
 aiosqlite==0.20.0

@@ -16,29 +16,35 @@ log = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Auto-create all tables (works with SQLite and PostgreSQL)
-    from app.db.database import engine, Base
-    import app.models.user  # noqa: F401
-    import app.models.signal  # noqa: F401
-    import app.models.portfolio  # noqa: F401
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        # Auto-create all tables (works with SQLite and PostgreSQL)
+        from app.db.database import engine, Base
+        import app.models.user  # noqa: F401
+        import app.models.signal  # noqa: F401
+        import app.models.portfolio  # noqa: F401
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    # Seed demo user
-    from app.db.database import AsyncSessionLocal
-    from app.models.user import User
-    from app.auth.jwt import hash_password
-    from sqlalchemy import select
-    async with AsyncSessionLocal() as session:
-        existing = await session.execute(select(User).where(User.email == "demo@tradingcopilot.ai"))
-        if not existing.scalar_one_or_none():
-            session.add(User(
-                id="00000000-0000-0000-0000-000000000001",
-                email="demo@tradingcopilot.ai",
-                hashed_password=hash_password("demo1234"),
-                tier="pro",
-            ))
-            await session.commit()
+        # Seed demo user
+        from app.db.database import AsyncSessionLocal
+        from app.models.user import User
+        from app.auth.jwt import hash_password
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as session:
+            existing = await session.execute(select(User).where(User.email == "demo@tradingcopilot.ai"))
+            if not existing.scalar_one_or_none():
+                session.add(User(
+                    id="00000000-0000-0000-0000-000000000001",
+                    email="demo@tradingcopilot.ai",
+                    hashed_password=hash_password("demo1234"),
+                    tier="pro",
+                ))
+                await session.commit()
+
+        log.info("startup_db_ok", environment=settings.environment)
+    except Exception as exc:
+        log.error("startup_db_failed", error=str(exc))
+        # App still starts — DB will be retried on first request
 
     log.info("startup", environment=settings.environment, version="1.0.0")
     yield
