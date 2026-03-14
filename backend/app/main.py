@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api.routes import auth, signals, portfolio, agents, backtest, debate
+from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market
 from app.api.websocket import router as ws_router
 
 log = structlog.get_logger()
@@ -80,6 +80,7 @@ app.include_router(portfolio.router)
 app.include_router(agents.router)
 app.include_router(backtest.router)
 app.include_router(debate.router)
+app.include_router(market.router)
 app.include_router(ws_router)
 
 

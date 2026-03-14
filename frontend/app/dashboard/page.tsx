@@ -9,8 +9,9 @@ import { TradingChart } from "@/components/TradingChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, type Signal, type AgentStatus } from "@/lib/api";
 import { formatPrice, formatPct } from "@/lib/utils";
+import { SymbolSearch } from "@/components/SymbolSearch";
 
-const WATCHLIST = ["AAPL", "NVDA", "TSLA", "SPY", "BTC", "EURUSD"];
+const WATCHLIST = ["AAPL", "NVDA", "TSLA", "SPY", "BTC-USD", "EURUSD=X", "GC=F"];
 
 export default function DashboardPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
@@ -32,11 +33,16 @@ export default function DashboardPage() {
     if (agentData.status === "fulfilled") setAgents(agentData.value.agents);
   }
 
-  async function handleGenerate(ticker: string) {
-    setLoading(true);
+  function handleTickerChange(ticker: string) {
     setActiveTicker(ticker);
+  }
+
+  async function handleGenerate(ticker?: string) {
+    const t = ticker || activeTicker;
+    setLoading(true);
+    setActiveTicker(t);
     try {
-      const signal = await generateSignal(ticker);
+      const signal = await generateSignal(t);
       setSignals((prev) => [signal, ...prev.slice(0, 9)]);
       setSelectedSignal(signal);
     } catch (e) {
@@ -73,35 +79,50 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-[1fr_320px] gap-6">
         {/* Left column */}
         <div className="space-y-4">
-          {/* Watchlist + generate */}
+          {/* Symbol search + quick picks + analyze */}
           <Card className="border-border/50">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground font-medium mr-1">Quick Analyze:</span>
-                {WATCHLIST.map((ticker) => (
-                  <button
-                    key={ticker}
-                    onClick={() => handleGenerate(ticker)}
+                {/* TradingView-style symbol search */}
+                <SymbolSearch value={activeTicker} onChange={handleTickerChange} />
+
+                {/* Quick pick chips */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {WATCHLIST.map((ticker) => (
+                    <button
+                      key={ticker}
+                      onClick={() => handleTickerChange(ticker)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-mono font-medium border transition-colors ${
+                        activeTicker === ticker
+                          ? "bg-primary/10 border-primary/40 text-primary"
+                          : "border-border/50 hover:border-primary/30 hover:text-primary text-muted-foreground"
+                      }`}
+                    >
+                      {ticker.replace("=X","").replace("-USD","").replace("=F","").replace("^","")}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
+                    onClick={() => handleGenerate()}
                     disabled={loading}
-                    className={`px-3 py-1.5 rounded-md text-xs font-mono font-medium border transition-colors ${
-                      activeTicker === ticker
-                        ? "bg-primary/10 border-primary/40 text-primary"
-                        : "border-border/50 hover:border-primary/30 hover:text-primary text-muted-foreground"
-                    }`}
                   >
-                    {ticker}
-                  </button>
-                ))}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="ml-auto h-7 text-xs"
-                  onClick={loadData}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-3 w-3 mr-1 ${loading ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
+                    <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+                    {loading ? "Analyzing…" : "Run AI Analysis"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={loadData}
+                    disabled={loading}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -118,7 +139,7 @@ export default function DashboardPage() {
                 </span>
               )}
             </div>
-            <TradingChart signal={selectedSignal} />
+            <TradingChart ticker={activeTicker} signal={selectedSignal} />
           </div>
 
           {/* Signal feed */}
