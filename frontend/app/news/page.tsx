@@ -89,7 +89,11 @@ export default function NewsPage() {
   async function handleRefresh() {
     setRefreshing(true);
     await fetch(`${API}/api/v1/news/refresh`, { method: "POST" });
-    setTimeout(() => loadNews(activeCategory), 3000); // give scraper time
+    // Scraper fetches 16 feeds concurrently — retry at 6s, 12s, 20s, 30s
+    [6000, 12000, 20000, 30000].forEach((delay) => {
+      setTimeout(() => loadNews(activeCategory), delay);
+    });
+    setTimeout(() => setRefreshing(false), 32000);
   }
 
   const crisisArticles  = articles.filter(a => a.category === "CRISIS");

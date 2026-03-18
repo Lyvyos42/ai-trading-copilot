@@ -21,22 +21,35 @@ from app.models.news import NewsArticle
 log = structlog.get_logger()
 
 # ── RSS Feed Catalogue ────────────────────────────────────────────────────────
+# Note: Reuters deprecated public RSS in 2023. AP News changed URLs. CNBC often blocks bots.
+# These are the most reliable free finance RSS feeds as of 2026.
 FEEDS = [
-    # Markets / Finance
-    {"url": "https://feeds.reuters.com/reuters/businessNews",                   "source": "Reuters"},
-    {"url": "https://feeds.reuters.com/reuters/worldNews",                      "source": "Reuters"},
-    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",            "source": "CNBC"},
-    {"url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",             "source": "CNBC Markets"},
-    {"url": "https://feeds.marketwatch.com/marketwatch/marketpulse/",           "source": "MarketWatch"},
-    {"url": "https://finance.yahoo.com/news/rssindex",                          "source": "Yahoo Finance"},
-    {"url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",                   "source": "WSJ Markets"},
-    # Macro / World
-    {"url": "http://feeds.bbci.co.uk/news/business/rss.xml",                   "source": "BBC Business"},
-    {"url": "http://feeds.bbci.co.uk/news/world/rss.xml",                      "source": "BBC World"},
-    {"url": "https://apnews.com/rss/apf-business",                             "source": "AP News"},
-    {"url": "https://apnews.com/rss/apf-finance",                              "source": "AP Finance"},
-    # Central Banks / Macro
-    {"url": "https://www.federalreserve.gov/feeds/releases.xml",               "source": "Federal Reserve"},
+    # Yahoo Finance — highly reliable, broad coverage
+    {"url": "https://finance.yahoo.com/news/rssindex",                              "source": "Yahoo Finance"},
+    # BBC — reliable, no paywall
+    {"url": "https://feeds.bbci.co.uk/news/business/rss.xml",                      "source": "BBC Business"},
+    {"url": "https://feeds.bbci.co.uk/news/world/rss.xml",                         "source": "BBC World"},
+    # AP News — updated URLs (2024+)
+    {"url": "https://feeds.apnews.com/rss/apf-business",                           "source": "AP Business"},
+    {"url": "https://feeds.apnews.com/rss/apf-finance",                            "source": "AP Finance"},
+    # MarketWatch
+    {"url": "https://feeds.marketwatch.com/marketwatch/topstories/",               "source": "MarketWatch"},
+    {"url": "https://feeds.marketwatch.com/marketwatch/marketpulse/",              "source": "MarketWatch"},
+    # The Guardian — reliable, no paywall
+    {"url": "https://www.theguardian.com/business/rss",                            "source": "The Guardian"},
+    {"url": "https://www.theguardian.com/business/economics/rss",                  "source": "Guardian Economics"},
+    # Investopedia
+    {"url": "https://www.investopedia.com/feeds/rss.aspx",                         "source": "Investopedia"},
+    # CNBC (top-level, less likely to be blocked)
+    {"url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", "source": "CNBC"},
+    {"url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",  "source": "CNBC Markets"},
+    # Central Banks / Macro — official, highly reliable
+    {"url": "https://www.federalreserve.gov/feeds/releases.xml",                   "source": "Federal Reserve"},
+    {"url": "https://www.ecb.europa.eu/rss/press.html",                            "source": "ECB"},
+    # Seeking Alpha (market news)
+    {"url": "https://seekingalpha.com/market_currents.xml",                        "source": "Seeking Alpha"},
+    # FT (limited but often available)
+    {"url": "https://www.ft.com/rss/home/uk",                                      "source": "FT"},
 ]
 
 # ── Category Keywords ─────────────────────────────────────────────────────────
@@ -135,7 +148,7 @@ async def _fetch_feed(client: httpx.AsyncClient, feed_meta: dict) -> list[dict]:
     url = feed_meta["url"]
     source = feed_meta["source"]
     try:
-        resp = await client.get(url, timeout=15.0, follow_redirects=True)
+        resp = await client.get(url, timeout=12.0)
         resp.raise_for_status()
         parsed = feedparser.parse(resp.text)
         articles = []
@@ -176,8 +189,14 @@ async def _fetch_feed(client: httpx.AsyncClient, feed_meta: dict) -> list[dict]:
 
 async def scrape_all_feeds() -> int:
     """Fetch all feeds and upsert new articles. Returns count of new articles saved."""
-    async with httpx.AsyncClient(headers={"User-Agent": "QuantNeural/1.0 (news-scraper)"}) as client:
-        results = await asyncio.gather(*[_fetch_feed(client, f) for f in FEEDS])
+    async with httpx.AsyncClient(
+        headers={"User-Agent": "Mozilla/5.0 (compatible; QuantNeural/1.0; +https://quantneuraledge.com/bot)"},
+        timeout=httpx.Timeout(20.0, connect=8.0),
+        follow_redirects=True,
+    ) as client:
+        results = await asyncio.gather(*[_fetch_feed(client, f) for f in FEEDS], return_exceptions=True)
+    # Filter out exceptions (individual feed failures should not crash the whole batch)
+    results = [r if isinstance(r, list) else [] for r in results]
 
     all_articles = [a for batch in results for a in batch]
     if not all_articles:

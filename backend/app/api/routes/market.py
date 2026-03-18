@@ -154,19 +154,54 @@ async def get_ohlcv(ticker: str):
         return {"ticker": ticker, "candles": candles}
 
     except Exception:
-        # Deterministic mock fallback
+        # Deterministic mock fallback with realistic price ranges per asset type
+        _MOCK_BASES = {
+            # Crypto
+            "BTC-USD": 68000, "ETH-USD": 3400, "SOL-USD": 160, "BNB-USD": 580,
+            "XRP-USD": 0.52, "ADA-USD": 0.45, "DOGE-USD": 0.17, "AVAX-USD": 35,
+            "MATIC-USD": 0.85, "DOT-USD": 7.5, "LINK-USD": 18, "UNI-USD": 9,
+            # Forex
+            "EURUSD=X": 1.082, "GBPUSD=X": 1.271, "USDJPY=X": 149.5,
+            "AUDUSD=X": 0.651, "USDCAD=X": 1.363, "USDCHF=X": 0.901,
+            "NZDUSD=X": 0.598, "EURGBP=X": 0.853, "EURJPY=X": 161.8,
+            "GBPJPY=X": 190.2, "USDMXN=X": 17.2, "USDZAR=X": 18.8,
+            # Commodities
+            "GC=F": 2340, "SI=F": 27.5, "CL=F": 79.5, "BZ=F": 83.2,
+            "NG=F": 2.1, "HG=F": 4.15, "ZW=F": 540, "ZC=F": 430,
+            # Indices
+            "^GSPC": 5180, "^IXIC": 16300, "^DJI": 38900, "^RUT": 2040,
+            "^FTSE": 7680, "^GDAXI": 17800, "^N225": 38200, "^HSI": 17400,
+            # ETFs
+            "SPY": 523, "QQQ": 441, "IWM": 202, "GLD": 218, "TLT": 91,
+            "XLK": 208, "XLE": 91, "VIX": 15,
+            # US stocks (approximate current levels)
+            "AAPL": 182, "MSFT": 415, "NVDA": 875, "GOOGL": 158, "AMZN": 185,
+            "META": 520, "TSLA": 175, "SPY": 523, "QQQ": 441, "AMD": 165,
+            "INTC": 43, "NFLX": 630, "DIS": 112, "JPM": 198, "GS": 452,
+            "BAC": 37, "V": 278, "MA": 468, "JNJ": 158, "WMT": 59,
+            "XOM": 118, "CVX": 154, "UNH": 510, "PG": 161, "HD": 380,
+            "KO": 60, "PEP": 172, "ABBV": 182, "MRK": 128, "LLY": 770,
+            "COST": 755, "MCD": 282, "SBUX": 80, "NKE": 93, "BA": 188,
+            "CAT": 358, "GE": 162, "IBM": 190, "ORCL": 120, "CRM": 295,
+            "ADBE": 480, "PYPL": 64, "UBER": 71, "PLTR": 24, "RIVN": 11,
+        }
+        base = _MOCK_BASES.get(ticker, _MOCK_BASES.get(ticker.upper(), 100.0))
+        # For forex use tighter volatility, crypto use wider
+        is_forex = "=X" in ticker
+        is_crypto = "-USD" in ticker and ticker not in ("GLD", "SLV")
+        daily_vol = 0.003 if is_forex else (0.028 if is_crypto else 0.014)
+
         rng = random.Random(sum(ord(c) for c in ticker))
-        base = rng.uniform(20, 500)
         now = int(datetime.utcnow().timestamp())
         DAY = 86400
         candles = []
         price = base
         for i in range(130, 0, -1):
             o = price
-            change = rng.gauss(0.0003, 0.014)
-            c = round(o * (1 + change), 4)
-            h = round(max(o, c) * (1 + abs(rng.gauss(0, 0.005))), 4)
-            l = round(min(o, c) * (1 - abs(rng.gauss(0, 0.005))), 4)
-            candles.append({"time": now - i * DAY, "open": round(o,4), "high": h, "low": l, "close": c})
+            change = rng.gauss(0.0002, daily_vol)
+            c = round(o * (1 + change), 4 if is_forex else 2)
+            h = round(max(o, c) * (1 + abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
+            l = round(min(o, c) * (1 - abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
+            candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c})
             price = c
         return {"ticker": ticker, "candles": candles}
