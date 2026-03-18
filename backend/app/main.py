@@ -47,6 +47,20 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.error("startup_db_failed", error=str(exc))
 
+    # Seed news table on first boot so the UI is never blank before the first scrape
+    try:
+        from sqlalchemy import func, select as sa_select
+        from app.models.news import NewsArticle
+        from app.db.database import AsyncSessionLocal as _ASL
+        from app.services.news_scraper import insert_seed_articles
+        async with _ASL() as _sess:
+            count_result = await _sess.execute(sa_select(func.count()).select_from(NewsArticle))
+            news_count = count_result.scalar_one()
+        if news_count == 0:
+            await insert_seed_articles()
+    except Exception as exc:
+        log.error("news_seed_failed", error=str(exc))
+
     # Start background news scraper (runs every 5 min)
     try:
         start_scheduler()

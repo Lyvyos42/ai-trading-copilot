@@ -17,6 +17,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   NYMEX: "#ef4444", ICE: "#06b6d4", CBOT: "#84cc16",
 };
 
+// Maps exchange → display group label
+const EXCHANGE_GROUP: Record<string, string> = {
+  NASDAQ: "Equities", NYSE: "Equities",
+  FX: "Forex",
+  CRYPTO: "Crypto",
+  INDEX: "Indices",
+  COMEX: "Commodities", NYMEX: "Commodities", ICE: "Commodities", CBOT: "Commodities",
+};
+
+// Stable display order for groups
+const GROUP_ORDER = ["Equities", "Crypto", "Forex", "Indices", "Commodities"];
+
 const QUICK_PICKS = [
   // US Equities
   { symbol: "AAPL",     exchange: "NASDAQ" },
@@ -55,16 +67,29 @@ interface SymbolSearchProps {
 }
 
 export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
-  const [open, setOpen]       = useState(false);
-  const [query, setQuery]     = useState("");
-  const [results, setResults] = useState<SymbolItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [open, setOpen]           = useState(false);
+  const [query, setQuery]         = useState("");
+  const [results, setResults]     = useState<SymbolItem[]>([]);
+  const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
+  const [loading, setLoading]     = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Fetch symbols whenever query changes
+  // When panel opens with empty query, fetch the full symbol list once
   useEffect(() => {
     if (!open) return;
+    if (allSymbols.length > 0) return; // already loaded
+    setLoading(true);
+    fetch(`${API}/api/v1/market/symbols`)
+      .then(r => r.json())
+      .then(data => setAllSymbols(data.symbols ?? []))
+      .catch(() => setAllSymbols([]))
+      .finally(() => setLoading(false));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch filtered results when user types
+  useEffect(() => {
+    if (!open || !query) return;
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
@@ -102,6 +127,14 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  // Group all symbols by display category for the browse view
+  const groupedSymbols: Record<string, SymbolItem[]> = {};
+  for (const s of allSymbols) {
+    const group = EXCHANGE_GROUP[s.exchange] ?? s.exchange;
+    if (!groupedSymbols[group]) groupedSymbols[group] = [];
+    groupedSymbols[group].push(s);
+  }
+
   const displaySymbol = value.replace("=X", "").replace("-USD", "/USD").replace("=F","");
 
   return (
@@ -121,7 +154,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
       {open && (
         <div
           className="absolute left-0 top-full mt-1 bg-card border border-border/60 rounded-xl shadow-2xl overflow-hidden"
-          style={{ width: 380, maxHeight: 480 }}
+          style={{ width: 380, maxHeight: 520 }}
         >
           {/* Search input */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/40">
@@ -141,44 +174,82 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
             )}
           </div>
 
-          <div style={{ overflowY: "auto", maxHeight: 400 }}>
-            {/* Quick picks (shown when query is empty) */}
-            {!query && (
-              <div className="px-3 py-2">
-                <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-2">
-                  Quick Pick
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_PICKS.map(q => (
-                    <button
-                      key={q.symbol}
-                      onClick={() => select(q.symbol)}
-                      className="px-2.5 py-1 rounded-md text-xs font-mono font-medium border border-border/40 hover:border-primary/40 hover:text-primary transition-colors"
-                      style={{ color: value === q.symbol ? CATEGORY_COLORS[q.exchange] : undefined,
-                               borderColor: value === q.symbol ? CATEGORY_COLORS[q.exchange] + "66" : undefined }}
-                    >
-                      {q.symbol.replace("=X","").replace("-USD","").replace("=F","")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Results list */}
+          <div style={{ overflowY: "auto", maxHeight: 448 }}>
             {loading && (
               <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
                 <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                Searching…
+                Loading…
               </div>
             )}
 
-            {!loading && results.length === 0 && query && (
+            {/* ── Empty query: quick picks + full grouped catalogue ── */}
+            {!loading && !query && (
+              <>
+                {/* Quick picks row */}
+                <div className="px-3 py-2 border-b border-border/30">
+                  <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-2">
+                    Quick Pick
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUICK_PICKS.map(q => (
+                      <button
+                        key={q.symbol}
+                        onClick={() => select(q.symbol)}
+                        className="px-2.5 py-1 rounded-md text-xs font-mono font-medium border border-border/40 hover:border-primary/40 hover:text-primary transition-colors"
+                        style={{
+                          color: value === q.symbol ? CATEGORY_COLORS[q.exchange] : undefined,
+                          borderColor: value === q.symbol ? CATEGORY_COLORS[q.exchange] + "66" : undefined,
+                        }}
+                      >
+                        {q.symbol.replace("=X","").replace("-USD","").replace("=F","")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Full catalogue grouped by asset class */}
+                {GROUP_ORDER.filter(g => groupedSymbols[g]?.length).map(group => (
+                  <div key={group}>
+                    <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                      {group}
+                    </div>
+                    {groupedSymbols[group].map(s => {
+                      const color = CATEGORY_COLORS[s.exchange] || "#64748b";
+                      const isActive = s.symbol === value;
+                      return (
+                        <button
+                          key={s.symbol}
+                          onClick={() => select(s.symbol)}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/30 transition-colors text-left"
+                          style={{ background: isActive ? "rgba(59,130,246,0.06)" : undefined }}
+                        >
+                          <div
+                            className="text-xs font-bold font-mono rounded px-1.5 py-0.5 shrink-0"
+                            style={{ background: color + "18", color, border: `1px solid ${color}30`, minWidth: 70, textAlign: "center" }}
+                          >
+                            {s.symbol.replace("=X","").replace("-USD","").replace("=F","").replace("^","")}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-foreground truncate">{s.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{s.exchange}</div>
+                          </div>
+                          {isActive && <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* ── Query active: filtered search results ── */}
+            {!loading && query && results.length === 0 && (
               <div className="py-6 text-center text-xs text-muted-foreground">
                 No symbols found for "{query}"
               </div>
             )}
 
-            {!loading && results.map(s => {
+            {!loading && query && results.map(s => {
               const color = CATEGORY_COLORS[s.exchange] || "#64748b";
               const isActive = s.symbol === value;
               return (

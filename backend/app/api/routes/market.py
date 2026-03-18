@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from app.data.market_data import fetch_market_data
 import asyncio, random
 from datetime import datetime, timedelta
+import httpx
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
 
@@ -128,9 +129,51 @@ async def get_symbols(q: str = Query(default="", max_length=50)):
     return {"symbols": results[:30], "total": len(results)}
 
 
+_COINGECKO_IDS = {
+    "BTC-USD": "bitcoin", "ETH-USD": "ethereum", "SOL-USD": "solana",
+    "BNB-USD": "binancecoin", "XRP-USD": "ripple", "ADA-USD": "cardano",
+    "DOGE-USD": "dogecoin", "AVAX-USD": "avalanche-2", "MATIC-USD": "matic-network",
+    "DOT-USD": "polkadot", "LINK-USD": "chainlink", "UNI-USD": "uniswap",
+}
+
+
 @router.get("/ohlcv/{ticker}")
 async def get_ohlcv(ticker: str):
     """Return OHLCV candle data for the chart."""
+
+    # ── 1. CoinGecko (primary source for crypto) ──────────────────────────────
+    if ticker in _COINGECKO_IDS:
+        try:
+            coin_id = _COINGECKO_IDS[ticker]
+            url = (
+                f"https://api.coingecko.com/api/v3/coins/{coin_id}"
+                f"/ohlc?vs_currency=usd&days=180"
+            )
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                raw = resp.json()  # [[timestamp_ms, open, high, low, close], ...]
+
+            if raw:
+                # Aggregate: group by day boundary (timestamp_ms / 1000 → seconds, round down to day)
+                day_map: dict[int, dict] = {}
+                for row in raw:
+                    ts_ms, o, h, l, c = row
+                    day_ts = int(ts_ms // 1000 // 86400 * 86400)
+                    if day_ts not in day_map:
+                        day_map[day_ts] = {"time": day_ts, "open": o, "high": h, "low": l, "close": c}
+                    else:
+                        existing = day_map[day_ts]
+                        existing["high"]  = max(existing["high"], h)
+                        existing["low"]   = min(existing["low"], l)
+                        existing["close"] = c  # last update wins for close
+
+                candles = sorted(day_map.values(), key=lambda x: x["time"])
+                return {"ticker": ticker, "candles": candles}
+        except Exception:
+            pass  # fall through to yfinance
+
+    # ── 2. yfinance ───────────────────────────────────────────────────────────
     try:
         import yfinance as yf
 
