@@ -8,13 +8,19 @@ def _build_engine_args(raw_url: str):
     """
     asyncpg does not accept `sslmode` as a keyword argument — it uses an ssl context.
     Strip sslmode (and other unsupported params) from the URL and pass ssl separately.
+    Handles both postgres:// and postgresql:// schemes.
     """
-    if not raw_url.startswith("postgresql"):
+    is_pg = raw_url.startswith("postgresql") or raw_url.startswith("postgres://")
+    if not is_pg:
         return raw_url, {}
 
-    # Ensure we use asyncpg driver
-    url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    # Normalise to postgresql+asyncpg:// scheme
+    url = raw_url
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    # If already postgresql+asyncpg:// leave as-is
 
     # Strip sslmode from query string — asyncpg requires ssl= context, not sslmode=
     parsed = urlparse(url)
