@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market
+from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market, news
 from app.api.websocket import router as ws_router
+from app.services.scheduler import start_scheduler, stop_scheduler
 
 log = structlog.get_logger()
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
         import app.models.user  # noqa: F401
         import app.models.signal  # noqa: F401
         import app.models.portfolio  # noqa: F401
+        import app.models.news  # noqa: F401
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -44,10 +46,20 @@ async def lifespan(app: FastAPI):
         log.info("startup_db_ok", environment=settings.environment)
     except Exception as exc:
         log.error("startup_db_failed", error=str(exc))
-        # App still starts — DB will be retried on first request
+
+    # Start background news scraper (runs every 5 min)
+    try:
+        start_scheduler()
+        # Kick off an immediate first scrape on startup
+        import asyncio
+        from app.services.news_scraper import scrape_all_feeds
+        asyncio.create_task(scrape_all_feeds())
+    except Exception as exc:
+        log.error("scheduler_start_failed", error=str(exc))
 
     log.info("startup", environment=settings.environment, version="1.0.0")
     yield
+    stop_scheduler()
     log.info("shutdown")
 
 
@@ -81,6 +93,7 @@ app.include_router(agents.router)
 app.include_router(backtest.router)
 app.include_router(debate.router)
 app.include_router(market.router)
+app.include_router(news.router)
 app.include_router(ws_router)
 
 
