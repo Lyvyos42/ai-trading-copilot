@@ -38,5 +38,5 @@ export function directionColor(direction: string): string {
 export function directionBg(direction: string): string {
   if (direction === "LONG") return "bg-bull/10 text-bull border-bull/20";
   if (direction === "SHORT") return "bg-bear/10 text-bear border-bear/20";
-  return "bg-neutral/10 text-neutral border-neutral/20";
+  return "bg-warn/10 text-warn border-warn/20";
 }

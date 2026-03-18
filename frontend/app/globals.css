@@ -1,27 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --card: 224 71% 6%;
-    --card-foreground: 213 31% 91%;
-    --primary: 210 100% 56%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 47% 12%;
-    --secondary-foreground: 213 31% 80%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 16% 57%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 210 100% 56%;
-    --radius: 0.5rem;
+    /* Bloomberg Terminal palette */
+    --background: 0 0% 2%;
+    --foreground: 0 0% 88%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 88%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 88%;
+
+    /* Terminal green as primary */
+    --primary: 151 100% 45%;
+    --primary-foreground: 0 0% 2%;
+
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 70%;
+
+    --muted: 0 0% 7%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 88%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 12%;
+    --input: 0 0% 10%;
+    --ring: 151 100% 45%;
+
+    /* Semantic trading tokens */
+    --bull: 142 71% 45%;
+    --bear: 0 72% 51%;
+    --warn: 38 92% 50%;
+    --info: 201 96% 52%;
+
+    --radius: 0.2rem;
   }
 }
 
@@ -29,31 +48,185 @@
   * {
     @apply border-border;
   }
+
+  html {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Subtle scanline effect */
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+  }
+
+  /* Monospace for all numeric/financial data */
+  .font-mono, code, kbd, pre,
+  [class*="font-mono"] {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+/* ── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ── Terminal panel utility classes ─────────────────────────────────── */
+.terminal-panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
 }
 
-/* TradingView chart container */
+.terminal-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.4), transparent);
+}
+
+.terminal-header {
+  padding: 6px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Bull / Bear color utilities ─────────────────────────────────── */
+.text-bull { color: hsl(var(--bull)); }
+.text-bear { color: hsl(var(--bear)); }
+.text-warn { color: hsl(var(--warn)); }
+.text-info { color: hsl(var(--info)); }
+.bg-bull\/10 { background: hsl(var(--bull) / 0.1); }
+.bg-bear\/10 { background: hsl(var(--bear) / 0.1); }
+.bg-warn\/10 { background: hsl(var(--warn) / 0.1); }
+
+/* ── Animations ──────────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes signal-flash {
+  0%   { background: hsl(var(--primary) / 0.2); }
+  50%  { background: hsl(var(--primary) / 0.05); }
+  100% { background: transparent; }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Live indicator dot */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--bull));
+  display: inline-block;
+  animation: blink 1.4s ease-in-out infinite;
+  position: relative;
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: hsl(var(--bull) / 0.4);
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+/* News ticker bar */
+.ticker-track {
+  display: flex;
+  white-space: nowrap;
+  animation: ticker-scroll 60s linear infinite;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Signal flash on new entry */
+.signal-new {
+  animation: signal-flash 1.2s ease-out forwards;
+}
+
+/* ── Market overview bar ─────────────────────────────────────────── */
+.market-bar {
+  background: hsl(0 0% 3%);
+  border-bottom: 1px solid hsl(var(--border));
+  height: 32px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Bloomberg-style data cell ───────────────────────────────────── */
+.data-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.data-cell-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  font-family: 'JetBrains Mono', monospace;
+}
+.data-cell-value {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+
+/* ── TradingView chart container ─────────────────────────────────── */
 .tv-chart-container {
   position: relative;
   width: 100%;
   height: 400px;
+}
+
+/* ── Card override for terminal feel ─────────────────────────────── */
+.card-terminal {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
 }

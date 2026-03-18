@@ -38,10 +38,11 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Trading-specific
-        bull: "#22c55e",
-        bear: "#ef4444",
-        neutral: "#f59e0b",
+        // Trading-specific (mapped to CSS vars for theme consistency)
+        bull: "hsl(var(--bull))",
+        bear: "hsl(var(--bear))",
+        warn: "hsl(var(--warn))",
+        info: "hsl(var(--info))",
       },
       fontFamily: {
         mono: ["JetBrains Mono", "Fira Code", "monospace"],
