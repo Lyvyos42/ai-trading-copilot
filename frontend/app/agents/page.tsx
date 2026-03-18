@@ -5,7 +5,7 @@ import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Zap, RefreshCw } 
 import { getAgentStatus, triggerDebate, type AgentStatus } from "@/lib/api";
 
 const AGENT_META: Record<string, {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   color: string;
   model: string;
   seq: number;
