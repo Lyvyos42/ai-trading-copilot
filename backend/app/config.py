@@ -5,8 +5,8 @@ from functools import lru_cache
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Database
-    database_url: str = "postgresql+asyncpg://copilot:copilot_secret@localhost:5432/trading_copilot"
+    # Database — defaults to SQLite so the app works on Render without a DB env var
+    database_url: str = "sqlite+aiosqlite:///./trading.db"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
-    # CORS — comma-separated list of allowed origins
-    allowed_origins: str = "http://localhost:3000"
+    # CORS — comma-separated origins. Override via ALLOWED_ORIGINS env var.
+    allowed_origins: str = "http://localhost:3000,https://*.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"
 
     # Rate limits per tier (requests per minute)
     rate_limits: dict = {

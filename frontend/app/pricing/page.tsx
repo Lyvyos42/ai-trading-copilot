@@ -2,6 +2,24 @@ import Link from "next/link";
 import { Check, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const EMAIL = "quantneuraledge@gmail.com";
+const WA_NUMBER = "40770338051"; // WhatsApp number (no + or spaces)
+
+function waLink(tier: string, price: number) {
+  const msg = encodeURIComponent(
+    `Hi! I'm interested in the AI Trading Copilot ${tier} plan ($${price}/mo). Can you help me get started?`
+  );
+  return `https://wa.me/${WA_NUMBER}?text=${msg}`;
+}
+
+function emailLink(tier: string, price: number) {
+  const subject = encodeURIComponent(`AI Trading Copilot — ${tier} Plan`);
+  const body = encodeURIComponent(
+    `Hi,\n\nI'd like to subscribe to the ${tier} plan ($${price}/mo).\n\nPlease send me payment details.\n\nThank you.`
+  );
+  return `mailto:${EMAIL}?subject=${subject}&body=${body}`;
+}
+
 const TIERS = [
   {
     name: "Free",
@@ -16,6 +34,7 @@ const TIERS = [
       "Community support",
     ],
     cta: "Start Free",
+    href: "/login",
     variant: "outline" as const,
   },
   {
@@ -31,7 +50,8 @@ const TIERS = [
       "WebSocket stream",
       "Email support",
     ],
-    cta: "Get Started",
+    cta: "Get Started — $49/mo",
+    href: waLink("Retail", 49),
     variant: "outline" as const,
   },
   {
@@ -48,7 +68,8 @@ const TIERS = [
       "Priority support",
       "Portfolio analytics",
     ],
-    cta: "Go Pro",
+    cta: "Go Pro — $199/mo",
+    href: waLink("Pro", 199),
     highlight: true,
     variant: "default" as const,
   },
@@ -67,6 +88,7 @@ const TIERS = [
       "Custom strategy development",
     ],
     cta: "Contact Sales",
+    href: emailLink("Enterprise", 499),
     variant: "outline" as const,
   },
 ];
@@ -102,7 +124,7 @@ export default function PricingPage() {
 
       {/* Pricing grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
-        {TIERS.map(({ name, price, description, features, cta, highlight, variant }) => (
+        {TIERS.map(({ name, price, description, features, cta, href, highlight, variant }) => (
           <div
             key={name}
             className={`relative p-6 rounded-xl border flex flex-col ${highlight ? "border-primary/50 bg-primary/5 shadow-lg shadow-primary/10" : "border-border/50 bg-card"}`}
@@ -128,7 +150,7 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <Link href="/login">
+            <Link href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noopener noreferrer" : undefined}>
               <Button variant={variant} size="sm" className="w-full">
                 {cta}
               </Button>

@@ -18,14 +18,35 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const QUICK_PICKS = [
+  // US Equities
   { symbol: "AAPL",     exchange: "NASDAQ" },
   { symbol: "NVDA",     exchange: "NASDAQ" },
+  { symbol: "MSFT",     exchange: "NASDAQ" },
   { symbol: "TSLA",     exchange: "NASDAQ" },
+  { symbol: "META",     exchange: "NASDAQ" },
+  { symbol: "GOOGL",    exchange: "NASDAQ" },
+  { symbol: "AMZN",     exchange: "NASDAQ" },
+  { symbol: "AMD",      exchange: "NASDAQ" },
+  // ETFs
   { symbol: "SPY",      exchange: "NYSE"   },
+  { symbol: "QQQ",      exchange: "NASDAQ" },
+  { symbol: "IWM",      exchange: "NYSE"   },
+  // Crypto
   { symbol: "BTC-USD",  exchange: "CRYPTO" },
+  { symbol: "ETH-USD",  exchange: "CRYPTO" },
+  { symbol: "SOL-USD",  exchange: "CRYPTO" },
+  // FX
   { symbol: "EURUSD=X", exchange: "FX"     },
+  { symbol: "GBPUSD=X", exchange: "FX"     },
+  { symbol: "USDJPY=X", exchange: "FX"     },
+  // Commodities
   { symbol: "GC=F",     exchange: "COMEX"  },
+  { symbol: "SI=F",     exchange: "COMEX"  },
+  { symbol: "CL=F",     exchange: "NYMEX"  },
+  // Indices
   { symbol: "^GSPC",    exchange: "INDEX"  },
+  { symbol: "^NDX",     exchange: "INDEX"  },
+  { symbol: "^VIX",     exchange: "INDEX"  },
 ];
 
 interface SymbolSearchProps {
