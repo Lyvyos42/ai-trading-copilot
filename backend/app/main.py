@@ -126,11 +126,5 @@ async def health():
 # ─── Global error handler ─────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
-    tb = traceback.format_exc()
-    log.error("unhandled_exception", path=request.url.path, error=str(exc), traceback=tb)
-    # Expose error detail temporarily to diagnose production 500s
-    return JSONResponse(status_code=500, content={
-        "detail": str(exc),
-        "type": type(exc).__name__,
-    })
+    log.error("unhandled_exception", path=request.url.path, error=str(exc))
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
