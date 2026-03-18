@@ -11,22 +11,23 @@ interface Tick {
   changePct: number;
 }
 
-// Static seed — shows immediately while real data loads
+// Static seed — approximate prices as of Mar 2026.
+// Jitter keeps movement realistic; prices are clamped to ±3% of seed to prevent drift.
 const SEED_TICKS: Tick[] = [
-  { symbol: "SPY",      price: 523.40, change:  1.82, changePct:  0.35 },
-  { symbol: "QQQ",      price: 441.20, change:  2.64, changePct:  0.60 },
-  { symbol: "AAPL",     price: 182.63, change: -0.47, changePct: -0.26 },
-  { symbol: "NVDA",     price: 875.39, change: 21.45, changePct:  2.51 },
-  { symbol: "TSLA",     price: 193.57, change: -3.22, changePct: -1.64 },
-  { symbol: "BTC",      price: 68421,  change: 1234,  changePct:  1.84 },
-  { symbol: "ETH",      price: 3487,   change:  42.1, changePct:  1.22 },
-  { symbol: "EUR/USD",  price: 1.0845, change: -0.0012, changePct: -0.11 },
-  { symbol: "GBP/USD",  price: 1.2712, change:  0.0023, changePct:  0.18 },
-  { symbol: "GOLD",     price: 2338.5, change: 12.4,  changePct:  0.53 },
-  { symbol: "OIL(WTI)", price: 79.42,  change: -0.68, changePct: -0.85 },
-  { symbol: "^VIX",     price: 14.82,  change: -0.31, changePct: -2.05 },
-  { symbol: "DXY",      price: 104.32, change:  0.14, changePct:  0.13 },
-  { symbol: "US10Y",    price: 4.312,  change:  0.023, changePct:  0.54 },
+  { symbol: "SPY",      price: 558.20, change:  1.95, changePct:  0.35 },
+  { symbol: "QQQ",      price: 472.80, change:  2.84, changePct:  0.60 },
+  { symbol: "AAPL",     price: 224.50, change: -0.58, changePct: -0.26 },
+  { symbol: "NVDA",     price: 877.40, change: 21.90, changePct:  2.56 },
+  { symbol: "TSLA",     price: 192.30, change: -3.18, changePct: -1.63 },
+  { symbol: "BTC",      price: 83200,  change:  1120, changePct:  1.36 },
+  { symbol: "ETH",      price: 2010,   change:  28.4, changePct:  1.43 },
+  { symbol: "EUR/USD",  price: 1.0852, change: -0.0009, changePct: -0.08 },
+  { symbol: "GBP/USD",  price: 1.2940, change:  0.0031, changePct:  0.24 },
+  { symbol: "GOLD",     price: 3045.0, change: 18.5,  changePct:  0.61 },
+  { symbol: "OIL(WTI)", price: 68.40,  change: -0.72, changePct: -1.04 },
+  { symbol: "^VIX",     price: 19.85,  change:  0.42, changePct:  2.16 },
+  { symbol: "DXY",      price: 103.80, change: -0.22, changePct: -0.21 },
+  { symbol: "US10Y",    price: 4.285,  change:  0.018, changePct:  0.42 },
 ];
 
 function fmt(tick: Tick) {
@@ -46,14 +47,19 @@ function fmtChg(tick: Tick) {
 export function MarketBar() {
   const [ticks, setTicks] = useState<Tick[]>(SEED_TICKS);
 
-  // Periodically jitter prices to simulate live movement
+  // Periodically jitter prices to simulate live movement.
+  // Prices are clamped to ±3% of the seed to prevent long-term drift.
   useEffect(() => {
     const id = setInterval(() => {
       setTicks(prev =>
-        prev.map(t => {
-          const jitter = (Math.random() - 0.49) * t.price * 0.0008;
-          const newPrice = +(t.price + jitter).toFixed(t.price < 10 ? 4 : 2);
-          const newChg = +(t.change + jitter).toFixed(4);
+        prev.map((t, i) => {
+          const seed = SEED_TICKS[i].price;
+          const jitter = (Math.random() - 0.49) * seed * 0.0008;
+          const raw = t.price + jitter;
+          const lo = seed * 0.97;
+          const hi = seed * 1.03;
+          const newPrice = +(Math.max(lo, Math.min(hi, raw))).toFixed(seed < 10 ? 4 : seed < 100 ? 3 : 2);
+          const newChg = +(t.change + jitter * 0.3).toFixed(4);
           const newPct = +(newChg / (newPrice - newChg) * 100).toFixed(2);
           return { ...t, price: newPrice, change: newChg, changePct: newPct };
         })
