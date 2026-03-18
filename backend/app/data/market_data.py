@@ -123,27 +123,30 @@ def _mock_market_data(ticker: str, asset_class: str) -> dict:
     """Deterministic realistic mock data for demo / offline mode."""
     rng = random.Random(sum(ord(c) for c in ticker))
 
-    # Use known price if available, otherwise derive from asset class range
-    if ticker in _KNOWN_PRICES:
-        base_price = _KNOWN_PRICES[ticker]
-        # Add ±3% jitter so it's not always exactly the same
-        base_price *= rng.uniform(0.97, 1.03)
+    # Use known price if available, otherwise derive from asset class range.
+    # For known tickers we PIN the current price so the signal prices are realistic.
+    known = ticker in _KNOWN_PRICES
+    if known:
+        current_price = _KNOWN_PRICES[ticker]
     else:
         lo, hi = _CLASS_PRICE_RANGE.get(asset_class, (15.0, 600.0))
-        base_price = rng.uniform(lo, hi)
-    num_bars = 260
+        current_price = rng.uniform(lo, hi)
 
-    closes = [base_price]
-    highs  = []
-    lows   = []
+    # Simulate 260 bars of history ending at current_price.
+    # Generate 259 steps backward (mean-reverting) then pin the last bar.
+    num_bars = 260
+    decimals = 4 if current_price < 10 else 2
+
+    # Build history: walk backward from current so it ends at the right price
+    history = [current_price]
     for _ in range(num_bars - 1):
-        change = rng.gauss(0.0003, 0.015)
-        new_close = closes[-1] * (1 + change)
-        closes.append(round(new_close, 2))
-    for c in closes:
-        daily_range = c * rng.uniform(0.005, 0.025)
-        highs.append(round(c + daily_range, 2))
-        lows.append(round(c - daily_range, 2))
+        change = rng.gauss(0.0001, 0.012)
+        history.append(round(history[-1] / (1 + change), decimals))
+    history.reverse()  # oldest → newest, last bar = current_price
+
+    closes = history
+    highs  = [round(c + c * rng.uniform(0.003, 0.018), decimals) for c in closes]
+    lows   = [round(c - c * rng.uniform(0.003, 0.018), decimals) for c in closes]
 
     current_close = closes[-1]
     prev_close    = closes[-2]
@@ -152,8 +155,8 @@ def _mock_market_data(ticker: str, asset_class: str) -> dict:
     return {
         "ticker": ticker,
         "asset_class": asset_class,
-        "close": round(current_close, 2),
-        "open":  round(closes[-2] * (1 + rng.uniform(-0.005, 0.005)), 2),
+        "close": round(current_close, decimals),
+        "open":  round(closes[-2] * (1 + rng.uniform(-0.005, 0.005)), decimals),
         "high":  highs[-1],
         "low":   lows[-1],
         "volume": rng.randint(500_000, 50_000_000),
