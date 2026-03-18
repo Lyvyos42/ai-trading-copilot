@@ -63,7 +63,7 @@ async def list_news(
     offset:    int = Query(0,  ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(NewsArticle).where(NewsArticle.is_active == True)
+    q = select(NewsArticle).where(NewsArticle.is_active.is_(True))
 
     if category and category.upper() in VALID_CATEGORIES:
         q = q.where(NewsArticle.category == category.upper())
@@ -84,7 +84,7 @@ async def list_news(
 async def news_summary(db: AsyncSession = Depends(get_db)):
     # Total count
     total_q = await db.execute(
-        select(func.count()).where(NewsArticle.is_active == True)
+        select(func.count()).select_from(NewsArticle).where(NewsArticle.is_active.is_(True))
     )
     total = total_q.scalar() or 0
 
@@ -95,7 +95,7 @@ async def news_summary(db: AsyncSession = Depends(get_db)):
             func.count().label("count"),
             func.max(NewsArticle.published_at).label("latest_at"),
         )
-        .where(NewsArticle.is_active == True)
+        .where(NewsArticle.is_active.is_(True))
         .group_by(NewsArticle.category)
         .order_by(desc("count"))
     )
@@ -106,7 +106,7 @@ async def news_summary(db: AsyncSession = Depends(get_db)):
 
     # Most recent scrape time
     last_q = await db.execute(
-        select(func.max(NewsArticle.scraped_at)).where(NewsArticle.is_active == True)
+        select(func.max(NewsArticle.scraped_at)).where(NewsArticle.is_active.is_(True))
     )
     last_scraped = last_q.scalar()
 

@@ -93,7 +93,7 @@ BROADER MARKET HEADLINES ({len(market_hl)} articles):
 Strategy 18.3: Based on the REAL headlines above, classify overall sentiment.
 Pay special attention to any direct ticker mentions. Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)
@@ -203,7 +203,7 @@ NOTE: Live news scraper is warming up — using estimated headlines for now:
 Simulated social media buzz score: {rng.randint(20, 90)}/100
 Strategy 18.3: Classify overall sentiment. Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)

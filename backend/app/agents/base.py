@@ -10,19 +10,19 @@ class BaseAgent:
     def __init__(self, name: str, model: str = "claude-sonnet-4-6"):
         self.name = name
         self.model = model
-        self._client: anthropic.Anthropic | None = None
+        self._client: anthropic.AsyncAnthropic | None = None
 
     @property
-    def client(self) -> anthropic.Anthropic:
+    def client(self) -> anthropic.AsyncAnthropic:
         if self._client is None:
-            self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key or None)
+            self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key or None)
         return self._client
 
-    def _call_claude(self, system: str, user: str, max_tokens: int = 2000) -> str:
+    async def _call_claude(self, system: str, user: str, max_tokens: int = 2000) -> str:
         if not settings.anthropic_api_key:
             return ""  # Signals mock path
         try:
-            message = self.client.messages.create(
+            message = await self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 system=system,

@@ -101,7 +101,7 @@ EMA Crossover: {ema_cross} (strategy 3.11-3.13)
 Current price: {closes[-1]:.2f}
 Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)

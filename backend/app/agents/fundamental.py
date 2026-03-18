@@ -41,7 +41,7 @@ Last Earnings Surprise: {market_data.get('earnings_surprise', 'N/A')}%
 
 Apply strategies 3.2 (earnings momentum) and 3.3 (value factor). Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
 
         if raw:
             try:

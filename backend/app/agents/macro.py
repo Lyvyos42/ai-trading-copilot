@@ -103,7 +103,7 @@ Strategy 8.2: Assess FX carry implications.
 Strategy 19.5: Identify any upcoming catalyst events mentioned.
 Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)
@@ -221,7 +221,7 @@ Current macro regime indicators:
 - Upcoming events: {', '.join(events)} (Strategy 19.5)
 Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)

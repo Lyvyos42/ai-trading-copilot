@@ -77,7 +77,7 @@ Simulated correlation with existing positions: 0.45
 
 Apply all risk constraints. Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)

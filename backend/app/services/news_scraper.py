@@ -169,6 +169,7 @@ async def _fetch_feed(client: httpx.AsyncClient, feed_meta: dict) -> list[dict]:
                 "sentiment":      sentiment,
                 "sentiment_score": score,
                 "tickers":        tickers,
+                "is_active":      True,
             })
         return articles
     except Exception as exc:

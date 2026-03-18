@@ -84,7 +84,7 @@ RISK PARAMETERS:
 Set TP1 at 1.5R, TP2 at 2.5R, TP3 at 4R from entry.
 Output JSON only."""
 
-        raw = self._call_claude(SYSTEM_PROMPT, user_msg, max_tokens=3000)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, max_tokens=3000)
         if raw:
             try:
                 return json.loads(raw)

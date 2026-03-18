@@ -64,17 +64,26 @@ export default function NewsPage() {
   const [activeCategory, setActive] = useState<string>("ALL");
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadNews = useCallback(async (category: string) => {
+    setFetchError(null);
     try {
       const params = category !== "ALL" ? `?category=${category}&limit=100` : "?limit=100";
       const [artRes, sumRes] = await Promise.all([
         fetch(`${API}/api/v1/news${params}`),
         fetch(`${API}/api/v1/news/summary`),
       ]);
-      if (artRes.ok)  setArticles(await artRes.json());
-      if (sumRes.ok)  setSummary(await sumRes.json());
-    } catch {}
+      if (artRes.ok) {
+        const data = await artRes.json();
+        setArticles(data);
+      } else {
+        setFetchError(`News feed returned ${artRes.status}`);
+      }
+      if (sumRes.ok) setSummary(await sumRes.json());
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : "Failed to reach backend");
+    }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
@@ -201,7 +210,13 @@ export default function NewsPage() {
             </div>
           )}
 
-          {!loading && articles.length === 0 && (
+          {!loading && fetchError && (
+            <div className="mx-4 mt-4 px-3 py-2 text-xs font-mono text-bear bg-bear/10 border border-bear/20">
+              ERR — {fetchError}
+            </div>
+          )}
+
+          {!loading && !fetchError && articles.length === 0 && (
             <div className="flex flex-col items-center justify-center h-60 gap-3">
               <Globe className="h-8 w-8 text-muted-foreground/20" />
               <div className="text-[10px] font-mono text-muted-foreground text-center">
