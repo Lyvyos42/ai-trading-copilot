@@ -93,6 +93,21 @@ async def run_debate(state: TradingState) -> TradingState:
     reasoning.append(f"Bull researcher: {bull_case[:200]}")
     reasoning.append(f"Bear researcher: {bear_case[:200]}")
 
+    # Inject top live headlines into reasoning chain for signal card display
+    news_ctx = state.get("news_context", {})
+    if news_ctx.get("has_news"):
+        top_hl = news_ctx.get("ticker_headlines", [])[:2] or news_ctx.get("market_headlines", [])[:2]
+        for hl in top_hl:
+            reasoning.append(f"Live intel: {hl[:180]}")
+        sent = state.get("sentiment_analysis", {})
+        top_sent_hl = sent.get("top_headlines", [])[:1]
+        for hl in top_sent_hl:
+            reasoning.append(f"Sentiment driver: {hl[:180]}")
+        macro = state.get("macro_analysis", {})
+        top_macro_hl = macro.get("key_news_drivers", [])[:1]
+        for hl in top_macro_hl:
+            reasoning.append(f"Macro driver: {hl[:180]}")
+
     return {**state, "bull_case": bull_case, "bear_case": bear_case, "reasoning_chain": reasoning}
 
 
@@ -181,16 +196,49 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
     Returns the completed TradingState with final_signal populated.
     """
     from app.data.market_data import fetch_market_data
+    from app.services.news_context import get_news_context
 
+    # Fetch market data and live news context in parallel
     if market_data is None:
-        market_data = await fetch_market_data(ticker, asset_class)
+        market_data, news_ctx = await asyncio.gather(
+            fetch_market_data(ticker, asset_class),
+            get_news_context(ticker),
+        )
+    else:
+        news_ctx = await get_news_context(ticker)
+
+    # Build reasoning chain prefix describing news context quality
+    reasoning_prefix = []
+    if news_ctx.get("has_news"):
+        n = news_ctx["article_count"]
+        ticker_n = len(news_ctx.get("ticker_headlines", []))
+        reasoning_prefix.append(
+            f"News context: {n} live articles loaded "
+            f"({ticker_n} direct {ticker} mentions, "
+            f"avg sentiment {news_ctx['avg_sentiment']:+.2f}, "
+            f"{news_ctx['positive_pct']:.0f}% bullish / {news_ctx['negative_pct']:.0f}% bearish)"
+        )
+        if news_ctx.get("crisis_headlines"):
+            reasoning_prefix.append(
+                f"⚠ CRISIS ALERT: {len(news_ctx['crisis_headlines'])} crisis articles detected — "
+                f"elevated risk-off bias applied"
+            )
+        if news_ctx.get("ticker_headlines"):
+            reasoning_prefix.append(
+                f"Top {ticker} headline: {news_ctx['ticker_headlines'][0]}"
+            )
+    else:
+        reasoning_prefix.append(
+            "News context: scraper warming up — agents using estimated data"
+        )
 
     initial_state: TradingState = {
-        "ticker": ticker,
-        "timeframe": timeframe,
-        "asset_class": asset_class,
-        "market_data": market_data,
-        "reasoning_chain": [],
+        "ticker":        ticker,
+        "timeframe":     timeframe,
+        "asset_class":   asset_class,
+        "market_data":   market_data,
+        "news_context":  news_ctx,
+        "reasoning_chain": reasoning_prefix,
         "errors": [],
     }
 

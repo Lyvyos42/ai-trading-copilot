@@ -6,6 +6,7 @@ class TradingState(TypedDict, total=False):
     timeframe: str
     asset_class: str
     market_data: dict[str, Any]          # OHLCV + indicators
+    news_context: dict[str, Any]         # live scraped headlines for agents
     fundamental_analysis: dict[str, Any]  # from fundamental agent
     technical_analysis: dict[str, Any]    # from technical agent
     sentiment_analysis: dict[str, Any]    # from sentiment agent
