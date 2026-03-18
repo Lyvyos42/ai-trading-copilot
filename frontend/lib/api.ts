@@ -5,14 +5,25 @@ export { API_URL, WS_URL };
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const res = await fetch(`${API_URL}${path}`, {
+  const reqOptions: RequestInit = {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
     ...options,
-  });
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, reqOptions);
+  } catch {
+    // Network error — Render free tier cold start takes ~30-50s.
+    // Wait 22s then retry once; the signals loading indicator stays visible.
+    await new Promise(r => setTimeout(r, 22_000));
+    res = await fetch(`${API_URL}${path}`, reqOptions);
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(err.detail || `HTTP ${res.status}`);

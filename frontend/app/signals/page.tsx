@@ -20,13 +20,23 @@ const AGENTS = ["FundamentalAnalyst", "TechnicalAnalyst", "SentimentAnalyst", "M
 export default function SignalsPage() {
   const [signals, setSignals]       = useState<Signal[]>([]);
   const [loading, setLoading]       = useState<string | null>(null);
+  const [waking, setWaking]         = useState(false);
   const [assetClass, setAssetClass] = useState("stocks");
   const [customTicker, setCustomTicker] = useState("");
   const [error, setError]           = useState("");
 
   async function handleGenerate(ticker: string) {
     setError("");
+    setWaking(false);
     setLoading(ticker);
+    // Pre-warm: ping /health — if it fails, the backend is cold starting.
+    // apiFetch will auto-retry after 22s, so just show waking indicator.
+    try {
+      const warmRes = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(5_000) });
+      if (!warmRes.ok) setWaking(true);
+    } catch {
+      setWaking(true);
+    }
     try {
       const signal = await generateSignal(ticker, assetClass);
       setSignals((prev) => [signal, ...prev]);
@@ -35,6 +45,7 @@ export default function SignalsPage() {
       setError(`${msg} [backend: ${API_URL}]`);
     } finally {
       setLoading(null);
+      setWaking(false);
     }
   }
 
@@ -132,16 +143,27 @@ export default function SignalsPage() {
 
       {/* Pipeline running indicator */}
       {loading && (
-        <div className="terminal-panel border-primary/30">
-          <div className="terminal-header bg-primary/5">
-            <span className="terminal-label text-primary">PIPELINE RUNNING</span>
-            <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
+        <div className={`terminal-panel ${waking ? "border-warn/40" : "border-primary/30"}`}>
+          <div className={`terminal-header ${waking ? "bg-warn/5" : "bg-primary/5"}`}>
+            {waking ? (
+              <>
+                <Zap className="h-3 w-3 text-warn animate-pulse" />
+                <span className="terminal-label text-warn ml-1">WAKING BACKEND</span>
+                <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
+                <span className="ml-auto text-[9px] font-mono text-warn/70">Render cold start — retrying in ~22s…</span>
+              </>
+            ) : (
+              <>
+                <span className="terminal-label text-primary">PIPELINE RUNNING</span>
+                <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
+              </>
+            )}
           </div>
           <div className="p-4">
             <div className="flex items-center gap-6">
               {AGENTS.map((agent, i) => (
                 <div key={agent} className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${waking ? "bg-warn" : "bg-primary"} animate-pulse`} style={{ animationDelay: `${i * 200}ms` }} />
                   <span className="text-[10px] font-mono text-muted-foreground">{agent.replace("Analyst", "")}</span>
                 </div>
               ))}

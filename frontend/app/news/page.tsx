@@ -65,27 +65,42 @@ export default function NewsPage() {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [waking, setWaking]         = useState(false);
 
   const loadNews = useCallback(async (category: string) => {
     setFetchError(null);
-    try {
-      const params = category !== "ALL" ? `?category=${category}&limit=100` : "?limit=100";
+    const params = category !== "ALL" ? `?category=${category}&limit=100` : "?limit=100";
+
+    async function tryFetch(attempt: number) {
       const [artRes, sumRes] = await Promise.all([
         fetch(`${API}/api/v1/news${params}`),
         fetch(`${API}/api/v1/news/summary`),
       ]);
-      if (artRes.ok) {
-        const data = await artRes.json();
-        setArticles(data);
-      } else {
-        setFetchError(`News feed returned ${artRes.status}`);
-      }
+      if (artRes.ok) setArticles(await artRes.json());
+      else setFetchError(`News feed returned ${artRes.status}`);
       if (sumRes.ok) setSummary(await sumRes.json());
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to reach backend";
-      setFetchError(`${msg} [backend: ${API}]`);
     }
-    finally { setLoading(false); setRefreshing(false); }
+
+    try {
+      await tryFetch(0);
+    } catch {
+      // Render free tier cold start — retry after 22s then 22s again
+      setWaking(true);
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        await new Promise(r => setTimeout(r, 22_000));
+        try {
+          await tryFetch(attempt);
+          setWaking(false);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        } catch {}
+      }
+      setWaking(false);
+      setFetchError(`Backend unreachable — is the server running? [${API}]`);
+    }
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => { setLoading(true); loadNews(activeCategory); }, [activeCategory, loadNews]);
@@ -143,6 +158,17 @@ export default function NewsPage() {
           </button>
         </div>
       </div>
+
+      {/* ── WAKING BANNER ───────────────────────────────────────────── */}
+      {waking && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-warn/10 border-b border-warn/30 shrink-0">
+          <Zap className="h-3.5 w-3.5 text-warn shrink-0 animate-pulse" />
+          <span className="text-[10px] font-mono font-bold text-warn tracking-widest">WAKING BACKEND</span>
+          <span className="text-[10px] font-mono text-warn/80">
+            Render free tier — cold start in progress, retrying…
+          </span>
+        </div>
+      )}
 
       {/* ── CRISIS BANNER (only when crisis articles exist) ─────────── */}
       {crisisArticles.length > 0 && (
