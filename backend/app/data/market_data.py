@@ -22,7 +22,11 @@ async def _fetch_yfinance(ticker: str) -> dict:
 
     def _sync_fetch():
         tk = yf.Ticker(ticker)
-        hist = tk.history(period="1y", interval="1d", auto_adjust=True)
+        # Futures front-month contracts only have ~3 months of data before rolling.
+        # Use a shorter period for futures/FX tickers to avoid empty history.
+        is_futures_or_fx = ticker.endswith("=F") or ticker.endswith("=X")
+        period = "3mo" if is_futures_or_fx else "1y"
+        hist = tk.history(period=period, interval="1d", auto_adjust=True)
         if hist.empty:
             raise ValueError(f"No data returned for {ticker}")
 
@@ -70,10 +74,63 @@ async def _fetch_yfinance(ticker: str) -> dict:
     return await asyncio.to_thread(_sync_fetch)
 
 
+# Realistic approximate prices for well-known tickers (updated Mar 2026).
+# Used when yfinance is unavailable so the mock is plausible, not random.
+_KNOWN_PRICES: dict[str, float] = {
+    # US Large-Cap Stocks
+    "AAPL": 225.0, "MSFT": 415.0, "NVDA": 875.0, "GOOGL": 175.0, "AMZN": 200.0,
+    "META": 600.0, "TSLA": 195.0, "JPM": 240.0, "V": 290.0, "MA": 490.0,
+    "BRK.B": 460.0, "XOM": 115.0, "CVX": 155.0, "WMT": 95.0, "HD": 380.0,
+    "GS": 580.0, "BAC": 44.0, "MS": 130.0, "NFLX": 980.0, "AMD": 125.0,
+    "INTC": 22.0, "PYPL": 75.0, "COST": 920.0, "SBUX": 95.0, "TGT": 135.0,
+    # ETFs
+    "SPY": 560.0, "QQQ": 475.0, "IWM": 215.0, "GLD": 265.0, "TLT": 93.0,
+    "XLK": 225.0, "XLE": 88.0, "DIA": 425.0, "IEF": 96.0, "HYG": 77.0, "LQD": 108.0,
+    # Crypto (USD)
+    "BTC-USD": 83000.0, "ETH-USD": 2000.0, "SOL-USD": 130.0,
+    "XRP-USD": 2.5, "DOGE-USD": 0.18, "BNB-USD": 590.0,
+    # FX (price of 1 unit of base currency in USD)
+    "EURUSD=X": 1.085, "GBPUSD=X": 1.295, "USDJPY=X": 148.5,
+    "AUDUSD=X": 0.635, "USDCAD=X": 1.355, "USDCHF=X": 0.895,
+    # Commodities Futures (USD per unit, standard contract price)
+    "GC=F": 3050.0,   # Gold $/troy oz
+    "SI=F": 34.5,     # Silver $/troy oz
+    "CL=F": 68.0,     # WTI Crude $/bbl
+    "BZ=F": 72.0,     # Brent Crude $/bbl
+    "NG=F": 4.2,      # Natural Gas $/MMBtu
+    "HG=F": 4.55,     # Copper $/lb
+    "ZC=F": 480.0,    # Corn ¢/bushel (quoted in cents)
+    "ZW=F": 555.0,    # Wheat ¢/bushel
+    # Fixed Income
+    "ZN=F": 108.5, "ZB=F": 117.0,
+    # Equity Index Futures
+    "ES=F": 5700.0, "NQ=F": 20100.0, "RTY=F": 2175.0, "YM=F": 42800.0,
+}
+
+# Asset-class price ranges for unknown tickers
+_CLASS_PRICE_RANGE: dict[str, tuple[float, float]] = {
+    "stocks":       (15.0,   600.0),
+    "etfs":         (30.0,   600.0),
+    "crypto":       (0.05, 80000.0),
+    "fx":           (0.60,     2.0),
+    "commodities":  (2.0,   3500.0),
+    "fixed_income": (70.0,   130.0),
+    "futures":      (20.0,  6000.0),
+}
+
+
 def _mock_market_data(ticker: str, asset_class: str) -> dict:
     """Deterministic realistic mock data for demo / offline mode."""
     rng = random.Random(sum(ord(c) for c in ticker))
-    base_price = rng.uniform(20, 800)
+
+    # Use known price if available, otherwise derive from asset class range
+    if ticker in _KNOWN_PRICES:
+        base_price = _KNOWN_PRICES[ticker]
+        # Add ±3% jitter so it's not always exactly the same
+        base_price *= rng.uniform(0.97, 1.03)
+    else:
+        lo, hi = _CLASS_PRICE_RANGE.get(asset_class, (15.0, 600.0))
+        base_price = rng.uniform(lo, hi)
     num_bars = 260
 
     closes = [base_price]
