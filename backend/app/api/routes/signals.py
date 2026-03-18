@@ -122,7 +122,7 @@ async def generate_signal(
         reasoning_chain=state.get("reasoning_chain", []),
         strategy_sources=final.get("strategy_sources", []),
         status="ACTIVE",
-        expiry_time=datetime.now(timezone.utc) + timedelta(hours=24),
+        expiry_time=datetime.utcnow() + timedelta(hours=24),
     )
     db.add(signal)
     await db.commit()
