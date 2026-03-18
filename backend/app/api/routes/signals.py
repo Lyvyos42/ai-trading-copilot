@@ -3,9 +3,11 @@ POST /api/v1/signals/generate  — trigger multi-agent pipeline
 GET  /api/v1/signals/{id}      — retrieve signal by ID
 GET  /api/v1/signals           — list recent signals for user
 """
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,32 @@ router = APIRouter(prefix="/api/v1/signals", tags=["signals"])
 
 VALID_ASSET_CLASSES = {"stocks", "etfs", "fixed_income", "fx", "commodities", "crypto", "futures", "global_macro"}
 
+# ── Ticker allowlist (built from market catalogue + common special-format symbols) ──
+_ALLOWED_TICKER_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-^=")
+
+def _is_valid_ticker(ticker: str) -> bool:
+    """Accept tickers that are alphanumeric with allowed punctuation, 1–15 chars."""
+    if not ticker or len(ticker) > 15:
+        return False
+    return all(c in _ALLOWED_TICKER_CHARS for c in ticker.upper())
+
+# ── In-memory rate limiter: max 10 signal generations per IP per minute ──
+_rate_store: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 10
+_RATE_WINDOW = 60  # seconds
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    window_start = now - _RATE_WINDOW
+    _rate_store[ip] = [t for t in _rate_store[ip] if t > window_start]
+    if len(_rate_store[ip]) >= _RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Max {_RATE_LIMIT} signals per minute per IP.",
+            headers={"Retry-After": "60"},
+        )
+    _rate_store[ip].append(now)
+
 
 class GenerateRequest(BaseModel):
     ticker: str
@@ -28,14 +56,23 @@ class GenerateRequest(BaseModel):
 
 @router.post("/generate")
 async def generate_signal(
+    request: Request,
     body: GenerateRequest,
     db: AsyncSession = Depends(get_db),
     user: dict | None = Depends(get_optional_user),
 ):
+    # Rate limiting
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+    _check_rate_limit(client_ip)
+
     if body.asset_class not in VALID_ASSET_CLASSES:
         raise HTTPException(status_code=400, detail=f"Invalid asset_class. Choose from: {VALID_ASSET_CLASSES}")
 
     ticker = body.ticker.upper().strip()
+
+    # Ticker allowlist validation
+    if not _is_valid_ticker(ticker):
+        raise HTTPException(status_code=400, detail="Invalid ticker format. Use standard exchange symbols (e.g. AAPL, BTC-USD, EURUSD=X).")
 
     # Run multi-agent pipeline
     state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe)

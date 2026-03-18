@@ -3,11 +3,31 @@ News context service — fetches structured live headlines from the DB
 and packages them for agent consumption before the pipeline runs.
 Falls back to empty context gracefully if DB has no articles yet.
 """
+import html
+import re
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import desc, select
 
 from app.db.database import AsyncSessionLocal
 from app.models.news import NewsArticle
+
+_MAX_HEADLINE_LEN = 160  # chars per sanitized headline
+
+
+def _sanitize_headline(text: str) -> str:
+    """Strip HTML tags, decode HTML entities, and truncate to safe length."""
+    if not text:
+        return ""
+    # Decode HTML entities first (&amp; → &, &#8217; → ', etc.)
+    text = html.unescape(text)
+    # Strip any residual HTML tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # Collapse whitespace
+    text = " ".join(text.split())
+    # Truncate (guards against oversized injected content)
+    if len(text) > _MAX_HEADLINE_LEN:
+        text = text[:_MAX_HEADLINE_LEN] + "…"
+    return text
 
 
 async def get_news_context(ticker: str) -> dict:
@@ -73,8 +93,10 @@ async def get_news_context(ticker: str) -> dict:
     negative = sum(1 for a in articles if a.sentiment == "NEGATIVE")
 
     for art in articles:
-        # Format: "[SOURCE] Headline (SENTIMENT)"
-        label = f"[{art.source}] {art.headline}"
+        # Sanitize headline before injecting into agent prompts (prompt injection defense)
+        safe_headline = _sanitize_headline(art.headline)
+        # Format with [NEWS] boundary marker so agents know this is external content
+        label = f"[NEWS][{art.source}] {safe_headline}"
 
         # Ticker-specific — mentioned in tickers array OR headline contains clean ticker
         if (clean_ticker in (art.tickers or [])) or (clean_ticker in art.headline.upper()):
