@@ -90,21 +90,11 @@ app = FastAPI(
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# Allow exact origins from config PLUS all *.vercel.app preview deployments.
-_exact_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
-
-def _is_allowed_origin(origin: str) -> bool:
-    if origin in _exact_origins:
-        return True
-    # Allow any Vercel preview deployment
-    if origin.endswith(".vercel.app"):
-        return True
-    return False
-
+# Open to all origins — auth uses Bearer tokens (not cookies), so wildcard is safe.
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+|https://app\.quantneuraledge\.com|https://quantneuraledge\.com",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

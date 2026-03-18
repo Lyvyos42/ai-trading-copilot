@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Zap } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, type Signal } from "@/lib/api";
+import { generateSignal, API_URL, type Signal } from "@/lib/api";
 
 const ASSET_CLASSES = ["stocks", "etfs", "crypto", "fx", "commodities", "fixed_income"];
 const POPULAR_TICKERS: Record<string, string[]> = {
@@ -31,7 +31,8 @@ export default function SignalsPage() {
       const signal = await generateSignal(ticker, assetClass);
       setSignals((prev) => [signal, ...prev]);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to generate signal");
+      const msg = e instanceof Error ? e.message : "Failed to generate signal";
+      setError(`${msg} [backend: ${API_URL}]`);
     } finally {
       setLoading(null);
     }

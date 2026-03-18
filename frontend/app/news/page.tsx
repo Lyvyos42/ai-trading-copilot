@@ -82,7 +82,8 @@ export default function NewsPage() {
       }
       if (sumRes.ok) setSummary(await sumRes.json());
     } catch (e) {
-      setFetchError(e instanceof Error ? e.message : "Failed to reach backend");
+      const msg = e instanceof Error ? e.message : "Failed to reach backend";
+      setFetchError(`${msg} [backend: ${API}]`);
     }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
