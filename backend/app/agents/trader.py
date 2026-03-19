@@ -57,6 +57,8 @@ class TraderAgent(BaseAgent):
         market_data = state.get("market_data", {})
 
         current_price = market_data.get("close", 100.0)
+        _dec = _price_decimals(current_price)
+        _pfmt = f".{_dec}f"
 
         # Vote aggregation
         votes = []
@@ -71,7 +73,7 @@ class TraderAgent(BaseAgent):
 
         user_msg = f"""Make a final trading decision for {ticker}.
 
-CURRENT PRICE: {current_price:.2f}
+CURRENT PRICE: {current_price:{_pfmt}}
 
 ANALYST CONSENSUS:
 - Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}
@@ -86,8 +88,8 @@ Bear case: {bear[:300]}
 RISK PARAMETERS:
 - Approved: {risk.get('approved', True)}
 - Position size: {risk.get('position_size_pct', 2.0):.1f}%
-- Support: {tech.get('support', current_price * 0.95):.2f}
-- Resistance: {tech.get('resistance', current_price * 1.06):.2f}
+- Support: {tech.get('support', current_price * 0.95):{_pfmt}}
+- Resistance: {tech.get('resistance', current_price * 1.06):{_pfmt}}
 
 Set TP1 at 1.5R, TP2 at 2.5R, TP3 at 4R from entry.
 Output JSON only."""

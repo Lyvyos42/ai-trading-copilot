@@ -48,7 +48,7 @@ export default function SignalsPage() {
       setWaking(true);
     }
     try {
-      const signal = await generateSignal(ticker, assetClass);
+      const signal = await generateSignal(ticker, TICKER_ASSET_CLASS[assetClass] ?? assetClass);
       setSignals((prev) => [signal, ...prev]);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to generate signal";

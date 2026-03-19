@@ -58,7 +58,7 @@ async def get_news_context(ticker: str) -> dict:
             # Fetch last 24h of articles across all categories (max 150)
             result = await session.execute(
                 select(NewsArticle)
-                .where(NewsArticle.is_active == True)
+                .where(NewsArticle.is_active.is_(True))
                 .where(NewsArticle.scraped_at >= cutoff)
                 .order_by(desc(NewsArticle.published_at))
                 .limit(150)
@@ -69,7 +69,7 @@ async def get_news_context(ticker: str) -> dict:
             if not articles:
                 result = await session.execute(
                     select(NewsArticle)
-                    .where(NewsArticle.is_active == True)
+                    .where(NewsArticle.is_active.is_(True))
                     .order_by(desc(NewsArticle.published_at))
                     .limit(60)
                 )

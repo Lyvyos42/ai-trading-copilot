@@ -19,7 +19,7 @@ from app.pipeline.graph import run_pipeline
 
 router = APIRouter(prefix="/api/v1/signals", tags=["signals"])
 
-VALID_ASSET_CLASSES = {"stocks", "etfs", "fixed_income", "fx", "commodities", "crypto", "futures", "global_macro"}
+VALID_ASSET_CLASSES = {"stocks", "etfs", "fixed_income", "fx", "commodities", "crypto", "futures", "global_macro", "indices"}
 
 # ── Ticker allowlist (built from market catalogue + common special-format symbols) ──
 _ALLOWED_TICKER_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-^=")
