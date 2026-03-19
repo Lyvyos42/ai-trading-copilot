@@ -76,11 +76,14 @@ export default function BacktestPage() {
   const [tab, setTab] = useState<Tab>("chart");
 
   // ── Chart state ──────────────────────────────────────────────────────────────
-  const chartRef  = useRef<HTMLDivElement>(null);
-  const chartInst = useRef<any>(null);
-  const candleSer = useRef<any>(null);
-  const volSer    = useRef<any>(null);
-  const lineRefs  = useRef<Map<string, any>>(new Map());
+  const chartRef    = useRef<HTMLDivElement>(null);
+  const chartInst   = useRef<any>(null);
+  const candleSer   = useRef<any>(null);
+  const volSer      = useRef<any>(null);
+  const lineRefs    = useRef<Map<string, any>>(new Map());
+  const allBarsRef  = useRef<Bar[]>([]);
+  const replayActive = useRef(false);
+  const replayTimer  = useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const [symbol,    setSymbol]    = useState("EURUSD");
   const [timeframe, setTimeframe] = useState<TF>("1d");
@@ -89,10 +92,13 @@ export default function BacktestPage() {
   const [chartError,   setChartError]   = useState("");
   const [bars,      setBars]      = useState(0);
   const [ohlcv,     setOhlcv]     = useState<{t:string;o:number;h:number;l:number;c:number}|null>(null);
-  const [tool,      setTool]      = useState<Tool>("none");
-  const [hlines,    setHlines]    = useState<HLine[]>([]);
-  const [tlines,    setTlines]    = useState<TLine[]>([]);
-  const [markers,   setMarkers]   = useState<Marker[]>([]);
+  const [tool,          setTool]          = useState<Tool>("none");
+  const [hlines,        setHlines]        = useState<HLine[]>([]);
+  const [tlines,        setTlines]        = useState<TLine[]>([]);
+  const [markers,       setMarkers]       = useState<Marker[]>([]);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replayIdx,     setReplayIdx]     = useState(0);
+  const [replaySpeed,   setReplaySpeed]   = useState<"fast"|"normal"|"slow">("normal");
   const pendingPt   = useRef<{time:number;value:number}|null>(null);
 
   // ── Strategy state ───────────────────────────────────────────────────────────
@@ -109,13 +115,21 @@ export default function BacktestPage() {
   }, []);
 
   // ── Load OHLCV ───────────────────────────────────────────────────────────────
+  const stopReplay = useCallback(() => {
+    replayActive.current = false;
+    if (replayTimer.current) { clearTimeout(replayTimer.current); replayTimer.current = null; }
+    setReplayPlaying(false);
+  }, []);
+
   const loadData = useCallback(async (sym:string, tf:TF, yr:number) => {
+    stopReplay();
     setChartLoading(true); setChartError("");
     try {
       const res  = await fetch(`${API_URL}/api/v1/backtest/ohlcv?symbol=${sym}&timeframe=${tf}&years=${yr}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || "Fetch failed");
       const data: Bar[] = json.data;
+      allBarsRef.current = data;
       setBars(data.length);
       if (!candleSer.current) return;
       candleSer.current.setData(data.map(b=>({time:b.time as any,open:b.open,high:b.high,low:b.low,close:b.close})));
@@ -123,7 +137,7 @@ export default function BacktestPage() {
       chartInst.current.timeScale().fitContent();
     } catch(e:any) { setChartError(e.message); }
     finally { setChartLoading(false); }
-  }, []);
+  }, [stopReplay]);
 
   // ── Mount chart ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -271,6 +285,34 @@ export default function BacktestPage() {
     if (el) el.value = t;
   };
 
+  const startReplay = useCallback(() => {
+    if (!candleSer.current || !volSer.current || allBarsRef.current.length === 0) return;
+    stopReplay();
+    const all   = allBarsRef.current;
+    const delay = replaySpeed === "fast" ? 8 : replaySpeed === "slow" ? 150 : 40;
+    candleSer.current.setData([]);
+    volSer.current.setData([]);
+    replayActive.current = true;
+    setReplayPlaying(true);
+    setReplayIdx(0);
+    let idx = 0;
+    const tick = () => {
+      if (!replayActive.current || !candleSer.current || !volSer.current) return;
+      const b = all[idx];
+      candleSer.current.update({ time: b.time as any, open: b.open, high: b.high, low: b.low, close: b.close });
+      volSer.current.update({ time: b.time as any, value: b.volume, color: b.close >= b.open ? "rgba(34,197,94,0.35)" : "rgba(230,57,70,0.35)" });
+      idx++;
+      setReplayIdx(idx);
+      if (idx < all.length) {
+        replayTimer.current = setTimeout(tick, delay);
+      } else {
+        replayActive.current = false;
+        setReplayPlaying(false);
+      }
+    };
+    replayTimer.current = setTimeout(tick, delay);
+  }, [replaySpeed, stopReplay]);
+
   const handleLoad = () => { clearAll(); loadData(symbol, timeframe, years); };
 
   // ── Strategy run ─────────────────────────────────────────────────────────────
@@ -347,7 +389,32 @@ export default function BacktestPage() {
                 {chartLoading ? "LOADING…" : "LOAD"}
               </button>
 
-              {bars > 0 && <span className="terminal-label">{bars.toLocaleString()} BARS</span>}
+              {bars > 0 && (
+                <>
+                  {/* Speed pills */}
+                  <div className="flex gap-0.5">
+                    {(["slow","normal","fast"] as const).map(s=>(
+                      <button key={s} onClick={()=>setReplaySpeed(s)} disabled={replayPlaying}
+                        className={`px-1.5 py-0.5 text-[10px] font-mono border transition-colors disabled:opacity-40 ${replaySpeed===s ? "border-warn/50 bg-warn/10 text-warn" : "border-border/40 text-muted-foreground hover:border-warn/30"}`}>
+                        {s === "fast" ? "F" : s === "normal" ? "N" : "S"}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Replay button */}
+                  <button onClick={replayPlaying ? stopReplay : startReplay}
+                    className={`px-3 py-1 text-xs font-mono font-semibold border transition-colors flex items-center gap-1.5 ${replayPlaying ? "border-bear/50 bg-bear/10 text-bear hover:bg-bear/20" : "border-warn/50 bg-warn/10 text-warn hover:bg-warn/20"}`}>
+                    {replayPlaying
+                      ? <><svg width="9" height="9" viewBox="0 0 9 9"><rect x="0" y="0" width="3.5" height="9" rx="0.5" fill="currentColor"/><rect x="5.5" y="0" width="3.5" height="9" rx="0.5" fill="currentColor"/></svg> STOP</>
+                      : <><svg width="9" height="10" viewBox="0 0 9 10"><polygon points="0,0 9,5 0,10" fill="currentColor"/></svg> REPLAY</>
+                    }
+                  </button>
+                  {replayPlaying && (
+                    <span className="terminal-label text-warn">{replayIdx}/{bars}</span>
+                  )}
+                </>
+              )}
+
+              {bars > 0 && !replayPlaying && <span className="terminal-label">{bars.toLocaleString()} BARS</span>}
               {chartError && <span className="text-xs font-mono text-bear">{chartError}</span>}
             </div>
           </div>

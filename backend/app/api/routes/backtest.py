@@ -168,7 +168,7 @@ def _synthetic_daily(symbol: str, days: int = 730) -> list:
     rows = []
     from datetime import date, timedelta
     day  = date.today() - timedelta(days=days)
-    cur  = price / (1 + rng.gauss(0, vol)) ** days
+    cur  = price * max(0.5, min(2.0, 1.0 + rng.gauss(0, 0.15)))
     for _ in range(days):
         day += timedelta(days=1)
         if day.weekday() >= 5 and symbol.upper() not in _FOREX:
