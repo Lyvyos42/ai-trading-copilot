@@ -5,14 +5,24 @@ import { Zap } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, API_URL, type Signal } from "@/lib/api";
 
-const ASSET_CLASSES = ["stocks", "etfs", "crypto", "fx", "commodities", "fixed_income"];
+const ASSET_CLASSES = ["stocks", "etfs", "crypto", "forex", "metals", "energy", "indices", "futures", "agriculture"];
+
 const POPULAR_TICKERS: Record<string, string[]> = {
-  stocks:       ["AAPL", "NVDA", "MSFT", "TSLA", "AMZN", "GOOGL", "META", "JPM"],
-  etfs:         ["SPY", "QQQ", "IWM", "GLD", "TLT", "XLK", "XLE"],
-  crypto:       ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD"],
-  fx:           ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"],
-  commodities:  ["GC=F", "CL=F", "SI=F", "HG=F"],
-  fixed_income: ["TLT", "IEF", "HYG", "LQD"],
+  stocks:      ["AAPL","NVDA","MSFT","TSLA","AMZN","GOOGL","META","JPM","GS","V","NFLX","AMD","PLTR","COIN","LLY"],
+  etfs:        ["SPY","QQQ","DIA","IWM","VTI","GLD","TLT","XLK","XLE","XLF","SOXX","ARKK","EEM","GDX"],
+  crypto:      ["BTC-USD","ETH-USD","SOL-USD","XRP-USD","BNB-USD","DOGE-USD","AVAX-USD","LINK-USD","MATIC-USD"],
+  forex:       ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","USDCHF","NZDUSD","EURGBP","EURJPY","GBPJPY","USDMXN","USDTRY"],
+  metals:      ["XAUUSD","XAGUSD","XPTUSD","XPDUSD","HG=F"],
+  energy:      ["USOIL","UKOIL","NATGAS","RB=F","HO=F"],
+  indices:     ["US500","US100","US30","US2000","UK100","GER40","FRA40","JPN225","HK50","AUS200"],
+  futures:     ["ES=F","NQ=F","YM=F","RTY=F","ZN=F","ZB=F","VX=F"],
+  agriculture: ["CORN","WHEAT","SOYBEAN","COFFEE","SUGAR","COTTON","COCOA"],
+};
+
+const TICKER_ASSET_CLASS: Record<string, string> = {
+  stocks: "stocks", etfs: "etfs", crypto: "crypto",
+  forex: "fx", metals: "commodities", energy: "commodities",
+  indices: "indices", futures: "futures", agriculture: "commodities",
 };
 
 const AGENTS = ["FundamentalAnalyst", "TechnicalAnalyst", "SentimentAnalyst", "MacroAnalyst"];
@@ -96,7 +106,7 @@ export default function SignalsPage() {
               {(POPULAR_TICKERS[assetClass] || []).map((ticker) => (
                 <button
                   key={ticker}
-                  onClick={() => handleGenerate(ticker)}
+                  onClick={() => { setAssetClass(TICKER_ASSET_CLASS[assetClass] ?? assetClass); handleGenerate(ticker); }}
                   disabled={loading !== null}
                   className={`px-2.5 py-1 text-xs font-mono font-semibold border transition-all ${
                     loading === ticker
