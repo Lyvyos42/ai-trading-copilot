@@ -194,8 +194,10 @@ def _expand_to_intraday(daily: list, bars_per_day: int, symbol: str) -> list:
         vol = (h - l) / bars_per_day if h > l else abs(c) * 0.0002
         prices = [o]
         for i in range(1, bars_per_day):
-            drift = (c - prices[-1]) / (bars_per_day - i)
-            prices.append(max(l, min(h, prices[-1] + drift + rng.gauss(0, vol * 0.5))))
+            remaining = bars_per_day - i
+            drift = (c - prices[-1]) / remaining
+            # low noise relative to drift so bars follow the daily trend direction
+            prices.append(max(l, min(h, prices[-1] + drift + rng.gauss(0, vol * 0.15))))
         for i in range(bars_per_day):
             po = prices[i-1] if i > 0 else o
             pc = prices[i]

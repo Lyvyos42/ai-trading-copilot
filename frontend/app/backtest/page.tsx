@@ -81,9 +81,10 @@ export default function BacktestPage() {
   const candleSer   = useRef<any>(null);
   const volSer      = useRef<any>(null);
   const lineRefs    = useRef<Map<string, any>>(new Map());
-  const allBarsRef  = useRef<Bar[]>([]);
+  const allBarsRef   = useRef<Bar[]>([]);
   const replayActive = useRef(false);
   const replayTimer  = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const activeToolRef = useRef<Tool>("none");
 
   const [symbol,    setSymbol]    = useState("EURUSD");
   const [timeframe, setTimeframe] = useState<TF>("1d");
@@ -176,8 +177,7 @@ export default function BacktestPage() {
         if (!param.point || !param.time) return;
         const price = cSer.coordinateToPrice(param.point.y);
         if (price == null) return;
-        const activeToolEl = document.getElementById("__activeTool") as HTMLInputElement | null;
-        const currentTool = (activeToolEl?.value || "none") as Tool;
+        const currentTool = activeToolRef.current;
         const time = param.time as number;
         if (currentTool === "hline") {
           addHLine(price, cSer);
@@ -280,9 +280,9 @@ export default function BacktestPage() {
   };
 
   const selectTool = (t:Tool) => {
-    setTool(t); pendingPt.current = null;
-    const el = document.getElementById("__activeTool") as HTMLInputElement|null;
-    if (el) el.value = t;
+    setTool(t);
+    activeToolRef.current = t;
+    pendingPt.current = null;
   };
 
   const startReplay = useCallback(() => {
@@ -328,9 +328,6 @@ export default function BacktestPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-full px-0 py-0">
-      {/* Hidden input for active drawing tool (avoids stale closure) */}
-      <input id="__activeTool" type="hidden" defaultValue="none" />
-
       {/* ── Header + tabs ── */}
       <div className="terminal-panel mx-4 mt-4">
         <div className="terminal-header">
