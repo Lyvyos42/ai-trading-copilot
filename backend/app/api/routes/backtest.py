@@ -1,8 +1,13 @@
 """
-GET /api/v1/backtest/{strategy} — run historical backtest simulation for a strategy
+Backtest routes:
+  GET /api/v1/backtest/ohlcv          — OHLCV candlestick data for the chart
+  GET /api/v1/backtest/{strategy}     — strategy simulation
+  GET /api/v1/backtest               — list strategies
 """
+import asyncio
 import random
 import math
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/api/v1/backtest", tags=["backtest"])
@@ -89,6 +94,158 @@ def _simulate_backtest(strategy_name: str, ticker: str, period: str) -> dict:
         "sample_trades": trades,
         "note": "Simulated backtest for demonstration. Integrate LEAN/QuantConnect for production results.",
     }
+
+
+# ── OHLCV helpers ─────────────────────────────────────────────────────────────
+_pool = ThreadPoolExecutor(max_workers=2)
+
+_YF_LIMITS = {"5m":"60d","15m":"60d","1h":"730d","4h":"730d","1d":"5y","1w":"5y"}
+_YF_INTERVALS = {"5m":"5m","15m":"15m","1h":"60m","4h":"60m","1d":"1d","1w":"1wk"}
+_BARS_PER_DAY = {"5m":288,"15m":96}
+_FOREX = {"EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","USDCHF","NZDUSD",
+          "EURGBP","EURJPY","GBPJPY","XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS"}
+
+_SYMBOL_MAP = {
+    "XAUUSD":"GC=F","XAGUSD":"SI=F",
+    "EURUSD":"EURUSD=X","GBPUSD":"GBPUSD=X","USDJPY":"USDJPY=X",
+    "AUDUSD":"AUDUSD=X","USDCAD":"USDCAD=X","USDCHF":"USDCHF=X",
+    "NZDUSD":"NZDUSD=X","EURGBP":"EURGBP=X","EURJPY":"EURJPY=X","GBPJPY":"GBPJPY=X",
+    "BTCUSD":"BTC-USD","ETHUSD":"ETH-USD",
+    "USOIL":"CL=F","UKOIL":"BZ=F","NATGAS":"NG=F",
+    "SPX500":"^GSPC","NAS100":"^NDX","GER40":"^GDAXI","UK100":"^FTSE","JPN225":"^N225",
+}
+
+def _fetch_real(symbol: str, timeframe: str) -> list:
+    try:
+        import yfinance as yf
+    except ImportError:
+        return []
+    yf_sym   = _SYMBOL_MAP.get(symbol.upper(), symbol)
+    interval = _YF_INTERVALS.get(timeframe, "1d")
+    period   = _YF_LIMITS.get(timeframe, "5y")
+    try:
+        df = yf.download(yf_sym, period=period, interval=interval, progress=False, auto_adjust=True)
+        if df is None or df.empty:
+            return []
+        if hasattr(df.columns, "get_level_values"):
+            df.columns = df.columns.get_level_values(0)
+        df = df.reset_index()
+        for col in ("Datetime","Date"):
+            if col in df.columns:
+                df = df.rename(columns={col:"dt"})
+                break
+        if timeframe == "4h":
+            df = df.set_index("dt").resample("4h").agg(
+                {"Open":"first","High":"max","Low":"min","Close":"last","Volume":"sum"}
+            ).dropna().reset_index().rename(columns={"dt":"dt"})
+        rows = []
+        for _, r in df.iterrows():
+            try:
+                ts = int(r["dt"].timestamp()) if hasattr(r["dt"],"timestamp") else int(r["dt"])
+                rows.append({"time":ts,"open":round(float(r["Open"]),6),"high":round(float(r["High"]),6),
+                             "low":round(float(r["Low"]),6),"close":round(float(r["Close"]),6),
+                             "volume":int(float(r["Volume"]) if not math.isnan(float(r["Volume"])) else 0)})
+            except Exception:
+                continue
+        return rows
+    except Exception:
+        return []
+
+def _synthetic_daily(symbol: str, days: int = 730) -> list:
+    import yfinance as yf
+    _SEED = {"EURUSD":1.085,"GBPUSD":1.295,"USDJPY":148.5,"XAUUSD":3100,
+             "BTCUSD":83000,"ETHUSD":2000,"USOIL":68.0,"SPX500":5700,"NAS100":20100}
+    price = _SEED.get(symbol.upper(), 100.0)
+    try:
+        tk = yf.Ticker(_SYMBOL_MAP.get(symbol.upper(), symbol))
+        h  = tk.history(period="5d", interval="1d")
+        if not h.empty:
+            price = float(h["Close"].iloc[-1])
+    except Exception:
+        pass
+    rng  = random.Random(sum(ord(c) for c in symbol))
+    vol  = 0.012
+    rows = []
+    from datetime import date, timedelta
+    day  = date.today() - timedelta(days=days)
+    cur  = price / (1 + rng.gauss(0, vol)) ** days
+    for _ in range(days):
+        day += timedelta(days=1)
+        if day.weekday() >= 5 and symbol.upper() not in _FOREX:
+            continue
+        ret   = rng.gauss(0.0001, vol)
+        close = max(cur * (1 + ret), cur * 0.001)
+        high  = close * (1 + abs(rng.gauss(0, vol * 0.6)))
+        low   = close * (1 - abs(rng.gauss(0, vol * 0.6)))
+        ts    = int((day - date(1970,1,1)).total_seconds() if hasattr(date(1970,1,1),"total_seconds") else (day - date(1970,1,1)).days * 86400)
+        rows.append({"time":ts,"open":round(cur,6),"high":round(max(cur,high,close),6),
+                     "low":round(min(cur,low,close),6),"close":round(close,6),
+                     "volume":rng.randint(100_000,50_000_000)})
+        cur = close
+    return rows
+
+def _expand_to_intraday(daily: list, bars_per_day: int, symbol: str) -> list:
+    rng = random.Random(sum(ord(c) for c in symbol) + bars_per_day)
+    rows = []
+    bar_s = 86400 // bars_per_day
+    for day in daily:
+        o,h,l,c = day["open"],day["high"],day["low"],day["close"]
+        ts  = day["time"]
+        vol = (h - l) / bars_per_day if h > l else abs(c) * 0.0002
+        prices = [o]
+        for i in range(1, bars_per_day):
+            drift = (c - prices[-1]) / (bars_per_day - i)
+            prices.append(max(l, min(h, prices[-1] + drift + rng.gauss(0, vol * 0.5))))
+        for i in range(bars_per_day):
+            po = prices[i-1] if i > 0 else o
+            pc = prices[i]
+            rows.append({"time":ts + i * bar_s,"open":round(po,6),"high":round(min(h,max(po,pc)*(1+abs(rng.gauss(0,0.0003)))),6),
+                         "low":round(max(l,min(po,pc)*(1-abs(rng.gauss(0,0.0003)))),6),"close":round(pc,6),
+                         "volume":int((day["volume"]/bars_per_day)*rng.uniform(0.4,1.8))})
+    return rows
+
+def _build_ohlcv(symbol: str, timeframe: str, years: int) -> list:
+    rows = _fetch_real(symbol, timeframe)
+    if timeframe in ("5m","15m"):
+        bpd    = _BARS_PER_DAY[timeframe]
+        daily  = _synthetic_daily(symbol, days=years*365)
+        if rows:
+            cutoff = rows[0]["time"] - 86400
+            daily  = [d for d in daily if d["time"] < cutoff]
+        rows = _expand_to_intraday(daily, bpd, symbol) + rows
+    elif not rows:
+        daily = _synthetic_daily(symbol, days=years*365)
+        if timeframe == "1w":
+            weekly, wo, wh, wl, wc, wv, wts = [], None, 0, 1e18, 0, 0, 0
+            for d in daily:
+                if wo is None:
+                    wo,wh,wl,wts = d["open"],d["high"],d["low"],d["time"]
+                wh = max(wh,d["high"]); wl = min(wl,d["low"]); wc = d["close"]; wv += d["volume"]
+                if d["time"] >= wts + 5*86400:
+                    weekly.append({"time":wts,"open":wo,"high":wh,"low":wl,"close":wc,"volume":wv})
+                    wo = None; wh = 0; wl = 1e18; wv = 0
+            rows = weekly
+        else:
+            rows = daily
+    seen,out = set(),[]
+    for r in sorted(rows, key=lambda x: x["time"]):
+        if r["time"] not in seen:
+            seen.add(r["time"]); out.append(r)
+    return out
+
+
+@router.get("/ohlcv")
+async def get_ohlcv(
+    symbol:    str = Query("EURUSD"),
+    timeframe: str = Query("1d"),
+    years:     int = Query(2, ge=1, le=5),
+):
+    tf = timeframe.lower()
+    if tf not in _YF_LIMITS:
+        raise HTTPException(400, f"Unsupported timeframe. Use: {list(_YF_LIMITS.keys())}")
+    loop = asyncio.get_event_loop()
+    rows = await loop.run_in_executor(_pool, _build_ohlcv, symbol, tf, years)
+    return {"symbol":symbol.upper(),"timeframe":tf,"years":years,"bars":len(rows),"data":rows}
 
 
 @router.get("/{strategy}")
