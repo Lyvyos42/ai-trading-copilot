@@ -191,13 +191,13 @@ def _expand_to_intraday(daily: list, bars_per_day: int, symbol: str) -> list:
     for day in daily:
         o,h,l,c = day["open"],day["high"],day["low"],day["close"]
         ts  = day["time"]
-        vol = (h - l) / bars_per_day if h > l else abs(c) * 0.0002
+        # Per-bar vol scales with sqrt(bars_per_day) so candles have realistic bodies
+        vol = (h - l) / max(1, bars_per_day ** 0.5) * 0.45 if h > l else abs(c) * 0.001
         prices = [o]
         for i in range(1, bars_per_day):
             remaining = bars_per_day - i
             drift = (c - prices[-1]) / remaining
-            # low noise relative to drift so bars follow the daily trend direction
-            prices.append(max(l, min(h, prices[-1] + drift + rng.gauss(0, vol * 0.15))))
+            prices.append(max(l, min(h, prices[-1] + drift + rng.gauss(0, vol))))
         for i in range(bars_per_day):
             po = prices[i-1] if i > 0 else o
             pc = prices[i]

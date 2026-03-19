@@ -97,9 +97,11 @@ export default function BacktestPage() {
   const [hlines,        setHlines]        = useState<HLine[]>([]);
   const [tlines,        setTlines]        = useState<TLine[]>([]);
   const [markers,       setMarkers]       = useState<Marker[]>([]);
-  const [replayPlaying, setReplayPlaying] = useState(false);
-  const [replayIdx,     setReplayIdx]     = useState(0);
-  const [replaySpeed,   setReplaySpeed]   = useState<"fast"|"normal"|"slow">("normal");
+  const [replayStatus, setReplayStatus] = useState<"idle"|"playing"|"paused">("idle");
+  const [replayIdx,    setReplayIdx]    = useState(0);
+  const [replaySpeed,  setReplaySpeed]  = useState<"fast"|"normal"|"slow">("normal");
+  const replayIdxRef   = useRef(0);
+  const replayDelayRef = useRef(40);
   const pendingPt   = useRef<{time:number;value:number}|null>(null);
 
   // ── Strategy state ───────────────────────────────────────────────────────────
@@ -115,13 +117,74 @@ export default function BacktestPage() {
     listStrategies().then(d => setStrategies(d.strategies));
   }, []);
 
-  // ── Load OHLCV ───────────────────────────────────────────────────────────────
+  // ── Replay engine ─────────────────────────────────────────────────────────────
+  // Keep delay in a ref so tickOnce (stable) always uses current speed
+  useEffect(() => {
+    replayDelayRef.current = replaySpeed === "fast" ? 8 : replaySpeed === "slow" ? 150 : 40;
+  }, [replaySpeed]);
+
+  const tickOnce = useCallback(() => {
+    const all = allBarsRef.current;
+    const idx = replayIdxRef.current;
+    if (!replayActive.current || !candleSer.current || !volSer.current) return;
+    if (idx >= all.length) { replayActive.current = false; setReplayStatus("idle"); return; }
+    const b = all[idx];
+    candleSer.current.update({ time: b.time as any, open: b.open, high: b.high, low: b.low, close: b.close });
+    volSer.current.update({ time: b.time as any, value: b.volume, color: b.close >= b.open ? "rgba(34,197,94,0.35)" : "rgba(230,57,70,0.35)" });
+    replayIdxRef.current = idx + 1;
+    setReplayIdx(idx + 1);
+    if (idx + 1 < all.length) {
+      replayTimer.current = setTimeout(tickOnce, replayDelayRef.current);
+    } else {
+      replayActive.current = false;
+      setReplayStatus("idle");
+    }
+  // stable — reads everything from refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stopReplay = useCallback(() => {
     replayActive.current = false;
     if (replayTimer.current) { clearTimeout(replayTimer.current); replayTimer.current = null; }
-    setReplayPlaying(false);
+    replayIdxRef.current = 0;
+    setReplayIdx(0);
+    setReplayStatus("idle");
+    // restore full chart
+    if (candleSer.current && volSer.current && allBarsRef.current.length > 0) {
+      const data = allBarsRef.current;
+      candleSer.current.setData(data.map(b => ({ time: b.time as any, open: b.open, high: b.high, low: b.low, close: b.close })));
+      volSer.current.setData(data.map(b => ({ time: b.time as any, value: b.volume, color: b.close >= b.open ? "rgba(34,197,94,0.35)" : "rgba(230,57,70,0.35)" })));
+      chartInst.current?.timeScale().fitContent();
+    }
   }, []);
 
+  const pauseReplay = useCallback(() => {
+    replayActive.current = false;
+    if (replayTimer.current) { clearTimeout(replayTimer.current); replayTimer.current = null; }
+    setReplayStatus("paused");
+  }, []);
+
+  const playReplay = useCallback(() => {
+    if (!candleSer.current || !volSer.current || allBarsRef.current.length === 0) return;
+    replayActive.current = true;
+    setReplayStatus("playing");
+    replayTimer.current = setTimeout(tickOnce, replayDelayRef.current);
+  }, [tickOnce]);
+
+  const startReplay = useCallback(() => {
+    if (!candleSer.current || !volSer.current || allBarsRef.current.length === 0) return;
+    replayActive.current = false;
+    if (replayTimer.current) { clearTimeout(replayTimer.current); replayTimer.current = null; }
+    candleSer.current.setData([]);
+    volSer.current.setData([]);
+    replayIdxRef.current = 0;
+    setReplayIdx(0);
+    replayActive.current = true;
+    setReplayStatus("playing");
+    replayTimer.current = setTimeout(tickOnce, replayDelayRef.current);
+  }, [tickOnce]);
+
+  // ── Load OHLCV ───────────────────────────────────────────────────────────────
   const loadData = useCallback(async (sym:string, tf:TF, yr:number) => {
     stopReplay();
     setChartLoading(true); setChartError("");
@@ -237,7 +300,7 @@ export default function BacktestPage() {
         [...next].sort((a,b)=>a.time-b.time).map(m=>({
           time:m.time as any, position:m.type==="buy"?"belowBar":"aboveBar",
           color:m.type==="buy"?"#22c55e":"#e63946", shape:m.type==="buy"?"arrowUp":"arrowDown",
-          text:m.type==="buy"?"BUY":"SELL",
+          text:m.type==="buy"?"BUY":"SELL", size:2,
         }))
       );
       return next;
@@ -265,7 +328,7 @@ export default function BacktestPage() {
         [...next].sort((a,b)=>a.time-b.time).map(m=>({
           time:m.time as any, position:m.type==="buy"?"belowBar":"aboveBar",
           color:m.type==="buy"?"#22c55e":"#e63946", shape:m.type==="buy"?"arrowUp":"arrowDown",
-          text:m.type==="buy"?"BUY":"SELL",
+          text:m.type==="buy"?"BUY":"SELL", size:2,
         }))
       );
       return next;
@@ -391,27 +454,47 @@ export default function BacktestPage() {
                   {/* Speed pills */}
                   <div className="flex gap-0.5">
                     {(["slow","normal","fast"] as const).map(s=>(
-                      <button key={s} onClick={()=>setReplaySpeed(s)} disabled={replayPlaying}
-                        className={`px-1.5 py-0.5 text-[10px] font-mono border transition-colors disabled:opacity-40 ${replaySpeed===s ? "border-warn/50 bg-warn/10 text-warn" : "border-border/40 text-muted-foreground hover:border-warn/30"}`}>
+                      <button key={s} onClick={()=>setReplaySpeed(s)}
+                        className={`px-1.5 py-0.5 text-[10px] font-mono border transition-colors ${replaySpeed===s ? "border-warn/50 bg-warn/10 text-warn" : "border-border/40 text-muted-foreground hover:border-warn/30"}`}>
                         {s === "fast" ? "F" : s === "normal" ? "N" : "S"}
                       </button>
                     ))}
                   </div>
-                  {/* Replay button */}
-                  <button onClick={replayPlaying ? stopReplay : startReplay}
-                    className={`px-3 py-1 text-xs font-mono font-semibold border transition-colors flex items-center gap-1.5 ${replayPlaying ? "border-bear/50 bg-bear/10 text-bear hover:bg-bear/20" : "border-warn/50 bg-warn/10 text-warn hover:bg-warn/20"}`}>
-                    {replayPlaying
-                      ? <><svg width="9" height="9" viewBox="0 0 9 9"><rect x="0" y="0" width="3.5" height="9" rx="0.5" fill="currentColor"/><rect x="5.5" y="0" width="3.5" height="9" rx="0.5" fill="currentColor"/></svg> STOP</>
-                      : <><svg width="9" height="10" viewBox="0 0 9 10"><polygon points="0,0 9,5 0,10" fill="currentColor"/></svg> REPLAY</>
-                    }
+
+                  {/* ⏮ Rewind — restart from bar 0 */}
+                  <button onClick={startReplay} title="Restart from beginning"
+                    className="w-7 h-6 flex items-center justify-center border border-border/40 text-muted-foreground hover:border-warn/40 hover:text-warn transition-colors">
+                    <svg width="10" height="10" viewBox="0 0 10 10"><polygon points="5,1 1,5 5,9" fill="currentColor"/><rect x="6" y="1" width="2" height="8" rx="0.5" fill="currentColor"/></svg>
                   </button>
-                  {replayPlaying && (
-                    <span className="terminal-label text-warn">{replayIdx}/{bars}</span>
+
+                  {/* ▶/⏸ Play / Pause */}
+                  {replayStatus === "playing" ? (
+                    <button onClick={pauseReplay}
+                      className="px-2.5 py-1 text-xs font-mono font-semibold border border-warn/50 bg-warn/10 text-warn hover:bg-warn/20 transition-colors flex items-center gap-1.5">
+                      <svg width="9" height="9" viewBox="0 0 9 9"><rect x="0" y="0" width="3" height="9" rx="0.5" fill="currentColor"/><rect x="6" y="0" width="3" height="9" rx="0.5" fill="currentColor"/></svg>
+                      PAUSE
+                    </button>
+                  ) : (
+                    <button onClick={replayStatus === "paused" ? playReplay : startReplay}
+                      className="px-2.5 py-1 text-xs font-mono font-semibold border border-warn/50 bg-warn/10 text-warn hover:bg-warn/20 transition-colors flex items-center gap-1.5">
+                      <svg width="8" height="10" viewBox="0 0 8 10"><polygon points="0,0 8,5 0,10" fill="currentColor"/></svg>
+                      {replayStatus === "paused" ? "RESUME" : "REPLAY"}
+                    </button>
                   )}
+
+                  {/* ⏹ Stop — restore all bars */}
+                  <button onClick={stopReplay} disabled={replayStatus === "idle"}
+                    className="w-7 h-6 flex items-center justify-center border border-border/40 text-muted-foreground hover:border-bear/50 hover:text-bear disabled:opacity-30 transition-colors">
+                    <svg width="8" height="8" viewBox="0 0 8 8"><rect x="0" y="0" width="8" height="8" rx="1" fill="currentColor"/></svg>
+                  </button>
+
+                  {/* Progress */}
+                  {replayStatus !== "idle"
+                    ? <span className="terminal-label text-warn">{replayIdx}/{bars}</span>
+                    : <span className="terminal-label">{bars.toLocaleString()} BARS</span>
+                  }
                 </>
               )}
-
-              {bars > 0 && !replayPlaying && <span className="terminal-label">{bars.toLocaleString()} BARS</span>}
               {chartError && <span className="text-xs font-mono text-bear">{chartError}</span>}
             </div>
           </div>
