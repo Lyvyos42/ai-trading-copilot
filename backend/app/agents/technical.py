@@ -5,6 +5,14 @@ from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
 
+def _price_decimals(price: float) -> int:
+    if price < 0.001:  return 6
+    if price < 0.1:    return 5
+    if price < 10:     return 4
+    if price < 100:    return 3
+    return 2
+
+
 SYSTEM_PROMPT = """You are an expert quantitative technical analyst applying price-action strategies
 from "151 Trading Strategies":
 - Strategy 3.1: Price Momentum (12-1 month cross-sectional return)
@@ -87,34 +95,43 @@ class TechnicalAnalyst(BaseAgent):
         else:
             momentum = 0.0
 
-        support = min(lows[-20:]) if len(lows) >= 20 else closes[-1] * 0.95
-        resistance = max(highs[-20:]) if len(highs) >= 20 else closes[-1] * 1.05
+        current_price = closes[-1] if closes else 100.0
+        dec = _price_decimals(current_price)
+        support = round(min(lows[-20:]) if len(lows) >= 20 else current_price * 0.95, dec)
+        resistance = round(max(highs[-20:]) if len(highs) >= 20 else current_price * 1.05, dec)
+        atr = market_data.get("atr", current_price * 0.012)
 
         ema_cross = "BULLISH" if ema12 > ema26 else ("BEARISH" if ema12 < ema26 else "NEUTRAL")
 
-        user_msg = f"""Analyze {ticker} technically.
-EMA12={ema12:.2f}, EMA26={ema26:.2f}, RSI={rsi:.1f}
-Z-Score (20d)={zscore:.2f} (mean reversion signal, strategy 3.9)
-Momentum (12-1m)={momentum:.3f} (strategy 3.1)
-Support={support:.2f}, Resistance={resistance:.2f}
-EMA Crossover: {ema_cross} (strategy 3.11-3.13)
-Current price: {closes[-1]:.2f}
-Output JSON only."""
+        user_msg = (
+            f"Analyze {ticker} technically.\n"
+            f"EMA12={ema12:.{dec}f}, EMA26={ema26:.{dec}f}, RSI={rsi:.1f}\n"
+            f"Z-Score (20d)={zscore:.2f} (mean reversion signal, strategy 3.9)\n"
+            f"Momentum (12-1m)={momentum:.3f} (strategy 3.1)\n"
+            f"ATR(14)={atr:.{dec}f}\n"
+            f"Support={support:.{dec}f}, Resistance={resistance:.{dec}f}\n"
+            f"EMA Crossover: {ema_cross} (strategy 3.11-3.13)\n"
+            f"Current price: {current_price:.{dec}f}\n"
+            f"Output JSON only."
+        )
 
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
                 result = json.loads(raw)
-                result.setdefault("support", round(support, 2))
-                result.setdefault("resistance", round(resistance, 2))
+                result.setdefault("support", support)
+                result.setdefault("resistance", resistance)
                 result.setdefault("rsi", round(rsi, 1))
+                result.setdefault("atr", atr)
                 return result
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_analysis(ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross)
+        return self._compute_analysis(ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross, atr)
 
-    def _compute_analysis(self, ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross) -> dict:
+    def _compute_analysis(self, ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross, atr=None) -> dict:
+        if atr is None:
+            atr = (closes[-1] if closes else 100.0) * 0.012
         # Composite signal from multiple indicators
         signals = []
         if ema12 > ema26:
@@ -149,9 +166,10 @@ Output JSON only."""
             "trend_signal": trend,
             "momentum_score": round(min(1, max(-1, momentum * 5)), 3),
             "mean_reversion_signal": round(-zscore / 3, 3),
-            "support": round(support, 2),
-            "resistance": round(resistance, 2),
+            "support": support,
+            "resistance": resistance,
             "rsi": round(rsi, 1),
+            "atr": atr,
             "ema_crossover": ema_cross,
             "reasoning": (
                 f"{ticker}: EMA12/26 crossover is {ema_cross} (strategy 3.11-3.13). "

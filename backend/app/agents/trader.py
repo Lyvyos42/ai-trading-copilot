@@ -4,6 +4,14 @@ from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
 
+def _price_decimals(price: float) -> int:
+    if price < 0.001:  return 6
+    if price < 0.1:    return 5
+    if price < 10:     return 4
+    if price < 100:    return 3
+    return 2
+
+
 SYSTEM_PROMPT = """You are an elite quantitative trader and portfolio manager with 20+ years of experience.
 You synthesize analysis from 4 specialized AI analysts and a bull/bear debate to make high-conviction
 trading decisions. You apply the mathematical frameworks from "151 Trading Strategies".
@@ -91,28 +99,38 @@ Output JSON only."""
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro)
+        return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
 
-    def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro) -> dict:
+    def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
+        if market_data is None:
+            market_data = {}
         rng = random.Random(sum(ord(c) for c in ticker) + 13)
 
-        support = tech.get("support", price * 0.95)
-        resistance = tech.get("resistance", price * 1.06)
+        dec = _price_decimals(price)
+
+        # Use ATR from market data (passed via state → tech) for realistic stop placement.
+        # ATR gives the average daily range — stops should be at least 1 ATR away.
+        atr = tech.get("atr", market_data.get("atr", price * 0.012))
+        if atr <= 0:
+            atr = price * 0.012
+
+        # Entry: at market (slight slippage simulation)
+        slippage = atr * rng.uniform(0.02, 0.08)
 
         if direction == "LONG":
-            entry = price * (1 + rng.uniform(0, 0.003))
-            stop = support * (1 - rng.uniform(0.002, 0.008))
-            risk_per_share = entry - stop
-            tp1 = entry + risk_per_share * 1.5
-            tp2 = entry + risk_per_share * 2.5
-            tp3 = entry + risk_per_share * 4.0
+            entry    = round(price + slippage, dec)
+            stop     = round(entry - atr * 1.5, dec)        # 1.5 ATR stop
+            risk_amt = entry - stop
+            tp1      = round(entry + risk_amt * 1.5, dec)   # 1.5R
+            tp2      = round(entry + risk_amt * 2.5, dec)   # 2.5R
+            tp3      = round(entry + risk_amt * 4.0, dec)   # 4R
         else:
-            entry = price * (1 - rng.uniform(0, 0.003))
-            stop = resistance * (1 + rng.uniform(0.002, 0.008))
-            risk_per_share = stop - entry
-            tp1 = entry - risk_per_share * 1.5
-            tp2 = entry - risk_per_share * 2.5
-            tp3 = entry - risk_per_share * 4.0
+            entry    = round(price - slippage, dec)
+            stop     = round(entry + atr * 1.5, dec)        # 1.5 ATR stop
+            risk_amt = stop - entry
+            tp1      = round(entry - risk_amt * 1.5, dec)   # 1.5R
+            tp2      = round(entry - risk_amt * 2.5, dec)   # 2.5R
+            tp3      = round(entry - risk_amt * 4.0, dec)   # 4R
 
         long_weight = sum(c for d, c in votes if d == "LONG")
         short_weight = sum(c for d, c in votes if d == "SHORT")
@@ -139,32 +157,36 @@ Output JSON only."""
         if not strategy_sources:
             strategy_sources = ["multi_factor_alpha_3.20"]
 
+        fmt = f".{dec}f"
+        risk_pct = abs((stop - entry) / entry) * 100
+        tp1_pct  = abs((tp1 - entry)  / entry) * 100
         reasoning_chain = [
             f"Analyst vote: {sum(1 for d, _ in votes if d == direction)}/4 agents agree on {direction}",
-            f"Technical: EMA crossover {tech.get('ema_crossover', 'N/A')}, RSI {tech.get('rsi', 'N/A'):.0f}",
+            f"Technical: EMA crossover {tech.get('ema_crossover', 'N/A')}, RSI {tech.get('rsi', 50):.0f}",
             f"Fundamental: Earnings momentum {fund.get('earnings_momentum', 0):+.2f}, value score {fund.get('value_score', 0):+.2f}",
             f"Sentiment: News {sent.get('news_sentiment', 0):+.2f}, social {sent.get('social_sentiment', 0):+.2f}",
             f"Macro regime: {macro.get('macro_regime', 'N/A')}, Fed {macro.get('fed_stance', 'N/A')}",
             f"Risk check passed: position size {risk.get('position_size_pct', 2):.1f}% (half-Kelly)",
-            f"Entry {entry:.2f}, SL {stop:.2f} ({abs((stop-entry)/entry)*100:.1f}% risk), TP1 {tp1:.2f} (1.5R)",
+            f"ATR(14)={atr:{fmt}} — stop at 1.5×ATR from entry",
+            f"Entry {entry:{fmt}}, SL {stop:{fmt}} ({risk_pct:.1f}% risk), TP1 {tp1:{fmt}} (1.5R)",
         ]
 
         return {
             "direction": direction,
-            "entry_price": round(entry, 2),
-            "stop_loss": round(stop, 2),
-            "take_profit_1": round(tp1, 2),
-            "take_profit_2": round(tp2, 2),
-            "take_profit_3": round(tp3, 2),
+            "entry_price":    round(entry, dec),
+            "stop_loss":      round(stop, dec),
+            "take_profit_1":  round(tp1, dec),
+            "take_profit_2":  round(tp2, dec),
+            "take_profit_3":  round(tp3, dec),
             "confidence_score": round(confidence, 1),
             "position_size_pct": risk.get("position_size_pct", round(rng.uniform(1, 3), 2)),
             "strategy_sources": strategy_sources,
-            "reasoning_chain": reasoning_chain,
+            "reasoning_chain":  reasoning_chain,
             "trade_rationale": (
-                f"{direction} {ticker} @ {entry:.2f}. "
-                f"Stop {stop:.2f} ({abs((stop-entry)/entry)*100:.1f}% risk). "
-                f"Targets: TP1={tp1:.2f} (+{abs((tp1-entry)/entry)*100:.1f}%), "
-                f"TP2={tp2:.2f}, TP3={tp3:.2f}. "
+                f"{direction} {ticker} @ {entry:{fmt}}. "
+                f"Stop {stop:{fmt}} ({risk_pct:.1f}% risk). "
+                f"Targets: TP1={tp1:{fmt}} (+{tp1_pct:.1f}%), "
+                f"TP2={tp2:{fmt}}, TP3={tp3:{fmt}}. "
                 f"Conviction: {confidence:.0f}%. Strategies: {', '.join(strategy_sources[:3])}."
             ),
         }

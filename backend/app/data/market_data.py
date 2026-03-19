@@ -8,6 +8,27 @@ from datetime import datetime, timedelta
 from app.config import settings
 
 
+def _price_decimals(price: float) -> int:
+    """Return appropriate decimal places based on price magnitude."""
+    if price < 0.001:  return 6   # tiny crypto
+    if price < 0.1:   return 5
+    if price < 10:    return 4    # FX pairs (EURUSD=X ~1.08), small crypto
+    if price < 100:   return 3
+    return 2                      # stocks, futures, indices
+
+
+def _compute_atr(highs: list, lows: list, closes: list, period: int = 14) -> float:
+    """Average True Range — measures volatility for ATR-based stop placement."""
+    if len(closes) < 2:
+        return closes[-1] * 0.01
+    trs = []
+    for i in range(1, len(closes)):
+        h, l, pc = highs[i], lows[i], closes[i - 1]
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+    recent = trs[-period:]
+    return sum(recent) / len(recent) if recent else closes[-1] * 0.01
+
+
 async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     """Main entry point. Returns a unified market data dict for a given ticker."""
     try:
@@ -36,9 +57,13 @@ async def _fetch_yfinance(ticker: str) -> dict:
         except Exception:
             pass
 
-        closes = [round(float(p), 2) for p in hist["Close"].tolist()]
-        highs  = [round(float(p), 2) for p in hist["High"].tolist()]
-        lows   = [round(float(p), 2) for p in hist["Low"].tolist()]
+        # Determine decimal precision from price magnitude
+        sample_price = float(hist["Close"].iloc[-1])
+        dec = _price_decimals(sample_price)
+
+        closes  = [round(float(p), dec) for p in hist["Close"].tolist()]
+        highs   = [round(float(p), dec) for p in hist["High"].tolist()]
+        lows    = [round(float(p), dec) for p in hist["Low"].tolist()]
         volumes = [int(v) for v in hist["Volume"].tolist()]
 
         current_close = closes[-1]
@@ -49,11 +74,14 @@ async def _fetch_yfinance(ticker: str) -> dict:
         avg_vol_30 = sum(volumes[-30:]) / 30 if len(volumes) >= 30 else (volumes[-1] or 1)
         volume_ratio = round(volumes[-1] / avg_vol_30, 2) if avg_vol_30 else 1.0
 
+        # ATR (14-period, True Range)
+        atr = _compute_atr(highs, lows, closes)
+
         return {
             "ticker": ticker,
             "asset_class": "stocks",
             "close": current_close,
-            "open":  round(float(hist["Open"].iloc[-1]), 2),
+            "open":  round(float(hist["Open"].iloc[-1]), dec),
             "high":  highs[-1],
             "low":   lows[-1],
             "volume": volumes[-1],
@@ -62,6 +90,8 @@ async def _fetch_yfinance(ticker: str) -> dict:
             "lows":   lows,
             "price_change_pct": price_change_pct,
             "volume_ratio": volume_ratio,
+            "atr": round(atr, dec),
+            "price_decimals": dec,
             # Fundamentals — present in info dict for most US equities
             "pe_ratio":        info.get("trailingPE") or info.get("forwardPE"),
             "pb_ratio":        info.get("priceToBook"),
@@ -135,7 +165,7 @@ def _mock_market_data(ticker: str, asset_class: str) -> dict:
     # Simulate 260 bars of history ending at current_price.
     # Generate 259 steps backward (mean-reverting) then pin the last bar.
     num_bars = 260
-    decimals = 4 if current_price < 10 else 2
+    decimals = _price_decimals(current_price)
 
     # Build history: walk backward from current so it ends at the right price
     history = [current_price]
@@ -165,6 +195,8 @@ def _mock_market_data(ticker: str, asset_class: str) -> dict:
         "lows":   lows,
         "price_change_pct": price_change_pct,
         "volume_ratio": round(rng.uniform(0.5, 3.0), 2),
+        "atr": round(current_price * 0.012, decimals),  # ~1.2% ATR for mock
+        "price_decimals": decimals,
         "pe_ratio":        round(rng.uniform(8, 45), 1),
         "pb_ratio":        round(rng.uniform(0.8, 8.0), 2),
         "eps_growth":      round(rng.uniform(-15, 40), 1),
