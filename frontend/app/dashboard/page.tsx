@@ -10,7 +10,16 @@ import { formatPrice, formatPct } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
 
-const WATCHLIST = ["AAPL", "NVDA", "TSLA", "SPY", "BTC-USD", "EURUSD=X", "GC=F"];
+const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
+
+const TIMEFRAMES = [
+  { label: "1D",  period: "5d",  interval: "1h"  },
+  { label: "1W",  period: "1mo", interval: "1h"  },
+  { label: "1M",  period: "1mo", interval: "1d"  },
+  { label: "3M",  period: "3mo", interval: "1d"  },
+  { label: "6M",  period: "6mo", interval: "1d"  },
+  { label: "1Y",  period: "1y",  interval: "1d"  },
+];
 
 export default function DashboardPage() {
   const [signals, setSignals]               = useState<Signal[]>([]);
@@ -18,6 +27,7 @@ export default function DashboardPage() {
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [loading, setLoading]               = useState(false);
   const [activeTicker, setActiveTicker]     = useState("AAPL");
+  const [timeframe, setTimeframe]           = useState(TIMEFRAMES[4]); // default 6M
 
   useEffect(() => { loadData(); }, []);
 
@@ -189,11 +199,27 @@ export default function DashboardPage() {
                   </>
                 )}
               </div>
-              <span className="terminal-label">6MO · 1D · CANDLES</span>
+              <div className="flex items-center gap-1">
+                {TIMEFRAMES.map((tf) => (
+                  <button
+                    key={tf.label}
+                    onClick={() => setTimeframe(tf)}
+                    className={cn(
+                      "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-colors",
+                      timeframe.label === tf.label
+                        ? "bg-primary/20 text-primary border border-primary/40"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
+                <span className="terminal-label ml-2">CANDLES</span>
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">
-              <TradingChart ticker={activeTicker} signal={selectedSignal} fillContainer />
+              <TradingChart ticker={activeTicker} signal={selectedSignal} fillContainer period={timeframe.period} interval={timeframe.interval} />
             </div>
           </div>
         </div>

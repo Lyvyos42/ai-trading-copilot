@@ -80,8 +80,180 @@ def resolve_ticker(display_symbol: str) -> str:
     return _TICKER_ALIAS.get(upper, upper)
 
 
+# Maps display symbols → (TradingView symbol, exchange) for tvDatafeed.
+# Covers FX, metals, indices, energy, commodities, crypto.
+# Stocks/ETFs not listed here — yfinance handles those better (plus fundamentals).
+_TV_EXCHANGE: dict[str, tuple[str, str]] = {
+    # ── Spot Metals (OANDA) ──────────────────────────────────────────────────
+    "XAUUSD": ("XAUUSD", "OANDA"),  "XAGUSD": ("XAGUSD", "OANDA"),
+    "XPTUSD": ("XPTUSD", "OANDA"),  "XPDUSD": ("XPDUSD", "OANDA"),
+    # ── FX Majors (FX_IDC) ───────────────────────────────────────────────────
+    "EURUSD": ("EURUSD", "FX_IDC"), "GBPUSD": ("GBPUSD", "FX_IDC"),
+    "USDJPY": ("USDJPY", "FX_IDC"), "AUDUSD": ("AUDUSD", "FX_IDC"),
+    "USDCAD": ("USDCAD", "FX_IDC"), "USDCHF": ("USDCHF", "FX_IDC"),
+    "NZDUSD": ("NZDUSD", "FX_IDC"),
+    # ── FX Minors (FX_IDC) ───────────────────────────────────────────────────
+    "EURGBP": ("EURGBP", "FX_IDC"), "EURJPY": ("EURJPY", "FX_IDC"),
+    "GBPJPY": ("GBPJPY", "FX_IDC"), "EURCHF": ("EURCHF", "FX_IDC"),
+    "EURAUD": ("EURAUD", "FX_IDC"), "EURCAD": ("EURCAD", "FX_IDC"),
+    "EURNZD": ("EURNZD", "FX_IDC"), "GBPAUD": ("GBPAUD", "FX_IDC"),
+    "GBPCAD": ("GBPCAD", "FX_IDC"), "GBPCHF": ("GBPCHF", "FX_IDC"),
+    "GBPNZD": ("GBPNZD", "FX_IDC"), "AUDJPY": ("AUDJPY", "FX_IDC"),
+    "AUDCAD": ("AUDCAD", "FX_IDC"), "AUDCHF": ("AUDCHF", "FX_IDC"),
+    "AUDNZD": ("AUDNZD", "FX_IDC"), "CADJPY": ("CADJPY", "FX_IDC"),
+    "CADCHF": ("CADCHF", "FX_IDC"), "CHFJPY": ("CHFJPY", "FX_IDC"),
+    "NZDJPY": ("NZDJPY", "FX_IDC"), "NZDCAD": ("NZDCAD", "FX_IDC"),
+    "NZDCHF": ("NZDCHF", "FX_IDC"),
+    # ── FX Exotics (FX_IDC) ──────────────────────────────────────────────────
+    "USDTRY": ("USDTRY", "FX_IDC"), "USDZAR": ("USDZAR", "FX_IDC"),
+    "USDMXN": ("USDMXN", "FX_IDC"), "USDSEK": ("USDSEK", "FX_IDC"),
+    "USDNOK": ("USDNOK", "FX_IDC"), "USDDKK": ("USDDKK", "FX_IDC"),
+    "USDSGD": ("USDSGD", "FX_IDC"), "USDHKD": ("USDHKD", "FX_IDC"),
+    "USDCNH": ("USDCNH", "FX_IDC"), "USDINR": ("USDINR", "FX_IDC"),
+    "USDBRL": ("USDBRL", "FX_IDC"), "USDPLN": ("USDPLN", "FX_IDC"),
+    "USDHUF": ("USDHUF", "FX_IDC"), "USDCZK": ("USDCZK", "FX_IDC"),
+    "USDTHB": ("USDTHB", "FX_IDC"), "USDKRW": ("USDKRW", "FX_IDC"),
+    # ── Energy CFDs (TVC) ────────────────────────────────────────────────────
+    "USOIL":  ("USOIL",      "TVC"), "UKOIL":  ("UKOIL",      "TVC"),
+    "NATGAS": ("NATURALGAS", "TVC"), "RBOB":   ("GASOLINE",   "TVC"),
+    # ── Commodity CFDs (TVC) ─────────────────────────────────────────────────
+    "CORN":    ("CORN",    "TVC"),   "WHEAT":   ("WHEAT",   "TVC"),
+    "SOYBEAN": ("SOYBEAN", "TVC"),   "COFFEE":  ("COFFEE",  "TVC"),
+    "SUGAR":   ("SUGAR",   "TVC"),   "COTTON":  ("COTTON",  "TVC"),
+    "COCOA":   ("COCOA",   "TVC"),
+    # ── Crypto (BINANCE) ─────────────────────────────────────────────────────
+    "BTCUSD":  ("BTCUSDT",  "BINANCE"), "ETHUSD":  ("ETHUSDT",  "BINANCE"),
+    "BNBUSD":  ("BNBUSDT",  "BINANCE"), "XRPUSD":  ("XRPUSDT",  "BINANCE"),
+    "SOLUSD":  ("SOLUSDT",  "BINANCE"), "ADAUSD":  ("ADAUSDT",  "BINANCE"),
+    "DOGEUSD": ("DOGEUSDT", "BINANCE"), "AVAXUSD": ("AVAXUSDT", "BINANCE"),
+    "DOTUSD":  ("DOTUSDT",  "BINANCE"), "LINKUSD": ("LINKUSDT", "BINANCE"),
+    "LTCUSD":  ("LTCUSDT",  "BINANCE"), "BCHUSD":  ("BCHUSDT",  "BINANCE"),
+    "NEARUSD": ("NEARUSDT", "BINANCE"), "APTUSD":  ("APTUSDT",  "BINANCE"),
+    "OPUSD":   ("OPUSDT",   "BINANCE"), "ARBUSD":  ("ARBUSDT",  "BINANCE"),
+    "SUIUSD":  ("SUIUSDT",  "BINANCE"), "ATOMUSD": ("ATOMUSDT", "BINANCE"),
+    "UNIUSD":  ("UNIUSDT",  "BINANCE"), "MATICUSD":("MATICUSDT","BINANCE"),
+    # ── Equity Indices (TV native sources) ───────────────────────────────────
+    "US500":  ("SPX",    "SP"),     "SPX":     ("SPX",    "SP"),
+    "US100":  ("NDX",    "NASDAQ"), "NDX":     ("NDX",    "NASDAQ"),
+    "US30":   ("DJI",    "DJ"),     "DJIA":    ("DJI",    "DJ"),
+    "US2000": ("RUT",    "TVC"),
+    "UK100":  ("UK100",  "TVC"),
+    "GER40":  ("DEU40",  "TVC"),    "DAX":     ("DEU40",  "TVC"),
+    "FRA40":  ("CAC40",  "TVC"),    "CAC40":   ("CAC40",  "TVC"),
+    "JPN225": ("NI225",  "TVC"),    "NKY":     ("NI225",  "TVC"),
+    "HK50":   ("HSI",    "TVC"),
+    "AUS200": ("ASX200", "TVC"),
+    "ESP35":  ("IBEX35", "TVC"),
+    "ITA40":  ("IT40",   "TVC"),
+    "STOXX50":("STOXX50","TVC"),
+    # ── Index Futures (CME/CBOT) ──────────────────────────────────────────────
+    "ES":  ("ES1!",  "CME"),  "NQ":  ("NQ1!",  "CME"),
+    "YM":  ("YM1!",  "CBOT"), "RTY": ("RTY1!", "CME"),
+}
+
+# Lazy singleton — TvDatafeed WebSocket connection, reused across requests
+_tv_client = None
+
+
+def _get_tv_client():
+    """Return shared TvDatafeed instance (no credentials = public/guest access)."""
+    global _tv_client
+    if _tv_client is None:
+        try:
+            from tvDatafeed import TvDatafeed
+            _tv_client = TvDatafeed()
+        except Exception:
+            pass
+    return _tv_client
+
+
+async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
+    """Fetch daily OHLCV from TradingView (no API key required).
+    Returns same dict format as _fetch_yfinance, or None to fall through.
+    """
+    entry = _TV_EXCHANGE.get(ticker.upper())
+    if not entry:
+        return None  # no TV mapping — stocks/ETFs fall through to yfinance
+
+    tv_symbol, exchange = entry
+
+    def _sync() -> dict | None:
+        try:
+            from tvDatafeed import Interval
+        except ImportError:
+            return None
+
+        tv = _get_tv_client()
+        if tv is None:
+            return None
+
+        df = tv.get_hist(
+            symbol=tv_symbol,
+            exchange=exchange,
+            interval=Interval.in_daily,
+            n_bars=300,
+        )
+        if df is None or df.empty:
+            return None
+
+        df.columns = [c.lower() for c in df.columns]
+
+        closes  = [round(float(v), 8) for v in df["close"].tolist()]
+        highs   = [round(float(v), 8) for v in df["high"].tolist()]
+        lows    = [round(float(v), 8) for v in df["low"].tolist()]
+        volumes = [int(float(v)) for v in df["volume"].fillna(0).tolist()]
+
+        current_close = closes[-1]
+        dec = _price_decimals(current_close)
+
+        closes  = [round(v, dec) for v in closes]
+        highs   = [round(v, dec) for v in highs]
+        lows    = [round(v, dec) for v in lows]
+
+        prev_close       = closes[-2] if len(closes) >= 2 else current_close
+        price_change_pct = round((current_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
+        avg_vol_30       = sum(volumes[-30:]) / 30 if len(volumes) >= 30 else max(volumes[-1], 1)
+        volume_ratio     = round(volumes[-1] / avg_vol_30, 2) if avg_vol_30 else 1.0
+        atr              = _compute_atr(highs, lows, closes)
+
+        return {
+            "ticker":            ticker,
+            "asset_class":       asset_class,
+            "close":             current_close,
+            "open":              round(float(df["open"].iloc[-1]), dec),
+            "high":              highs[-1],
+            "low":               lows[-1],
+            "volume":            volumes[-1],
+            "closes":            closes,
+            "highs":             highs,
+            "lows":              lows,
+            "price_change_pct":  price_change_pct,
+            "volume_ratio":      volume_ratio,
+            "atr":               round(atr, dec),
+            "price_decimals":    dec,
+            # Fundamentals unavailable from free TradingView WebSocket
+            "pe_ratio":          None,
+            "pb_ratio":          None,
+            "eps_growth":        None,
+            "revenue_growth":    None,
+            "dividend_yield":    None,
+            "earnings_surprise": None,
+        }
+
+    return await asyncio.to_thread(_sync)
+
+
 async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
-    """Main entry point. Resolves TV-style display symbols to yfinance tickers, then fetches."""
+    """Main entry point. TradingView → yfinance → mock fallback chain."""
+    # 1. TradingView (real-time, covers FX/metals/indices/crypto/commodities)
+    try:
+        data = await _fetch_tvdatafeed(ticker, asset_class)
+        if data:
+            return data
+    except Exception:
+        pass
+
+    # 2. yfinance (15-min delayed, good for stocks/ETFs + fundamentals)
     yf_ticker = resolve_ticker(ticker)
     try:
         data = await _fetch_yfinance(yf_ticker, asset_class)

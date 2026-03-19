@@ -11,31 +11,33 @@ interface Tick {
   changePct: number;
 }
 
-// Static seed — approximate prices as of Mar 2026.
+// Static seed — realistic prices as of Mar 2026.
 // Jitter keeps movement realistic; prices are clamped to ±3% of seed to prevent drift.
+// changePct is always computed relative to seed (day open) — no cumulative drift.
 const SEED_TICKS: Tick[] = [
-  { symbol: "SPY",      price: 558.20, change:  1.95, changePct:  0.35 },
-  { symbol: "QQQ",      price: 472.80, change:  2.84, changePct:  0.60 },
-  { symbol: "AAPL",     price: 224.50, change: -0.58, changePct: -0.26 },
-  { symbol: "NVDA",     price: 877.40, change: 21.90, changePct:  2.56 },
-  { symbol: "TSLA",     price: 192.30, change: -3.18, changePct: -1.63 },
-  { symbol: "BTC",      price: 83200,  change:  1120, changePct:  1.36 },
-  { symbol: "ETH",      price: 2010,   change:  28.4, changePct:  1.43 },
-  { symbol: "EUR/USD",  price: 1.0852, change: -0.0009, changePct: -0.08 },
-  { symbol: "GBP/USD",  price: 1.2940, change:  0.0031, changePct:  0.24 },
-  { symbol: "GOLD",     price: 3045.0, change: 18.5,  changePct:  0.61 },
-  { symbol: "OIL(WTI)", price: 68.40,  change: -0.72, changePct: -1.04 },
-  { symbol: "^VIX",     price: 19.85,  change:  0.42, changePct:  2.16 },
-  { symbol: "DXY",      price: 103.80, change: -0.22, changePct: -0.21 },
-  { symbol: "US10Y",    price: 4.285,  change:  0.018, changePct:  0.42 },
+  { symbol: "NVDA",     price: 116.50,  change:  2.85,   changePct:  2.50 },
+  { symbol: "TSLA",     price: 192.30,  change: -3.18,   changePct: -1.63 },
+  { symbol: "AAPL",     price: 224.50,  change: -0.58,   changePct: -0.26 },
+  { symbol: "BTC",      price: 83200,   change:  1120,   changePct:  1.36 },
+  { symbol: "ETH",      price: 2010,    change:  28.4,   changePct:  1.43 },
+  { symbol: "EUR/USD",  price: 1.0852,  change: -0.0009, changePct: -0.08 },
+  { symbol: "GBP/USD",  price: 1.2940,  change:  0.0031, changePct:  0.24 },
+  { symbol: "USD/JPY",  price: 148.50,  change:  0.35,   changePct:  0.24 },
+  { symbol: "GOLD",     price: 3100.0,  change:  18.5,   changePct:  0.60 },
+  { symbol: "SILVER",   price: 34.50,   change:  0.28,   changePct:  0.82 },
+  { symbol: "OIL(WTI)", price: 68.40,   change: -0.72,   changePct: -1.04 },
+  { symbol: "^VIX",     price: 19.85,   change:  0.42,   changePct:  2.16 },
+  { symbol: "DXY",      price: 103.80,  change: -0.22,   changePct: -0.21 },
+  { symbol: "US10Y",    price: 4.285,   change:  0.018,  changePct:  0.42 },
+  { symbol: "SPY",      price: 558.20,  change:  1.95,   changePct:  0.35 },
+  { symbol: "QQQ",      price: 472.80,  change:  2.84,   changePct:  0.60 },
 ];
 
 function fmt(tick: Tick) {
-  if (tick.symbol.includes("/") || tick.symbol === "DXY") {
-    return tick.price.toFixed(4);
-  }
   if (tick.symbol === "US10Y") return tick.price.toFixed(3) + "%";
   if (tick.price > 1000) return tick.price.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (tick.symbol === "USD/JPY") return tick.price.toFixed(2);
+  if (tick.symbol.includes("/") || tick.symbol === "DXY") return tick.price.toFixed(4);
   return tick.price.toFixed(2);
 }
 
@@ -54,13 +56,14 @@ export function MarketBar() {
       setTicks(prev =>
         prev.map((t, i) => {
           const seed = SEED_TICKS[i].price;
-          const jitter = (Math.random() - 0.49) * seed * 0.0008;
+          const jitter = (Math.random() - 0.5) * seed * 0.0008;
           const raw = t.price + jitter;
           const lo = seed * 0.97;
           const hi = seed * 1.03;
           const newPrice = +(Math.max(lo, Math.min(hi, raw))).toFixed(seed < 10 ? 4 : seed < 100 ? 3 : 2);
-          const newChg = +(t.change + jitter * 0.3).toFixed(4);
-          const newPct = +(newChg / (newPrice - newChg) * 100).toFixed(2);
+          // Compute change relative to seed (day open) — prevents cumulative drift
+          const newChg = +(newPrice - seed).toFixed(seed < 10 ? 4 : seed < 100 ? 3 : 2);
+          const newPct = +(newChg / seed * 100).toFixed(2);
           return { ...t, price: newPrice, change: newChg, changePct: newPct };
         })
       );

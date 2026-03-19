@@ -379,16 +379,22 @@ _COINGECKO_IDS = {
 
 
 @router.get("/ohlcv/{ticker}")
-async def get_ohlcv(ticker: str):
+async def get_ohlcv(
+    ticker: str,
+    period: str = Query(default="6mo", regex="^(1d|5d|1mo|3mo|6mo|1y|2y)$"),
+    interval: str = Query(default="1d", regex="^(1m|5m|15m|30m|1h|4h|1d|1wk)$"),
+):
     """Return OHLCV candle data for the chart."""
 
     # ── 1. CoinGecko (primary source for crypto) ──────────────────────────────
     if ticker in _COINGECKO_IDS:
         try:
             coin_id = _COINGECKO_IDS[ticker]
+            _PERIOD_TO_DAYS = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730}
+            cg_days = _PERIOD_TO_DAYS.get(period, 180)
             url = (
                 f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-                f"/ohlc?vs_currency=usd&days=180"
+                f"/ohlc?vs_currency=usd&days={cg_days}"
             )
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(url)
@@ -422,7 +428,7 @@ async def get_ohlcv(ticker: str):
 
         def _sync():
             t = yf.Ticker(yf_ticker)
-            hist = t.history(period="6mo", interval="1d", auto_adjust=True)
+            hist = t.history(period=period, interval=interval, auto_adjust=True)
             if hist.empty:
                 raise ValueError("empty")
             candles = []
@@ -524,10 +530,14 @@ async def get_ohlcv(ticker: str):
 
         rng = random.Random(sum(ord(c) for c in ticker))
         now = int(datetime.utcnow().timestamp())
-        DAY = 86400
+        _PERIOD_BARS = {"1d": 390, "5d": 120, "1mo": 720, "3mo": 90, "6mo": 130, "1y": 252, "2y": 504}
+        n_bars = _PERIOD_BARS.get(period, 130)
+        _INTERVAL_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1wk": 604800}
+        bar_seconds = _INTERVAL_SECONDS.get(interval, 86400)
+        DAY = bar_seconds
         candles = []
         price = base
-        for i in range(130, 0, -1):
+        for i in range(n_bars, 0, -1):
             o = price
             change = rng.gauss(0.0002, daily_vol)
             c = round(o * (1 + change), 4 if is_forex else 2)

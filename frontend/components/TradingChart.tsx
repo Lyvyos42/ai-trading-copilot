@@ -22,9 +22,11 @@ interface TradingChartProps {
   signal?: Signal | null;
   /** When true the chart fills its parent container height instead of fixed 380px */
   fillContainer?: boolean;
+  period?: string;
+  interval?: string;
 }
 
-export function TradingChart({ ticker, signal, fillContainer }: TradingChartProps) {
+export function TradingChart({ ticker, signal, fillContainer, period = "6mo", interval = "1d" }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef     = useRef<LWChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,7 +41,7 @@ export function TradingChart({ ticker, signal, fillContainer }: TradingChartProp
       // Fetch real OHLCV from backend
       let candles: CandleBar[] = [];
       try {
-        const res = await fetch(`${API}/api/v1/market/ohlcv/${encodeURIComponent(ticker)}`);
+        const res = await fetch(`${API}/api/v1/market/ohlcv/${encodeURIComponent(ticker)}?period=${period}&interval=${interval}`);
         if (res.ok) {
           const data = await res.json();
           candles = data.candles ?? [];
@@ -125,7 +127,7 @@ export function TradingChart({ ticker, signal, fillContainer }: TradingChartProp
       window.removeEventListener("resize", handleResize);
       if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; }
     };
-  }, [ticker]); // re-run whenever ticker changes
+  }, [ticker, period, interval]); // re-run when ticker or timeframe changes
 
   return (
     <div className={fillContainer ? "w-full h-full relative" : "w-full relative rounded overflow-hidden border border-border/50 bg-card"}>

@@ -20,14 +20,18 @@ const CATEGORY_COLORS: Record<string, string> = {
 // Maps exchange → display group label
 const EXCHANGE_GROUP: Record<string, string> = {
   NASDAQ: "Equities", NYSE: "Equities",
+  LSE: "Equities", XETRA: "Equities", EPA: "Equities",
+  AMS: "Equities", SWX: "Equities", TSE: "Equities",
   FX: "Forex",
   CRYPTO: "Crypto",
   INDEX: "Indices",
   COMEX: "Commodities", NYMEX: "Commodities", ICE: "Commodities", CBOT: "Commodities",
+  OTC: "Commodities",
+  CME: "Futures", CBOE: "Futures",
 };
 
 // Stable display order for groups
-const GROUP_ORDER = ["Equities", "Crypto", "Forex", "Indices", "Commodities"];
+const GROUP_ORDER = ["Equities", "Crypto", "Forex", "Indices", "Commodities", "Futures"];
 
 const QUICK_PICKS = [
   // US Equities
@@ -42,23 +46,27 @@ const QUICK_PICKS = [
   // ETFs
   { symbol: "SPY",      exchange: "NYSE"   },
   { symbol: "QQQ",      exchange: "NASDAQ" },
-  { symbol: "IWM",      exchange: "NYSE"   },
   // Crypto
   { symbol: "BTC-USD",  exchange: "CRYPTO" },
   { symbol: "ETH-USD",  exchange: "CRYPTO" },
   { symbol: "SOL-USD",  exchange: "CRYPTO" },
-  // FX
+  // FX Majors
   { symbol: "EURUSD=X", exchange: "FX"     },
   { symbol: "GBPUSD=X", exchange: "FX"     },
   { symbol: "USDJPY=X", exchange: "FX"     },
-  // Commodities
-  { symbol: "GC=F",     exchange: "COMEX"  },
-  { symbol: "SI=F",     exchange: "COMEX"  },
-  { symbol: "CL=F",     exchange: "NYMEX"  },
+  { symbol: "AUDUSD=X", exchange: "FX"     },
+  // Metals & Energy — critical: XAUUSD must be here
+  { symbol: "XAUUSD",   exchange: "OTC"    },
+  { symbol: "XAGUSD",   exchange: "OTC"    },
+  { symbol: "USOIL",    exchange: "OTC"    },
   // Indices
-  { symbol: "^GSPC",    exchange: "INDEX"  },
-  { symbol: "^NDX",     exchange: "INDEX"  },
-  { symbol: "^VIX",     exchange: "INDEX"  },
+  { symbol: "US500",    exchange: "INDEX"  },
+  { symbol: "US100",    exchange: "INDEX"  },
+  { symbol: "US30",     exchange: "INDEX"  },
+  // Futures
+  { symbol: "GC=F",     exchange: "COMEX"  },
+  { symbol: "CL=F",     exchange: "NYMEX"  },
+  { symbol: "ES=F",     exchange: "CME"    },
 ];
 
 interface SymbolSearchProps {
