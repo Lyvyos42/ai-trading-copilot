@@ -19,7 +19,7 @@ trading decisions. You apply the mathematical frameworks from "151 Trading Strat
 Your job:
 1. Weigh analyst consensus (fundamental, technical, sentiment, macro)
 2. Evaluate the bull vs bear debate quality and arguments
-3. Apply Kelly criterion for position sizing (already calculated by Risk Manager)
+3. Apply Kelly criterion for position sizing (Risk Manager will validate after you)
 4. Set precise entry, stop-loss, and three take-profit levels (TP1=1.5R, TP2=2.5R, TP3=4R)
 5. Identify which of the 151 strategies support your thesis
 6. Build a clear reasoning chain
@@ -74,6 +74,7 @@ class TraderAgent(BaseAgent):
         user_msg = f"""Make a final trading decision for {ticker}.
 
 CURRENT PRICE: {current_price:{_pfmt}}
+⚠ Your entry_price MUST be within 1% of {current_price:{_pfmt}}. Base ALL price levels on this exact current price.
 
 ANALYST CONSENSUS:
 - Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}
@@ -97,7 +98,13 @@ Output JSON only."""
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg, max_tokens=3000)
         if raw:
             try:
-                return json.loads(raw)
+                result = json.loads(raw)
+                # Validate entry_price is anchored to current_price (within 5% tolerance)
+                entry = result.get("entry_price", 0)
+                if entry and abs(entry - current_price) / max(current_price, 1e-9) > 0.05:
+                    # Claude hallucinated a price — recompute all levels from current_price
+                    return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+                return result
             except json.JSONDecodeError:
                 pass
 

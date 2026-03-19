@@ -28,7 +28,16 @@ class BaseAgent:
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
-            return message.content[0].text
+            text = message.content[0].text.strip()
+            # Strip markdown code fences that Claude often wraps JSON in
+            if text.startswith("```"):
+                # Remove opening fence (```json or ```)
+                text = text.split("\n", 1)[-1] if "\n" in text else text
+                # Remove closing fence
+                if text.endswith("```"):
+                    text = text[: text.rfind("```")]
+                text = text.strip()
+            return text
         except Exception as e:
             log.warning("claude_call_failed", agent=self.name, error=str(e))
             return ""

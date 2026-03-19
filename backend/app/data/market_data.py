@@ -84,14 +84,14 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     """Main entry point. Resolves TV-style display symbols to yfinance tickers, then fetches."""
     yf_ticker = resolve_ticker(ticker)
     try:
-        data = await _fetch_yfinance(yf_ticker)
+        data = await _fetch_yfinance(yf_ticker, asset_class)
         data["ticker"] = ticker  # keep display symbol in response
         return data
     except Exception:
         return _mock_market_data(ticker, asset_class)
 
 
-async def _fetch_yfinance(ticker: str) -> dict:
+async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
     """Fetch OHLCV + fundamentals from Yahoo Finance (free, no key required)."""
     import yfinance as yf  # lazy import so missing package degrades gracefully
 
@@ -133,7 +133,7 @@ async def _fetch_yfinance(ticker: str) -> dict:
 
         return {
             "ticker": ticker,
-            "asset_class": "stocks",
+            "asset_class": asset_class,
             "close": current_close,
             "open":  round(float(hist["Open"].iloc[-1]), dec),
             "high":  highs[-1],
@@ -162,7 +162,7 @@ async def _fetch_yfinance(ticker: str) -> dict:
 # Used when yfinance is unavailable so the mock is plausible, not random.
 _KNOWN_PRICES: dict[str, float] = {
     # ── US Large-Cap Stocks ────────────────────────────────────────────────────
-    "AAPL": 225.0,  "MSFT": 415.0,  "NVDA": 875.0,  "GOOGL": 175.0, "AMZN": 200.0,
+    "AAPL": 225.0,  "MSFT": 415.0,  "NVDA": 115.0,  "GOOGL": 175.0, "AMZN": 200.0,
     "META": 600.0,  "TSLA": 195.0,  "JPM":  240.0,  "V":     290.0, "MA":   490.0,
     "BRK.B":460.0,  "XOM":  115.0,  "CVX":  155.0,  "WMT":    95.0, "HD":   380.0,
     "GS":   580.0,  "BAC":   44.0,  "MS":   130.0,  "NFLX":  980.0, "AMD":  125.0,

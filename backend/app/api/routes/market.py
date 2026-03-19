@@ -455,6 +455,17 @@ async def get_ohlcv(ticker: str):
             "EURGBP=X":0.855,"EURJPY=X":161.0,"GBPJPY=X":192.0,"EURCHF=X":0.955,
             "EURAUD=X":1.715,"GBPAUD=X":2.040,"AUDJPY=X":94.5, "CADJPY=X":109.5,
             "USDTRY=X":38.5,"USDZAR=X":18.5, "USDMXN=X":17.8,"USDSGD=X":1.335,
+            # FX display name aliases (TV-style, without =X suffix)
+            "EURUSD":1.085, "GBPUSD":1.295, "USDJPY":148.5, "AUDUSD":0.635,
+            "USDCAD":1.355, "USDCHF":0.895, "NZDUSD":0.583,
+            "EURGBP":0.855, "EURJPY":161.0, "GBPJPY":192.0, "EURCHF":0.955,
+            "EURAUD":1.715, "EURCAD":1.565, "EURNZD":1.860, "GBPAUD":2.040,
+            "GBPCAD":1.830, "GBPCHF":1.140, "GBPNZD":2.215, "AUDJPY":94.5,
+            "AUDCAD":0.860, "AUDCHF":0.568, "AUDNZD":1.090, "CADJPY":109.5,
+            "CADCHF":0.661, "CHFJPY":165.5, "NZDJPY":86.5,  "NZDCAD":0.788,
+            "NZDCHF":0.523, "USDTRY":38.5,  "USDZAR":18.5,  "USDMXN":17.8,
+            "USDSEK":10.45, "USDNOK":10.85, "USDSGD":1.335, "USDHKD":7.782,
+            "USDCNH":7.25,  "USDINR":84.5,  "USDBRL":5.85,  "USDKRW":1360.0,
             # Metals & Commodities
             "GC=F":3100,  "SI=F":34.5,   "HG=F":4.55,  "PL=F":990,  "PA=F":950,
             "CL=F":68,    "BZ=F":72,     "NG=F":4.2,   "RB=F":2.15, "HO=F":2.45,
@@ -480,7 +491,7 @@ async def get_ohlcv(ticker: str):
             "GDX":43,   "SOXX":210, "SMH":225,  "EEM":42,   "VWO":43,
             "EFA":78,   "VGK":66,   "EWJ":70,   "EWZ":28,   "FXI":28,
             # US Stocks
-            "AAPL":225, "MSFT":415, "NVDA":875, "GOOGL":175,"AMZN":200,
+            "AAPL":225, "MSFT":415, "NVDA":115, "GOOGL":175,"AMZN":200,
             "META":600, "TSLA":195, "JPM":240,  "V":290,    "MA":490,
             "BRK.B":460,"XOM":115,  "CVX":155,  "WMT":95,   "HD":380,
             "GS":580,   "BAC":44,   "MS":130,   "NFLX":980, "AMD":125,
