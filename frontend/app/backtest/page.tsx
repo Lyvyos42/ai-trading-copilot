@@ -119,6 +119,7 @@ export default function BacktestPage() {
   const [period, setPeriod]         = useState("1Y");
   const [result, setResult]         = useState<BacktestResult | null>(null);
   const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
 
   useEffect(() => {
     listStrategies().then((d) => setStrategies(d.strategies));
@@ -126,11 +127,12 @@ export default function BacktestPage() {
 
   async function handleRun() {
     setLoading(true);
+    setError(null);
     try {
       const res = await runBacktest(selected, ticker, period);
       setResult(res as BacktestResult);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : "Backtest failed — backend may be waking up, try again in 30s");
     } finally {
       setLoading(false);
     }
@@ -310,8 +312,20 @@ export default function BacktestPage() {
           ) : (
             <div className="terminal-panel" style={{ minHeight: 400 }}>
               <div className="flex flex-col items-center justify-center h-96 gap-3">
-                <div className="text-primary/15 font-mono text-5xl">[ ]</div>
-                <span className="terminal-label">CONFIGURE A STRATEGY AND HIT RUN BACKTEST</span>
+                {error ? (
+                  <>
+                    <div className="text-bear/40 font-mono text-5xl">[ ! ]</div>
+                    <span className="terminal-label text-bear">{error}</span>
+                    <button onClick={handleRun} disabled={loading} className="mt-2 px-4 py-1.5 text-xs font-mono border border-primary/40 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40">
+                      RETRY
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-primary/15 font-mono text-5xl">[ ]</div>
+                    <span className="terminal-label">CONFIGURE A STRATEGY AND HIT RUN BACKTEST</span>
+                  </>
+                )}
               </div>
             </div>
           )}
