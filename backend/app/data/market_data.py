@@ -81,6 +81,18 @@ def resolve_ticker(display_symbol: str) -> str:
     return _TICKER_ALIAS.get(upper, upper)
 
 
+# Some Yahoo Finance tickers (e.g. XAUUSD=X) 404 on the v8/finance/chart REST API
+# but have a working equivalent that returns the live regularMarketPrice.
+# This mapping is used ONLY for the REST spot-price call — OHLCV history still
+# uses the =X tickers which are more stable for daily bar data.
+_REST_ALIAS: dict[str, str] = {
+    "XAUUSD=X": "GC=F",   # Spot gold → Gold Futures (live REST price is accurate)
+    "XAGUSD=X": "SI=F",   # Spot silver → Silver Futures
+    "XPTUSD=X": "PL=F",   # Spot platinum → Platinum Futures
+    "XPDUSD=X": "PA=F",   # Spot palladium → Palladium Futures
+}
+
+
 # Maps display symbols → (TradingView symbol, exchange) for tvDatafeed.
 # Covers FX, metals, indices, energy, commodities, crypto.
 # Stocks/ETFs not listed here — yfinance handles those better (plus fundamentals).
@@ -249,24 +261,80 @@ async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
     return await asyncio.to_thread(_sync)
 
 
+async def _fetch_rest_spot_price(yf_sym: str) -> float | None:
+    """Fetch live regularMarketPrice from Yahoo Finance Chart REST API.
+
+    Uses safe="=^." so tickers like GC=F, ^GSPC, DX-Y.NYB keep their
+    literal characters in the URL path and are not percent-encoded.
+    Applies _REST_ALIAS so that =X tickers that 404 (e.g. XAUUSD=X) are
+    automatically mapped to their working equivalent (e.g. GC=F).
+    Always returns the current live market price regardless of bar/contract data.
+    """
+    import urllib.request as _urlreq
+    import urllib.parse   as _urlpar
+    import json           as _json
+
+    rest_sym = _REST_ALIAS.get(yf_sym, yf_sym)
+
+    def _sync() -> float | None:
+        try:
+            safe = _urlpar.quote(rest_sym, safe="=^.")
+            url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
+                    f"?interval=1m&range=1d")
+            req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with _urlreq.urlopen(req, timeout=6) as r:
+                meta = _json.loads(r.read())["chart"]["result"][0]["meta"]
+                p = float(meta.get("regularMarketPrice") or 0)
+                return p if p > 0 else None
+        except Exception:
+            return None
+
+    return await asyncio.to_thread(_sync)
+
+
 async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
-    """Main entry point. TradingView → yfinance → mock fallback chain."""
+    """Main entry point. TradingView → yfinance → mock fallback chain.
+
+    Always fetches the live regularMarketPrice via Yahoo Finance REST in parallel
+    with OHLCV data and injects it into data["close"], so agents always receive
+    the current market price rather than a stale historical bar close.
+    """
+    yf_sym = resolve_ticker(ticker)
+
+    # Start live-price REST fetch concurrently — independent of OHLCV source.
+    # This is the authoritative current price and overrides whatever close the
+    # historical bar data returns (fixes GC=F/XAUUSD=X contract-roll staleness).
+    live_price_task = asyncio.create_task(_fetch_rest_spot_price(yf_sym))
+
     # 1. TradingView (real-time, covers FX/metals/indices/crypto/commodities)
+    data = None
     try:
         data = await _fetch_tvdatafeed(ticker, asset_class)
-        if data:
-            return data
     except Exception:
         pass
 
     # 2. yfinance (15-min delayed, good for stocks/ETFs + fundamentals)
-    yf_ticker = resolve_ticker(ticker)
-    try:
-        data = await _fetch_yfinance(yf_ticker, asset_class)
-        data["ticker"] = ticker  # keep display symbol in response
-        return data
-    except Exception:
-        return _mock_market_data(ticker, asset_class)
+    if not data:
+        try:
+            data = await _fetch_yfinance(yf_sym, asset_class)
+            data["ticker"] = ticker  # keep display symbol in response
+        except Exception:
+            pass
+
+    # 3. Mock fallback
+    if not data:
+        data = _mock_market_data(ticker, asset_class)
+
+    # Inject the live REST price as the close — overrides any stale bar value.
+    # Agents read data["close"] as current_price, so this is the critical fix.
+    live_price = await live_price_task
+    if live_price and live_price > 0:
+        dec = data.get("price_decimals") or _price_decimals(live_price)
+        data["close"] = round(live_price, dec)
+        if data.get("closes"):
+            data["closes"][-1] = round(live_price, dec)
+
+    return data
 
 
 async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
@@ -300,7 +368,7 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
             import urllib.parse   as _urlpar
             import json           as _json
             try:
-                safe = _urlpar.quote(sym, safe="")
+                safe = _urlpar.quote(sym, safe="=^.")
                 url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
                         f"?interval=1m&range=1d")
                 req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -311,7 +379,7 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
             except Exception:
                 return None
 
-        live_price = _rest_live_price(ticker)
+        live_price = _rest_live_price(_REST_ALIAS.get(ticker, ticker))
 
         # Fallback: for equities only, try fast_info if REST failed
         if live_price is None:

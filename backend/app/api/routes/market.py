@@ -413,7 +413,7 @@ def _fetch_one(display: str, yf_sym: str):
     def _rest_quote(sym: str) -> tuple[float, float] | None:
         """Yahoo Finance Chart API — regularMarketPrice is always the live price."""
         try:
-            safe = _urlpar.quote(sym, safe="")
+            safe = _urlpar.quote(sym, safe="=^.")
             url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
                     f"?interval=1m&range=1d")
             req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -436,9 +436,18 @@ def _fetch_one(display: str, yf_sym: str):
         pc = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else p
         return (p, pc) if p > 0 else None
 
+    # Some =X tickers 404 on the REST API (e.g. XAUUSD=X) — use futures equivalent.
+    _REST_MAP = {
+        "XAUUSD=X": "GC=F",
+        "XAGUSD=X": "SI=F",
+        "XPTUSD=X": "PL=F",
+        "XPDUSD=X": "PA=F",
+    }
+    rest_sym = _REST_MAP.get(yf_sym, yf_sym)
+
     try:
         # 1. Always try REST first — gives live regularMarketPrice
-        result = _rest_quote(yf_sym)
+        result = _rest_quote(rest_sym)
 
         # 2. If REST failed or price is out of known bounds, fall back
         if result is None or not (lo <= result[0] <= hi):
