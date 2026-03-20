@@ -363,20 +363,55 @@ _BAR_YF: dict[str, str] = {
     "BTC":      "BTC-USD",  "ETH":     "ETH-USD",
     "EUR/USD":  "EURUSD=X", "GBP/USD": "GBPUSD=X",  "USD/JPY": "USDJPY=X",
     "GOLD":     "GC=F",     "SILVER":  "SI=F",       "OIL(WTI)":"CL=F",
-    "^VIX":     "^VIX",     "DXY":     "DX-Y.NYB",  "US10Y":   "^TNX",
+    "^VIX":     "^VIX",     "DXY":     "DX=F",       "US10Y":   "^TNX",
     "SPY":      "SPY",      "QQQ":     "QQQ",
 }
 
 # Cache quotes for 60 seconds to avoid hammering yfinance on every request
-_quotes_cache: dict | None = None
+_quotes_cache: list | None = None
 _quotes_cache_ts: float = 0.0
 _QUOTES_TTL = 60  # seconds
+
+
+def _fetch_one(display: str, yf_sym: str):
+    """Fetch a single ticker via fast_info — reliable across all asset classes."""
+    import yfinance as yf
+    try:
+        t = yf.Ticker(yf_sym)
+        fi = t.fast_info
+        price      = fi.last_price
+        prev_close = fi.previous_close
+        if not price or not prev_close:
+            return None
+        change     = price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close else 0.0
+
+        if display in ("EUR/USD", "GBP/USD", "DXY"):
+            price_fmt = round(price, 4)
+        elif display == "USD/JPY":
+            price_fmt = round(price, 2)
+        elif display == "US10Y":
+            price_fmt = round(price, 3)
+        elif price > 1000:
+            price_fmt = round(price, 0)
+        else:
+            price_fmt = round(price, 2)
+
+        return {
+            "symbol":    display,
+            "price":     price_fmt,
+            "change":    round(change, 4),
+            "changePct": round(change_pct, 2),
+        }
+    except Exception:
+        return None
 
 
 @router.get("/quotes")
 async def get_quotes():
     """
     Return real-time prices + day-change for the market bar tickers.
+    Uses fast_info per-ticker (reliable across stocks, forex, futures, crypto).
     Cached for 60s to avoid yfinance rate limits.
     """
     global _quotes_cache, _quotes_cache_ts
@@ -385,57 +420,13 @@ async def get_quotes():
     if _quotes_cache and (_time.time() - _quotes_cache_ts) < _QUOTES_TTL:
         return _quotes_cache
 
-    import yfinance as yf
-
-    yf_symbols = list(_BAR_YF.values())
-    results = []
-
-    try:
-        # Batch download: period=2d gives us today + yesterday close for change calc
-        data = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: yf.download(yf_symbols, period="2d", interval="1h",
-                                 group_by="ticker", auto_adjust=True, progress=False)
-        )
-
-        for display, yf_sym in _BAR_YF.items():
-            try:
-                if len(yf_symbols) == 1:
-                    closes = data["Close"].dropna()
-                else:
-                    closes = data[yf_sym]["Close"].dropna()
-
-                if len(closes) < 2:
-                    raise ValueError("not enough data")
-
-                price      = float(closes.iloc[-1])
-                prev_close = float(closes.iloc[0])   # first candle of 2d window ≈ yesterday close
-                change     = price - prev_close
-                change_pct = (change / prev_close * 100) if prev_close else 0.0
-
-                # Format price to appropriate decimals
-                if display in ("EUR/USD", "GBP/USD", "DXY"):
-                    price_fmt = round(price, 4)
-                elif display == "USD/JPY":
-                    price_fmt = round(price, 2)
-                elif display == "US10Y":
-                    price_fmt = round(price, 3)
-                elif price > 1000:
-                    price_fmt = round(price, 0)
-                else:
-                    price_fmt = round(price, 2)
-
-                results.append({
-                    "symbol":    display,
-                    "price":     price_fmt,
-                    "change":    round(change, 4),
-                    "changePct": round(change_pct, 2),
-                })
-            except Exception:
-                pass   # skip tickers that fail; frontend keeps seed value
-
-    except Exception:
-        pass  # full fetch failure — frontend keeps seed values
+    loop = asyncio.get_event_loop()
+    tasks = [
+        loop.run_in_executor(None, _fetch_one, display, yf_sym)
+        for display, yf_sym in _BAR_YF.items()
+    ]
+    raw = await asyncio.gather(*tasks)
+    results = [r for r in raw if r is not None]
 
     if results:
         _quotes_cache    = results
