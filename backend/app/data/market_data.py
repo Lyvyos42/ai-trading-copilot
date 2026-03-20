@@ -283,14 +283,35 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
         except Exception:
             pass
 
+        # Use fast_info.last_price for the live current price — history() only
+        # returns the previous session's close which can be hours stale.
+        live_price = None
+        try:
+            fi = tk.fast_info
+            if fi.last_price and fi.last_price > 0:
+                live_price = fi.last_price
+        except Exception:
+            pass
+
         # Determine decimal precision from price magnitude
-        sample_price = float(hist["Close"].iloc[-1])
+        sample_price = live_price or float(hist["Close"].iloc[-1])
         dec = _price_decimals(sample_price)
 
         closes  = [round(float(p), dec) for p in hist["Close"].tolist()]
         highs   = [round(float(p), dec) for p in hist["High"].tolist()]
         lows    = [round(float(p), dec) for p in hist["Low"].tolist()]
         volumes = [int(v) for v in hist["Volume"].tolist()]
+
+        # Patch the last close with the live price so entry/SL/TP are calculated
+        # from the current market price, not yesterday's close.
+        if live_price:
+            closes[-1] = round(live_price, dec)
+            # Also update last high/low to reflect intraday range
+            try:
+                highs[-1] = max(highs[-1], closes[-1])
+                lows[-1]  = min(lows[-1],  closes[-1])
+            except Exception:
+                pass
 
         current_close = closes[-1]
         prev_close    = closes[-2] if len(closes) >= 2 else current_close
