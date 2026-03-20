@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { MarketBar } from "@/components/MarketBar";
+import { KeepAlive } from "@/components/KeepAlive";
 
 export const metadata: Metadata = {
   title: "AI Trading Copilot — Bloomberg-Style Multi-Agent Terminal",
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="fixed top-10 left-0 right-0 z-40">
           <MarketBar />
         </div>
+        <KeepAlive />
         {/* Page content — offset for both bars (navbar=40px, marketbar=32px) */}
         <main className="pt-[72px]">{children}</main>
       </body>

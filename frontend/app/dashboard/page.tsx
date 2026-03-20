@@ -21,15 +21,21 @@ export default function DashboardPage() {
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [loading, setLoading]               = useState(false);
   const [analysisError, setAnalysisError]   = useState<string | null>(null);
-  const [activeTicker, setActiveTicker]     = useState("AAPL");
+  const [activeTicker, setActiveTicker]     = useState(() =>
+    (typeof window !== "undefined" && localStorage.getItem("dashboard_ticker")) || "AAPL"
+  );
 const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
   const { isLoggedIn } = useAuth();
 
   useEffect(() => {
-    wakeBackend(); // pre-warm Render so it's ready when user clicks RUN AI ANALYSIS
+    wakeBackend();
     loadData();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_ticker", activeTicker);
+  }, [activeTicker]);
 
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
