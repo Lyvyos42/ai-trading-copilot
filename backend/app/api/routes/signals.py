@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import get_optional_user
 from app.db.database import get_db
 from app.models.signal import Signal
+from app.models.user import User
 from app.pipeline.graph import run_pipeline
 
 router = APIRouter(prefix="/api/v1/signals", tags=["signals"])
@@ -142,7 +143,10 @@ async def generate_signal(
     # ── Authenticated user guards ────────────────────────────────────────────────
     if user:
         user_id = user.get("sub", "")
-        tier = user.get("tier", "free") or "free"
+        # Fetch real tier from DB — Supabase JWTs don't carry a tier claim
+        db_user_result = await db.execute(select(User).where(User.id == user_id))
+        db_user = db_user_result.scalar_one_or_none()
+        tier = (db_user.tier if db_user else None) or user.get("tier", "free") or "free"
         is_admin = tier == "admin"
 
         if not is_admin:
