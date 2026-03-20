@@ -281,8 +281,8 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
         "reasoning_chain": signal.reasoning_chain,
         "strategy_sources": signal.strategy_sources,
         "status": signal.status,
-        "timestamp": signal.created_at.isoformat() if signal.created_at else None,
-        "expiry_time": signal.expiry_time.isoformat() if signal.expiry_time else None,
+        "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
+        "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,
     }
     if state:
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")

@@ -57,7 +57,7 @@ async def get_positions(
             "unrealized_pnl": round(pnl, 2),
             "unrealized_pnl_pct": round(pnl / (p.entry_price * p.quantity) * 100, 2),
             "status": p.status,
-            "opened_at": p.opened_at.isoformat(),
+            "opened_at": (p.opened_at.isoformat() + "Z") if p.opened_at else None,
             "is_paper": p.is_paper,
         })
     return enriched
