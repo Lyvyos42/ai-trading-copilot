@@ -16,12 +16,12 @@ class JSONEncodedValue(TypeDecorator):
         return _json.dumps(value) if value is not None else "{}"
 
     def process_result_value(self, value, dialect):
-        if value:
-            try:
-                return _json.loads(value)
-            except Exception:
-                return {}
-        return {}
+        if value is None or value == "":
+            return {}
+        try:
+            return _json.loads(value)
+        except Exception:
+            return {}
 
 
 class Signal(Base):
@@ -42,7 +42,7 @@ class Signal(Base):
     agent_votes: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
     reasoning_chain: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
     strategy_sources: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
-    timeframe_levels: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
+    timeframe_levels: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=True, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default="ACTIVE")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expiry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)

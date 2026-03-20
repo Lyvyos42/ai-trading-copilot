@@ -29,6 +29,22 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+        # ── Column migrations (poor-man's Alembic) ────────────────────────────
+        # create_all never alters existing tables, so new columns must be added
+        # explicitly. Each statement is wrapped in try/except so it's idempotent:
+        # PostgreSQL raises ProgrammingError, SQLite raises OperationalError,
+        # both are silently ignored when the column already exists.
+        from sqlalchemy import text as _text
+        _migrations = [
+            "ALTER TABLE signals ADD COLUMN timeframe_levels TEXT DEFAULT '{}'",
+        ]
+        async with engine.begin() as conn:
+            for _stmt in _migrations:
+                try:
+                    await conn.execute(_text(_stmt))
+                except Exception:
+                    pass  # column already exists — safe to ignore
+
         # Seed demo user
         from app.db.database import AsyncSessionLocal
         from app.models.user import User
