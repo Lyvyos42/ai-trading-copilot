@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart2, Briefcase, ChevronDown, Crown, LayoutDashboard, LogOut, Menu, Newspaper, Shield, X, Zap } from "lucide-react";
+import { Activity, BarChart2, Briefcase, ChevronDown, Crown, LayoutDashboard, LogOut, Menu, Newspaper, Shield, X, Zap, BellRing } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -49,7 +49,7 @@ function getInitials(email: string): string {
   return email.charAt(0).toUpperCase();
 }
 
-export function Navbar() {
+export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
   const pathname  = usePathname();
   const router    = useRouter();
   const { user, tier, isLoggedIn, loading } = useAuth();
@@ -124,7 +124,8 @@ export function Navbar() {
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center h-full">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
+            const active  = pathname === href || pathname.startsWith(href + "/");
+            const isIntel = href === "/news";
             return (
               <Link
                 key={href}
@@ -138,6 +139,9 @@ export function Navbar() {
               >
                 <Icon className="h-3 w-3" />
                 {label}
+                {isIntel && unreadAlerts > 0 && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-bear animate-pulse" />
+                )}
               </Link>
             );
           })}

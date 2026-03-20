@@ -1,11 +1,23 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2 } from "lucide-react";
+import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils";
+import { ScannerPanel } from "@/components/ScannerPanel";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface ScannerAlert {
+  id:         string;
+  ticker:     string;
+  direction:  string;
+  confidence: number;
+  summary:    string;
+  entry_hint: number;
+  created_at: string;
+  read:       boolean;
+}
 
 interface Article {
   id:              string;
@@ -66,6 +78,22 @@ export default function NewsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [waking, setWaking]         = useState(false);
+  const [scanAlerts, setScanAlerts] = useState<ScannerAlert[]>([]);
+
+  // Load recent scanner alerts on mount
+  useEffect(() => {
+    async function loadAlerts() {
+      try {
+        const token = localStorage.getItem("sb-access-token") || localStorage.getItem("token");
+        if (!token) return;
+        const res = await fetch(`${API}/api/v1/alerts?limit=10`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setScanAlerts(await res.json());
+      } catch { /* not premium or not logged in — skip */ }
+    }
+    loadAlerts();
+  }, []);
 
   const loadNews = useCallback(async (category: string) => {
     setFetchError(null);
@@ -258,9 +286,73 @@ export default function NewsPage() {
           ))}
         </div>
 
-        {/* RIGHT SIDEBAR — Source stats */}
+        {/* RIGHT SIDEBAR — Agent Alerts + Scanner + Sources */}
         <div className="w-56 shrink-0 border-l border-border overflow-y-auto">
+
+          {/* Agent Alerts feed */}
           <div className="terminal-header">
+            <BellRing className="h-2.5 w-2.5 text-primary" />
+            <span className="terminal-label ml-1">AGENT ALERTS</span>
+            {scanAlerts.filter(a => !a.read).length > 0 && (
+              <span className="ml-auto text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                {scanAlerts.filter(a => !a.read).length} NEW
+              </span>
+            )}
+          </div>
+
+          {scanAlerts.length === 0 ? (
+            <div className="px-3 py-3 text-[8px] font-mono text-muted-foreground/60">
+              No alerts yet. Configure the scanner below.
+            </div>
+          ) : (
+            <div>
+              {scanAlerts.slice(0, 5).map(alert => {
+                const isLong = alert.direction === "LONG";
+                return (
+                  <div key={alert.id} className={cn(
+                    "px-3 py-2 border-b border-border/40 text-[8px] font-mono",
+                    !alert.read && "bg-primary/[0.03]"
+                  )}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center gap-1">
+                        <span className={cn(
+                          "px-1 py-0.5 rounded font-bold",
+                          isLong ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                        )}>
+                          {alert.direction}
+                        </span>
+                        <span className="font-bold text-foreground">{alert.ticker}</span>
+                      </div>
+                      <span className={cn(
+                        "font-bold",
+                        alert.confidence >= 80 ? "text-bull" : "text-warn"
+                      )}>
+                        {Math.round(alert.confidence)}%
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground line-clamp-2 leading-relaxed">{alert.summary}</div>
+                    <div className="text-muted-foreground/50 mt-0.5">{timeAgo(alert.created_at)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Scanner config panel */}
+          <div className="terminal-header mt-1">
+            <Zap className="h-2.5 w-2.5 text-primary" />
+            <span className="terminal-label ml-1">SCANNER CONFIG</span>
+          </div>
+          <ScannerPanel onConfigChange={() => {
+            // Refresh alerts after config change
+            const token = localStorage.getItem("sb-access-token") || localStorage.getItem("token");
+            if (!token) return;
+            fetch(`${API}/api/v1/alerts?limit=10`, { headers: { Authorization: `Bearer ${token}` } })
+              .then(r => r.json()).then(setScanAlerts).catch(() => {});
+          }} />
+
+          {/* Sources header */}
+          <div className="terminal-header mt-1">
             <span className="terminal-label">SOURCES</span>
           </div>
 

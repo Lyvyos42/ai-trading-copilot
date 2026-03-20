@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market, news
+from app.api.routes.scanner import router as scanner_router, alerts_router
 from app.api.websocket import router as ws_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -23,7 +24,8 @@ async def lifespan(app: FastAPI):
         import app.models.user  # noqa: F401
         import app.models.signal  # noqa: F401
         import app.models.portfolio  # noqa: F401
-        import app.models.news  # noqa: F401
+        import app.models.news   # noqa: F401
+        import app.models.alert  # noqa: F401
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -108,6 +110,8 @@ app.include_router(backtest.router)
 app.include_router(debate.router)
 app.include_router(market.router)
 app.include_router(news.router)
+app.include_router(scanner_router)
+app.include_router(alerts_router)
 app.include_router(ws_router)
 
 

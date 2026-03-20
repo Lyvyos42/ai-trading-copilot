@@ -1,48 +1,85 @@
 """
-WS /ws/v1/signals/stream — real-time signal stream via WebSocket.
+WS /ws/v1/signals/stream — real-time signal + alert stream via WebSocket.
 
-Clients connect and optionally subscribe to specific tickers.
-The server periodically emits live signals for subscribed tickers.
+Clients connect with an optional ?token=<jwt> query param.
+- All clients: can subscribe/unsubscribe to tickers, receive pings.
+- Pro/Enterprise/Admin clients: automatically receive scanner alerts
+  broadcast to their user_id.
 """
 import asyncio
 import json
-import random
 from datetime import datetime, timezone
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.pipeline.graph import run_pipeline
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from typing import Optional
 
 router = APIRouter()
 
-# Connected clients: {websocket: set_of_subscribed_tickers}
-_clients: dict[WebSocket, set[str]] = {}
+PREMIUM_TIERS = {"pro", "enterprise", "admin"}
+
+# Connected clients: websocket → {tickers: set, user_id: str|None, tier: str}
+_clients: dict[WebSocket, dict] = {}
+
+
+def _decode_user(token: str | None) -> tuple[str | None, str]:
+    """Extract (user_id, tier) from a JWT token. Returns (None, 'free') on failure."""
+    if not token:
+        return None, "free"
+    try:
+        from jose import jwt
+        from app.config import settings
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm],
+                             options={"verify_exp": False})
+        return payload.get("sub"), payload.get("tier", "free") or "free"
+    except Exception:
+        # Supabase asymmetric token — try without verification for tier claim only
+        try:
+            from jose import jwt as _jwt
+            payload = _jwt.get_unverified_claims(token)
+            # Supabase stores app metadata in user_metadata or app_metadata
+            tier = (
+                payload.get("tier")
+                or payload.get("user_metadata", {}).get("tier")
+                or payload.get("app_metadata", {}).get("tier")
+                or "free"
+            )
+            return payload.get("sub"), tier
+        except Exception:
+            return None, "free"
 
 
 @router.websocket("/ws/v1/signals/stream")
-async def signal_stream(ws: WebSocket):
+async def signal_stream(ws: WebSocket, token: Optional[str] = Query(default=None)):
     await ws.accept()
-    _clients[ws] = set()
+
+    user_id, tier = _decode_user(token)
+    _clients[ws] = {"tickers": set(), "user_id": user_id, "tier": tier}
+
+    # Inform client of their tier on connect
+    await ws.send_json({
+        "type":    "connected",
+        "user_id": user_id,
+        "tier":    tier,
+        "premium": tier in PREMIUM_TIERS,
+    })
 
     try:
-        # Start background signal emitter for this connection
-        emit_task = asyncio.create_task(_emit_signals(ws))
-
         async for raw_msg in ws.iter_text():
             try:
-                msg = json.loads(raw_msg)
+                msg    = json.loads(raw_msg)
                 action = msg.get("action")
                 tickers = msg.get("tickers", [])
 
                 if action == "subscribe" and tickers:
-                    _clients[ws].update(t.upper() for t in tickers)
-                    await ws.send_json({"type": "subscribed", "tickers": list(_clients[ws])})
+                    _clients[ws]["tickers"].update(t.upper() for t in tickers)
+                    await ws.send_json({"type": "subscribed", "tickers": list(_clients[ws]["tickers"])})
 
                 elif action == "unsubscribe" and tickers:
                     for t in tickers:
-                        _clients[ws].discard(t.upper())
-                    await ws.send_json({"type": "unsubscribed", "tickers": list(_clients[ws])})
+                        _clients[ws]["tickers"].discard(t.upper())
+                    await ws.send_json({"type": "unsubscribed", "tickers": list(_clients[ws]["tickers"])})
 
                 elif action == "ping":
-                    await ws.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    await ws.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat() + "Z"})
 
             except (json.JSONDecodeError, KeyError):
                 await ws.send_json({"type": "error", "detail": "Invalid message format"})
@@ -51,43 +88,31 @@ async def signal_stream(ws: WebSocket):
         pass
     finally:
         _clients.pop(ws, None)
-        emit_task.cancel()
-
-
-async def _emit_signals(ws: WebSocket):
-    """Every 15 seconds, run the pipeline on subscribed tickers and push signals."""
-    DEFAULT_TICKERS = ["AAPL", "TSLA", "NVDA", "SPY"]
-    while True:
-        await asyncio.sleep(15)
-        tickers = list(_clients.get(ws, set())) or DEFAULT_TICKERS[:1]
-
-        for ticker in tickers:
-            try:
-                state = await run_pipeline(ticker=ticker)
-                final = state.get("final_signal", {})
-                if final:
-                    await ws.send_json({
-                        "type": "signal",
-                        "ticker": ticker,
-                        "direction": final.get("direction"),
-                        "entry_price": final.get("entry_price"),
-                        "stop_loss": final.get("stop_loss"),
-                        "take_profit_1": final.get("take_profit_1"),
-                        "confidence_score": final.get("confidence_score"),
-                        "strategy_sources": final.get("strategy_sources", []),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
-            except Exception as e:
-                await ws.send_json({"type": "error", "ticker": ticker, "detail": str(e)})
 
 
 async def broadcast_signal(ticker: str, signal: dict):
     """Broadcast a signal to all clients subscribed to that ticker."""
     dead = []
-    for ws, subs in _clients.items():
-        if ticker in subs or not subs:
+    for ws, meta in _clients.items():
+        if ticker.upper() in meta["tickers"] or not meta["tickers"]:
             try:
                 await ws.send_json({"type": "signal", **signal})
+            except Exception:
+                dead.append(ws)
+    for ws in dead:
+        _clients.pop(ws, None)
+
+
+async def broadcast_alert(user_id: str, alert: dict):
+    """
+    Push a scanner alert to the specific premium user's WebSocket connection.
+    Only sends to connections that match user_id and have a premium tier.
+    """
+    dead = []
+    for ws, meta in _clients.items():
+        if meta.get("user_id") == user_id and meta.get("tier") in PREMIUM_TIERS:
+            try:
+                await ws.send_json({"type": "alert", **alert})
             except Exception:
                 dead.append(ws)
     for ws in dead:
