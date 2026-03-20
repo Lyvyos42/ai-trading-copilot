@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 
-export type UserTier = "visitor" | "free" | "retail" | "pro" | "enterprise";
+export type UserTier = "visitor" | "free" | "retail" | "pro" | "enterprise" | "admin";
 
 export interface AuthUser {
   id: string;
@@ -71,7 +71,7 @@ export function useAuth() {
   }, []);
 
   const isAtLeast = (required: UserTier): boolean => {
-    const order: UserTier[] = ["visitor", "free", "retail", "pro", "enterprise"];
+    const order: UserTier[] = ["visitor", "free", "retail", "pro", "enterprise", "admin"];
     const userIdx = order.indexOf(user?.tier ?? "visitor");
     const reqIdx  = order.indexOf(required);
     return userIdx >= reqIdx;

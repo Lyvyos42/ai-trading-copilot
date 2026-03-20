@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_optional_user
@@ -30,12 +30,12 @@ def _is_valid_ticker(ticker: str) -> bool:
         return False
     return all(c in _ALLOWED_TICKER_CHARS for c in ticker.upper())
 
-# ── In-memory rate limiter: max 10 signal generations per IP per minute ──
+# ── Layer 0: IP-based rate limiter — max 10 requests per minute per IP ──────────
 _rate_store: dict[str, list[float]] = defaultdict(list)
 _RATE_LIMIT = 10
 _RATE_WINDOW = 60  # seconds
 
-def _check_rate_limit(ip: str) -> None:
+def _check_ip_rate_limit(ip: str) -> None:
     now = time.time()
     window_start = now - _RATE_WINDOW
     _rate_store[ip] = [t for t in _rate_store[ip] if t > window_start]
@@ -46,6 +46,80 @@ def _check_rate_limit(ip: str) -> None:
             headers={"Retry-After": "60"},
         )
     _rate_store[ip].append(now)
+
+# ── Layer 1: Per-user daily quota by tier ────────────────────────────────────────
+_DAILY_QUOTA: dict[str, int] = {
+    "free":       5,
+    "retail":    50,
+    "pro":       200,
+    "enterprise": 9999,
+    "admin":      9999,
+}
+
+async def _check_daily_quota(user_id: str, tier: str, db: AsyncSession) -> None:
+    quota = _DAILY_QUOTA.get(tier, 5)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    result = await db.execute(
+        select(func.count()).select_from(Signal)
+        .where(Signal.user_id == user_id)
+        .where(Signal.created_at >= today_start)
+    )
+    count_today = result.scalar() or 0
+    if count_today >= quota:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily signal quota reached ({count_today}/{quota} for {tier} tier). Resets at midnight UTC.",
+            headers={"Retry-After": "3600"},
+        )
+
+# ── Layer 2: Per-user cooldown — minimum 60s between consecutive requests ────────
+_user_last_request: dict[str, float] = {}
+_USER_COOLDOWN_S = 60  # seconds
+
+def _check_user_cooldown(user_id: str) -> None:
+    now = time.time()
+    last = _user_last_request.get(user_id, 0)
+    elapsed = now - last
+    if elapsed < _USER_COOLDOWN_S:
+        wait = int(_USER_COOLDOWN_S - elapsed)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {wait}s before generating another signal.",
+            headers={"Retry-After": str(wait)},
+        )
+    _user_last_request[user_id] = now
+
+# ── Layer 3: Burst circuit breaker — >15 signals in 1 hour suspends user ────────
+_user_burst_store: dict[str, list[float]] = defaultdict(list)
+_BURST_LIMIT = 15
+_BURST_WINDOW = 3600  # 1 hour
+
+def _check_burst(user_id: str) -> None:
+    now = time.time()
+    window_start = now - _BURST_WINDOW
+    _user_burst_store[user_id] = [t for t in _user_burst_store[user_id] if t > window_start]
+    if len(_user_burst_store[user_id]) >= _BURST_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Burst limit exceeded ({_BURST_LIMIT} signals/hour). Account temporarily restricted. Try again in 1 hour.",
+            headers={"Retry-After": "3600"},
+        )
+    _user_burst_store[user_id].append(now)
+
+# ── Layer 4: Result cache — same user+ticker within 10 min returns cached signal ─
+_signal_cache: dict[str, tuple[float, dict]] = {}  # key → (expires_at, signal_dict)
+_CACHE_TTL_S = 600  # 10 minutes
+
+def _get_cached_signal(user_id: str, ticker: str) -> dict | None:
+    key = f"{user_id}:{ticker}"
+    entry = _signal_cache.get(key)
+    if entry and time.time() < entry[0]:
+        return entry[1]
+    return None
+
+def _cache_signal(user_id: str, ticker: str, signal_dict: dict) -> None:
+    key = f"{user_id}:{ticker}"
+    _signal_cache[key] = (time.time() + _CACHE_TTL_S, signal_dict)
 
 
 class GenerateRequest(BaseModel):
@@ -61,9 +135,30 @@ async def generate_signal(
     db: AsyncSession = Depends(get_db),
     user: dict | None = Depends(get_optional_user),
 ):
-    # Rate limiting
+    # ── Layer 0: IP rate limit (protects unauthenticated + authenticated) ────────
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
-    _check_rate_limit(client_ip)
+    _check_ip_rate_limit(client_ip)
+
+    # ── Authenticated user guards ────────────────────────────────────────────────
+    if user:
+        user_id = user.get("sub", "")
+        tier = user.get("tier", "free") or "free"
+        is_admin = tier == "admin"
+
+        if not is_admin:
+            # Layer 2: cooldown check BEFORE burst/quota (cheapest check first)
+            _check_user_cooldown(user_id)
+
+            # Layer 3: burst circuit breaker
+            _check_burst(user_id)
+
+            # Layer 4: result cache — return immediately without hitting Claude API
+            cached = _get_cached_signal(user_id, body.ticker.upper().strip())
+            if cached:
+                return {**cached, "cached": True}
+
+            # Layer 1: daily quota (DB query — do last to avoid unnecessary I/O)
+            await _check_daily_quota(user_id, tier, db)
 
     if body.asset_class not in VALID_ASSET_CLASSES:
         raise HTTPException(status_code=400, detail=f"Invalid asset_class. Choose from: {VALID_ASSET_CLASSES}")
@@ -128,7 +223,13 @@ async def generate_signal(
     await db.commit()
     await db.refresh(signal)
 
-    return _signal_to_dict(signal, state)
+    result = _signal_to_dict(signal, state)
+
+    # Store in cache so repeat requests for the same ticker in the next 10 min are instant
+    if user:
+        _cache_signal(user.get("sub", ""), ticker, result)
+
+    return result
 
 
 @router.get("/{signal_id}")

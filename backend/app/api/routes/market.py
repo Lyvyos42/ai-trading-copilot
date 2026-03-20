@@ -357,6 +357,94 @@ SYMBOLS = {
 ALL_SYMBOLS = [s for cat in SYMBOLS.values() for s in cat]
 
 
+# ── Bar ticker map: display symbol → yfinance ticker ─────────────────────────
+_BAR_YF: dict[str, str] = {
+    "NVDA":     "NVDA",     "TSLA":    "TSLA",      "AAPL":    "AAPL",
+    "BTC":      "BTC-USD",  "ETH":     "ETH-USD",
+    "EUR/USD":  "EURUSD=X", "GBP/USD": "GBPUSD=X",  "USD/JPY": "USDJPY=X",
+    "GOLD":     "GC=F",     "SILVER":  "SI=F",       "OIL(WTI)":"CL=F",
+    "^VIX":     "^VIX",     "DXY":     "DX-Y.NYB",  "US10Y":   "^TNX",
+    "SPY":      "SPY",      "QQQ":     "QQQ",
+}
+
+# Cache quotes for 60 seconds to avoid hammering yfinance on every request
+_quotes_cache: dict | None = None
+_quotes_cache_ts: float = 0.0
+_QUOTES_TTL = 60  # seconds
+
+
+@router.get("/quotes")
+async def get_quotes():
+    """
+    Return real-time prices + day-change for the market bar tickers.
+    Cached for 60s to avoid yfinance rate limits.
+    """
+    global _quotes_cache, _quotes_cache_ts
+    import time as _time
+
+    if _quotes_cache and (_time.time() - _quotes_cache_ts) < _QUOTES_TTL:
+        return _quotes_cache
+
+    import yfinance as yf
+
+    yf_symbols = list(_BAR_YF.values())
+    results = []
+
+    try:
+        # Batch download: period=2d gives us today + yesterday close for change calc
+        data = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: yf.download(yf_symbols, period="2d", interval="1h",
+                                 group_by="ticker", auto_adjust=True, progress=False)
+        )
+
+        for display, yf_sym in _BAR_YF.items():
+            try:
+                if len(yf_symbols) == 1:
+                    closes = data["Close"].dropna()
+                else:
+                    closes = data[yf_sym]["Close"].dropna()
+
+                if len(closes) < 2:
+                    raise ValueError("not enough data")
+
+                price      = float(closes.iloc[-1])
+                prev_close = float(closes.iloc[0])   # first candle of 2d window ≈ yesterday close
+                change     = price - prev_close
+                change_pct = (change / prev_close * 100) if prev_close else 0.0
+
+                # Format price to appropriate decimals
+                if display in ("EUR/USD", "GBP/USD", "DXY"):
+                    price_fmt = round(price, 4)
+                elif display == "USD/JPY":
+                    price_fmt = round(price, 2)
+                elif display == "US10Y":
+                    price_fmt = round(price, 3)
+                elif price > 1000:
+                    price_fmt = round(price, 0)
+                else:
+                    price_fmt = round(price, 2)
+
+                results.append({
+                    "symbol":    display,
+                    "price":     price_fmt,
+                    "change":    round(change, 4),
+                    "changePct": round(change_pct, 2),
+                })
+            except Exception:
+                pass   # skip tickers that fail; frontend keeps seed value
+
+    except Exception:
+        pass  # full fetch failure — frontend keeps seed values
+
+    if results:
+        _quotes_cache    = results
+        _quotes_cache_ts = _time.time()
+        return results
+
+    return []   # empty → frontend uses seeds
+
+
 @router.get("/symbols")
 async def get_symbols(q: str = Query(default="", max_length=50)):
     """Search symbols by query string. Returns all if q is empty."""

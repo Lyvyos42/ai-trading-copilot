@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, ChevronUp, ChevronDown } from "lucide-react";
+import { RefreshCw, TrendingUp, Activity, Zap, DollarSign } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
-import { formatPrice, formatPct } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/useAuth";
@@ -14,14 +14,6 @@ import { UpgradeModal } from "@/components/UpgradeModal";
 
 const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
 
-const TIMEFRAMES = [
-  { label: "1D",  period: "5d",  interval: "1h"  },
-  { label: "1W",  period: "1mo", interval: "1h"  },
-  { label: "1M",  period: "1mo", interval: "1d"  },
-  { label: "3M",  period: "3mo", interval: "1d"  },
-  { label: "6M",  period: "6mo", interval: "1d"  },
-  { label: "1Y",  period: "1y",  interval: "1d"  },
-];
 
 export default function DashboardPage() {
   const [signals, setSignals]               = useState<Signal[]>([]);
@@ -30,8 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading]               = useState(false);
   const [analysisError, setAnalysisError]   = useState<string | null>(null);
   const [activeTicker, setActiveTicker]     = useState("AAPL");
-  const [timeframe, setTimeframe]           = useState(TIMEFRAMES[4]); // default 6M
-  const [upgradeOpen, setUpgradeOpen]       = useState(false);
+const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
   const { isLoggedIn } = useAuth();
 
@@ -191,55 +182,8 @@ export default function DashboardPage() {
 
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
-            {/* Chart header */}
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-[hsl(0_0%_3%)] shrink-0">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-xs font-bold text-foreground">
-                  {activeTicker.replace("=X","").replace("-USD","").replace("=F","").replace("^","")}
-                </span>
-                {selectedSignal && selectedSignal.ticker === activeTicker && (
-                  <>
-                    <span className={cn(
-                      "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded",
-                      selectedSignal.direction === "LONG"
-                        ? "bg-bull/10 text-bull border border-bull/30"
-                        : "bg-bear/10 text-bear border border-bear/30"
-                    )}>
-                      {selectedSignal.direction === "LONG" ? "▲" : "▼"} {selectedSignal.direction}
-                    </span>
-                    <span className="text-[9px] font-mono text-muted-foreground">
-                      ENTRY <span className="text-foreground">{formatPrice(selectedSignal.entry_price)}</span>
-                    </span>
-                    <span className="text-[9px] font-mono text-muted-foreground">
-                      TP1 <span className="text-bull">{formatPrice(selectedSignal.take_profit_1)}</span>
-                    </span>
-                    <span className="text-[9px] font-mono text-muted-foreground">
-                      SL <span className="text-bear">{formatPrice(selectedSignal.stop_loss)}</span>
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {TIMEFRAMES.map((tf) => (
-                  <button
-                    key={tf.label}
-                    onClick={() => setTimeframe(tf)}
-                    className={cn(
-                      "px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-colors",
-                      timeframe.label === tf.label
-                        ? "bg-primary/20 text-primary border border-primary/40"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {tf.label}
-                  </button>
-                ))}
-                <span className="terminal-label ml-2">CANDLES</span>
-              </div>
-            </div>
-
             <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "400px" }}>
-              <TradingViewChart ticker={activeTicker} interval={timeframe.interval} fillContainer />
+              <TradingViewChart ticker={activeTicker} fillContainer />
             </div>
           </div>
         </div>

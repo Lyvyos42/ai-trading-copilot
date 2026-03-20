@@ -75,3 +75,29 @@ async def me(token: str = Depends(_oauth2), db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(user)
     return {"id": str(user.id), "email": user.email, "tier": user.tier, "is_active": user.is_active}
+
+
+# ── Admin: promote a user tier ────────────────────────────────────────────────
+
+VALID_TIERS = {"free", "retail", "pro", "enterprise", "admin"}
+
+
+class PromoteRequest(BaseModel):
+    email: str
+    tier: str
+    secret: str
+
+
+@router.post("/admin/set-tier")
+async def admin_set_tier(body: PromoteRequest, db: AsyncSession = Depends(get_db)):
+    if body.secret != settings.admin_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    if body.tier not in VALID_TIERS:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Choose from: {VALID_TIERS}")
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{body.email}' not found in database. Sign in once first so the account is created.")
+    user.tier = body.tier
+    await db.commit()
+    return {"ok": True, "email": user.email, "tier": user.tier}
