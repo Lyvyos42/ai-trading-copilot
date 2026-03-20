@@ -362,7 +362,7 @@ _BAR_YF: dict[str, str] = {
     "NVDA":     "NVDA",     "TSLA":    "TSLA",      "AAPL":    "AAPL",
     "BTC":      "BTC-USD",  "ETH":     "ETH-USD",
     "EUR/USD":  "EURUSD=X", "GBP/USD": "GBPUSD=X",  "USD/JPY": "USDJPY=X",
-    "GOLD":     "GC=F",     "SILVER":  "SI=F",       "OIL(WTI)":"CL=F",
+    "GOLD":     "XAUUSD=X", "SILVER":  "XAGUSD=X",  "OIL(WTI)":"CL=F",
     "^VIX":     "^VIX",     "DXY":     "DX-Y.NYB",  "US10Y":   "^TNX",
     "SPY":      "SPY",      "QQQ":     "QQQ",
 }
@@ -374,7 +374,7 @@ _PRICE_BOUNDS: dict[str, tuple[float, float]] = {
     "NVDA":     (10,    2000),   "TSLA":    (10,   2000),   "AAPL":    (50,    600),
     "BTC":      (5000, 250000),  "ETH":     (100, 30000),
     "EUR/USD":  (0.80,   1.60),  "GBP/USD": (0.90,  1.80),  "USD/JPY": (80,    200),
-    "GOLD":     (1000,  5000),   "SILVER":  (8,     150),    "OIL(WTI)":(20,    200),
+    "GOLD":     (1500,  8000),   "SILVER":  (8,     200),    "OIL(WTI)":(20,    200),
     "^VIX":     (5,      100),   "DXY":     (70,    130),    "US10Y":   (0.5,    15),
     "SPY":      (100,    900),   "QQQ":     (100,   800),
 }
@@ -388,53 +388,81 @@ _QUOTES_TTL = 30  # seconds
 def _fetch_one(display: str, yf_sym: str):
     """Fetch a single ticker price for the market bar.
 
-    Strategy:
-    - Equities / ETFs / Crypto (no special suffix): fast_info is reliable → use it.
-    - Futures (=F), FX (=X), indices (^…), and our named non-equity symbols
-      (GOLD, SILVER, OIL, DXY, ^VIX, US10Y): fast_info returns stale contract
-      prices that can be 10-40% wrong.  Always use hourly history for these.
+    Primary source: Yahoo Finance Chart REST API (regularMarketPrice).
+    This is the live current price, completely independent of library bar-data
+    or futures contract rolls — fixes gold/silver/DXY showing stale prices.
+
+    Fallback: yfinance fast_info for equities, hourly history for everything else.
     """
     import yfinance as yf
+    import urllib.request as _urlreq
+    import urllib.parse   as _urlpar
+    import json           as _json
 
-    # Symbols where fast_info is known to return wrong/stale values
     _NON_EQUITY = {"EUR/USD", "GBP/USD", "USD/JPY", "DXY", "US10Y",
                    "GOLD", "SILVER", "OIL(WTI)", "^VIX"}
-    use_history = (
+    is_non_equity = (
         display in _NON_EQUITY
         or yf_sym.endswith("=F")
         or yf_sym.endswith("=X")
         or yf_sym.startswith("^")
     )
 
-    def _history_price(t) -> tuple[float, float] | None:
+    lo, hi = _PRICE_BOUNDS.get(display, (0.0, float("inf")))
+
+    def _rest_quote(sym: str) -> tuple[float, float] | None:
+        """Yahoo Finance Chart API — regularMarketPrice is always the live price."""
+        try:
+            safe = _urlpar.quote(sym, safe="")
+            url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
+                    f"?interval=1m&range=1d")
+            req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with _urlreq.urlopen(req, timeout=6) as r:
+                meta = _json.loads(r.read())["chart"]["result"][0]["meta"]
+                p    = float(meta.get("regularMarketPrice") or 0)
+                prev = float(meta.get("chartPreviousClose") or
+                             meta.get("previousClose") or 0)
+                if p > 0 and prev > 0:
+                    return p, prev
+        except Exception:
+            pass
+        return None
+
+    def _history_quote(t) -> tuple[float, float] | None:
         hist = t.history(period="5d", interval="1h")
         if hist is None or hist.empty:
             return None
         p  = float(hist["Close"].iloc[-1])
         pc = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else p
-        if p <= 0:
-            return None
-        return p, pc
+        return (p, pc) if p > 0 else None
 
     try:
-        t = yf.Ticker(yf_sym)
+        # 1. Always try REST first — gives live regularMarketPrice
+        result = _rest_quote(yf_sym)
 
-        if use_history:
-            result = _history_price(t)
-            if result is None:
-                return None
-            price, prev_close = result
-        else:
-            # fast_info for stocks/ETFs/crypto
-            fi = t.fast_info
-            _p  = fi.last_price
-            _pc = fi.previous_close
-            if not _p or not _pc or float(_p) <= 0 or float(_pc) <= 0:
-                return None
-            price      = float(_p)
-            prev_close = float(_pc)
+        # 2. If REST failed or price is out of known bounds, fall back
+        if result is None or not (lo <= result[0] <= hi):
+            t = yf.Ticker(yf_sym)
+            if is_non_equity:
+                result = _history_quote(t)
+            else:
+                fi  = t.fast_info
+                _p  = fi.last_price
+                _pc = fi.previous_close
+                if _p and _pc and float(_p) > 0 and float(_pc) > 0:
+                    result = (float(_p), float(_pc))
+                else:
+                    result = _history_quote(t)
 
+        if result is None:
+            return None
+
+        price, prev_close = result
         if price <= 0 or prev_close <= 0:
+            return None
+
+        # Final bounds guard
+        if not (lo <= price <= hi):
             return None
 
         change     = price - prev_close

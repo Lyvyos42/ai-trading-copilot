@@ -32,8 +32,9 @@ def _compute_atr(highs: list, lows: list, closes: list, period: int = 14) -> flo
 # Maps TradingView-style display symbols to Yahoo Finance tickers.
 # Used so users see familiar names (XAUUSD, EURUSD) while we fetch correct data.
 _TICKER_ALIAS: dict[str, str] = {
-    # Spot Metals → nearest futures (free proxy, price diff < 0.1%)
-    "XAUUSD": "GC=F",   "XAGUSD": "SI=F",   "XPTUSD": "PL=F",   "XPDUSD": "PA=F",
+    # Spot Metals — use Yahoo Finance FX-pair format (XAUUSD=X) instead of
+    # futures (GC=F) which can lag the roll and return an expired contract price.
+    "XAUUSD": "XAUUSD=X", "XAGUSD": "XAGUSD=X", "XPTUSD": "XPTUSD=X", "XPDUSD": "XPDUSD=X",
     # Energy CFDs → futures
     "USOIL":  "CL=F",   "UKOIL":  "BZ=F",   "NATGAS": "NG=F",
     "RBOB":   "RB=F",   "HEATOIL":"HO=F",
@@ -288,23 +289,44 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
         except Exception:
             pass
 
-        # fast_info.last_price is reliable for stocks/ETFs but consistently
-        # returns stale/wrong values for futures (=F), FX (=X), and index
-        # tickers (^VIX, ^TNX, ^GSPC …).  For those instruments the daily
-        # history bars already contain accurate recent prices, so we skip the
-        # live-price patch entirely for non-equity tickers.
-        is_equity = not (ticker.endswith("=F") or ticker.endswith("=X") or ticker.startswith("^"))
-
-        live_price = None
-        if is_equity:
+        # ── Live price via Yahoo Finance Chart REST API ───────────────────────
+        # The yfinance library's history() bars can be from a stale/rolled
+        # futures contract (e.g. GC=F returning $3,097 when spot gold is $4,497).
+        # The REST endpoint's `regularMarketPrice` field is ALWAYS the current
+        # live market price, completely independent of the bar/contract data.
+        # We use it to patch the last close for ALL instrument types.
+        def _rest_live_price(sym: str) -> float | None:
+            import urllib.request as _urlreq
+            import urllib.parse   as _urlpar
+            import json           as _json
             try:
-                fi = tk.fast_info
-                if fi.last_price and fi.last_price > 0:
-                    live_price = fi.last_price
+                safe = _urlpar.quote(sym, safe="")
+                url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
+                        f"?interval=1m&range=1d")
+                req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with _urlreq.urlopen(req, timeout=6) as r:
+                    meta = _json.loads(r.read())["chart"]["result"][0]["meta"]
+                    p = float(meta.get("regularMarketPrice") or 0)
+                    return p if p > 0 else None
             except Exception:
-                pass
+                return None
 
-        # Determine decimal precision from price magnitude
+        live_price = _rest_live_price(ticker)
+
+        # Fallback: for equities only, try fast_info if REST failed
+        if live_price is None:
+            is_equity = not (
+                ticker.endswith("=F") or ticker.endswith("=X") or ticker.startswith("^")
+            )
+            if is_equity:
+                try:
+                    fi = tk.fast_info
+                    if fi.last_price and fi.last_price > 0:
+                        live_price = fi.last_price
+                except Exception:
+                    pass
+
+        # Determine decimal precision
         sample_price = live_price or float(hist["Close"].iloc[-1])
         dec = _price_decimals(sample_price)
 
@@ -313,9 +335,7 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
         lows    = [round(float(p), dec) for p in hist["Low"].tolist()]
         volumes = [int(v) for v in hist["Volume"].tolist()]
 
-        # For equities only: patch the last close with the live intraday price.
-        # We skip this for futures/FX/indices because fast_info returns stale
-        # contract prices that are often far from the current market price.
+        # Patch last close with the live price from REST API
         if live_price:
             closes[-1] = round(live_price, dec)
             try:
