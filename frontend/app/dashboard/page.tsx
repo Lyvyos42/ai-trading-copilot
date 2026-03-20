@@ -5,7 +5,7 @@ import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, ChevronUp, ChevronDow
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
-import { generateSignal, listSignals, getAgentStatus, type Signal, type AgentStatus } from "@/lib/api";
+import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
 import { formatPrice, formatPct } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,10 @@ export default function DashboardPage() {
 
   const { isLoggedIn } = useAuth();
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    wakeBackend(); // pre-warm Render so it's ready when user clicks RUN AI ANALYSIS
+    loadData();
+  }, []);
 
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
@@ -56,7 +59,14 @@ export default function DashboardPage() {
       setSignals((prev) => [signal, ...prev.slice(0, 9)]);
       setSelectedSignal(signal);
     } catch (e) {
-      setAnalysisError(e instanceof Error ? e.message : "Analysis failed — backend may be waking up, try again in 30s");
+      const msg = e instanceof Error ? e.message : "Analysis failed";
+      // Distinguish network errors (cold start) from API errors
+      const isColdStart = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network");
+      setAnalysisError(
+        isColdStart
+          ? "Backend is waking up (Render free tier). This takes ~60s on first use. Please wait and try again."
+          : msg
+      );
     } finally {
       setLoading(false);
     }
@@ -167,7 +177,7 @@ export default function DashboardPage() {
                 )}
               >
                 <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "ANALYZING…" : "RUN AI ANALYSIS"}
+                {loading ? "ANALYZING… (up to 60s)" : "RUN AI ANALYSIS"}
               </button>
               <button
                 onClick={loadData}

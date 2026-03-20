@@ -30,9 +30,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, reqOptions);
   } catch {
-    // Network error — Render free tier cold start takes ~30-50s.
-    // Wait 22s then retry once; the signals loading indicator stays visible.
-    await new Promise(r => setTimeout(r, 22_000));
+    // Network error — Render free tier cold start takes 45-60s.
+    // Wait 50s then retry once; the loading indicator stays visible during this time.
+    await new Promise(r => setTimeout(r, 50_000));
     res = await fetch(`${API_URL}${path}`, reqOptions);
   }
 
@@ -41,6 +41,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+/** Fire-and-forget: ping the backend health endpoint to wake Render from sleep.
+ *  Call on page mount so the backend is warm before the user clicks anything. */
+export function wakeBackend(): void {
+  fetch(`${API_URL}/health`, { method: "GET" }).catch(() => {});
 }
 
 // ─── Signals ──────────────────────────────────────────────────────────────────

@@ -107,7 +107,12 @@ interface TradingViewChartProps {
 }
 
 export function TradingViewChart({ ticker, interval = "1d", fillContainer }: TradingViewChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  // Keep interval in a ref so it's readable at mount time without being a dep.
+  // This means: interval sets the INITIAL timeframe when a new ticker loads,
+  // but changing interval alone does NOT recreate the widget (preserving drawings).
+  const intervalRef = useRef(interval);
+  useEffect(() => { intervalRef.current = interval; }, [interval]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -132,7 +137,8 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     script.textContent = JSON.stringify({
       autosize: true,
       symbol: toTVSymbol(ticker),
-      interval: toTVInterval(interval),
+      // Use the current interval as the initial timeframe; user can change via TV's own toolbar
+      interval: toTVInterval(intervalRef.current),
       timezone: "Etc/UTC",
       theme: "dark",
       style: "1",
@@ -151,7 +157,11 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     return () => {
       container.innerHTML = "";
     };
-  }, [ticker, interval]);
+  // Only recreate the widget when the TICKER changes — not on interval change.
+  // This preserves drawings (position boxes, trendlines etc) when the user
+  // switches timeframes using our buttons or TradingView's own toolbar.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker]);
 
   return (
     <div
