@@ -10,64 +10,83 @@ export interface AuthUser {
   tier: UserTier;
 }
 
-function tierFromJwt(token: string): UserTier {
+function parseLocalToken(token: string): { id: string; email: string; tier: UserTier } | null {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    return (payload.tier as UserTier) || "free";
+    // Reject expired tokens
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    const email = payload.email || payload.sub || "demo@tradingcopilot.ai";
+    const tier   = (payload.tier as UserTier) || "free";
+    const id     = payload.sub || "demo";
+    return { id, email, tier };
   } catch {
-    return "free";
+    return null;
   }
 }
 
+async function resolveSession(): Promise<AuthUser | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const me = await res.json();
+        return { id: me.id, email: me.email, tier: me.tier || "free" };
+      }
+    } catch {}
+    // Fallback: use Supabase session data directly
+    return { id: session.user.id, email: session.user.email || "", tier: "free" };
+  }
+
+  // No Supabase session — check localStorage (demo or legacy token)
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    const parsed = parseLocalToken(token);
+    if (parsed) return parsed;
+    // Token is expired — clean it up
+    localStorage.removeItem("token");
+  }
+
+  return null;
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser]       = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const resolve = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Try to get tier from our backend /me endpoint
-        try {
-          const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-          const res = await fetch(`${API}/api/v1/auth/me`, {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-          if (res.ok) {
-            const me = await res.json();
-            setUser({ id: me.id, email: me.email, tier: me.tier || "free" });
-            setLoading(false);
-            return;
-          }
-        } catch {}
-        setUser({ id: session.user.id, email: session.user.email || "", tier: "free" });
-      } else {
-        // Check localStorage demo token
-        const token = localStorage.getItem("token");
-        if (token) {
-          const tier = tierFromJwt(token);
-          setUser({ id: "demo", email: "demo@tradingcopilot.ai", tier });
-        } else {
-          setUser(null);
-        }
-      }
-      setLoading(false);
-    };
+    let cancelled = false;
 
-    resolve();
+    resolveSession().then((u) => {
+      if (!cancelled) { setUser(u); setLoading(false); }
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        const token = localStorage.getItem("token");
+      if (cancelled) return;
+
+      if (session?.user) {
+        // Auth state changed to signed-in — re-resolve to get tier from /me
+        resolveSession().then((u) => { if (!cancelled) setUser(u); });
+      } else {
+        // Signed out — check localStorage fallback
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         if (token) {
-          setUser({ id: "demo", email: "demo@tradingcopilot.ai", tier: tierFromJwt(token) });
+          const parsed = parseLocalToken(token);
+          setUser(parsed);
         } else {
           setUser(null);
         }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const isAtLeast = (required: UserTier): boolean => {
