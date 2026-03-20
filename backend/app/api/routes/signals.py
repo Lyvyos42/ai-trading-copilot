@@ -3,6 +3,7 @@ POST /api/v1/signals/generate  — trigger multi-agent pipeline
 GET  /api/v1/signals/{id}      — retrieve signal by ID
 GET  /api/v1/signals           — list recent signals for user
 """
+import math
 import time
 import uuid
 from collections import defaultdict
@@ -75,14 +76,14 @@ async def _check_daily_quota(user_id: str, tier: str, db: AsyncSession) -> None:
 
 # ── Layer 2: Per-user cooldown — minimum 60s between consecutive requests ────────
 _user_last_request: dict[str, float] = {}
-_USER_COOLDOWN_S = 60  # seconds
+_USER_COOLDOWN_S = 15  # seconds
 
 def _check_user_cooldown(user_id: str) -> None:
     now = time.time()
     last = _user_last_request.get(user_id, 0)
     elapsed = now - last
     if elapsed < _USER_COOLDOWN_S:
-        wait = int(_USER_COOLDOWN_S - elapsed)
+        wait = math.ceil(_USER_COOLDOWN_S - elapsed)
         raise HTTPException(
             status_code=429,
             detail=f"Please wait {wait}s before generating another signal.",
