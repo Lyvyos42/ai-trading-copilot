@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "change_me_in_production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
+    # Supabase — set SUPABASE_JWT_SECRET in Render env vars
+    supabase_jwt_secret: str = ""
 
     # App
     environment: str = "development"

@@ -28,6 +28,17 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
 
 
 def decode_token(token: str) -> dict[str, Any]:
+    # Try Supabase JWT first (all real users)
+    if settings.supabase_jwt_secret:
+        try:
+            return jwt.decode(
+                token, settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
+        except JWTError:
+            pass
+    # Fallback: custom JWT (demo user + legacy tokens)
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:

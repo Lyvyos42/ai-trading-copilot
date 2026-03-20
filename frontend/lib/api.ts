@@ -1,10 +1,22 @@
+import { supabase } from "./supabase";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
 
 export { API_URL, WS_URL };
 
+async function getToken(): Promise<string | null> {
+  // Prefer live Supabase session (handles refresh automatically)
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return session.access_token;
+  } catch {}
+  // Fallback: manually stored token (demo user / legacy)
+  return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = await getToken();
   const reqOptions: RequestInit = {
     headers: {
       "Content-Type": "application/json",
@@ -149,21 +161,51 @@ export async function triggerDebate(ticker: string, assetClass = "stocks") {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function login(email: string, password: string): Promise<{ access_token: string; tier: string }> {
-  const form = new URLSearchParams({ username: email, password });
-  const res = await fetch(`${API_URL}/api/v1/auth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  });
-  if (!res.ok) throw new Error("Invalid credentials");
-  return res.json();
+  // Demo user → use legacy backend token (avoids needing demo user in Supabase)
+  if (email === "demo@tradingcopilot.ai") {
+    const form = new URLSearchParams({ username: email, password });
+    const res = await fetch(`${API_URL}/api/v1/auth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (!res.ok) throw new Error("Invalid credentials");
+    const data = await res.json();
+    localStorage.setItem("token", data.access_token);
+    return data;
+  }
+
+  // All other users → Supabase
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  const token = data.session!.access_token;
+  localStorage.setItem("token", token);
+  return { access_token: token, tier: "free" };
 }
 
-export async function register(email: string, password: string) {
-  return apiFetch("/api/v1/auth/register", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
+export async function register(email: string, password: string): Promise<{ access_token?: string; tier: string }> {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  // signUp may return session immediately or require email confirmation
+  if (data.session) {
+    localStorage.setItem("token", data.session.access_token);
+    return { access_token: data.session.access_token, tier: "free" };
+  }
+  // Email confirmation required — no session yet
+  return { tier: "free" };
+}
+
+export async function loginWithGoogle(): Promise<void> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback` },
   });
+  if (error) throw new Error(error.message);
+}
+
+export async function logout(): Promise<void> {
+  await supabase.auth.signOut();
+  localStorage.removeItem("token");
 }
 
 export async function getMe() {

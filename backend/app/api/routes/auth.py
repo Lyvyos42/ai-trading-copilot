@@ -10,7 +10,9 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user_id
+from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user_id, decode_token
+from fastapi.security import OAuth2PasswordBearer as _Bearer
+_oauth2 = _Bearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 from app.config import settings
 from app.db.database import get_db
 from app.models.user import User
@@ -55,9 +57,21 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
 
 
 @router.get("/me")
-async def me(user_id: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+async def me(token: str = Depends(_oauth2), db: AsyncSession = Depends(get_db)):
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = decode_token(token)
+    user_id = payload.get("sub")
+    email   = payload.get("email", "")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Auto-create on first Supabase login
+        user = User(id=user_id, email=email, hashed_password="", tier="free")
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
     return {"id": str(user.id), "email": user.email, "tier": user.tier, "is_active": user.is_active}
