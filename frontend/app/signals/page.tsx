@@ -97,8 +97,12 @@ export default function SignalsPage() {
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customTicker.trim()) {
-      handleGenerate(customTicker.trim().toUpperCase());
-      setCustomTicker("");
+      // Cancel any in-progress run before starting new one
+      if (loading) cancelAnalysis();
+      setTimeout(() => {
+        handleGenerate(customTicker.trim().toUpperCase());
+        setCustomTicker("");
+      }, 0);
     }
   };
 
@@ -217,7 +221,7 @@ export default function SignalsPage() {
             </div>
             <button
               type="submit"
-              disabled={!customTicker.trim() || loading !== null}
+              disabled={!customTicker.trim()}
               className="px-3 py-1.5 text-xs font-mono font-semibold border border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
               <Zap className="h-3 w-3" />
