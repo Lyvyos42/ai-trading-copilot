@@ -213,7 +213,7 @@ export default function BacktestPage() {
         layout:    { background:{color:"#080810"}, textColor:"#94a3b8" },
         grid:      { vertLines:{color:"rgba(255,255,255,0.04)"}, horzLines:{color:"rgba(255,255,255,0.04)"} },
         crosshair: { mode: CrosshairMode.Normal },
-        rightPriceScale: { borderColor:"rgba(255,255,255,0.08)" },
+        rightPriceScale: { borderColor:"rgba(255,255,255,0.08)", scaleMargins:{ top:0.08, bottom:0.22 } },
         timeScale: { borderColor:"rgba(255,255,255,0.08)", timeVisible:true, secondsVisible:false },
         width:  chartRef.current.clientWidth,
         height: chartRef.current.clientHeight || 520,
@@ -292,16 +292,21 @@ export default function BacktestPage() {
     setTlines(p=>[...p,{id,p1,p2}]);
   };
 
+  const mkMarker = (m:{time:number;type:"buy"|"sell"}) => ({
+    time: m.time as any,
+    position: m.type==="buy" ? "belowBar" : "aboveBar",
+    color: m.type==="buy" ? "#00e676" : "#ff1744",
+    shape: m.type==="buy" ? "arrowUp" : "arrowDown",
+    text: m.type==="buy" ? "▲ BUY" : "▼ SELL",
+    size: 3,
+  });
+
   const addMarkerDirect = (time:number, type:"buy"|"sell", cSer?:any) => {
     setMarkers(prev=>{
       const next = [...prev,{time,type}];
       const series = cSer || candleSer.current;
       if (series) series.setMarkers(
-        [...next].sort((a,b)=>a.time-b.time).map(m=>({
-          time:m.time as any, position:m.type==="buy"?"belowBar":"aboveBar",
-          color:m.type==="buy"?"#22c55e":"#e63946", shape:m.type==="buy"?"arrowUp":"arrowDown",
-          text:m.type==="buy"?"BUY":"SELL", size:2,
-        }))
+        [...next].sort((a,b)=>a.time-b.time).map(mkMarker)
       );
       return next;
     });
@@ -325,11 +330,7 @@ export default function BacktestPage() {
     setMarkers(prev=>{
       const next = prev.filter((_,idx)=>idx!==i);
       if (candleSer.current) candleSer.current.setMarkers(
-        [...next].sort((a,b)=>a.time-b.time).map(m=>({
-          time:m.time as any, position:m.type==="buy"?"belowBar":"aboveBar",
-          color:m.type==="buy"?"#22c55e":"#e63946", shape:m.type==="buy"?"arrowUp":"arrowDown",
-          text:m.type==="buy"?"BUY":"SELL", size:2,
-        }))
+        [...next].sort((a,b)=>a.time-b.time).map(mkMarker)
       );
       return next;
     });
