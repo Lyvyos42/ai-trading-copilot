@@ -129,6 +129,33 @@ export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
             </span>
           )}
         </div>
+
+        {/* Paper trade action row */}
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+          {executeError && (
+            <span className="text-[8px] font-mono text-bear truncate mr-2">✗ {executeError}</span>
+          )}
+          {executed ? (
+            <span className="text-[8px] font-mono text-bull flex items-center gap-1">
+              ✓ OPENED — <a href="/portfolio" className="underline">View Portfolio</a>
+            </span>
+          ) : (
+            <span className="text-[8px] font-mono text-muted-foreground">R:R {rrRatio}x</span>
+          )}
+          <button
+            onClick={handleExecute}
+            disabled={loading || executed}
+            className={cn(
+              "text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors ml-auto",
+              (loading || executed) ? "opacity-50 cursor-not-allowed border-border/30 text-muted-foreground" :
+              isLong
+                ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
+                : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
+            )}
+          >
+            {loading ? "…" : executed ? "EXECUTED" : "PAPER TRADE"}
+          </button>
+        </div>
       </div>
     );
   }

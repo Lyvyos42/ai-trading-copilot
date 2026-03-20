@@ -363,49 +363,78 @@ _BAR_YF: dict[str, str] = {
     "BTC":      "BTC-USD",  "ETH":     "ETH-USD",
     "EUR/USD":  "EURUSD=X", "GBP/USD": "GBPUSD=X",  "USD/JPY": "USDJPY=X",
     "GOLD":     "GC=F",     "SILVER":  "SI=F",       "OIL(WTI)":"CL=F",
-    "^VIX":     "^VIX",     "DXY":     "DX=F",       "US10Y":   "^TNX",
+    "^VIX":     "^VIX",     "DXY":     "DX-Y.NYB",  "US10Y":   "^TNX",
     "SPY":      "SPY",      "QQQ":     "QQQ",
+}
+
+# Expected price ranges for sanity-checking yfinance fast_info results.
+# If a value lands outside these bounds we know the feed is broken and we
+# fall back to hourly history, which is more reliable for that symbol.
+_PRICE_BOUNDS: dict[str, tuple[float, float]] = {
+    "NVDA":     (10,    2000),   "TSLA":    (10,   2000),   "AAPL":    (50,    600),
+    "BTC":      (5000, 250000),  "ETH":     (100, 30000),
+    "EUR/USD":  (0.80,   1.60),  "GBP/USD": (0.90,  1.80),  "USD/JPY": (80,    200),
+    "GOLD":     (1000,  5000),   "SILVER":  (8,     150),    "OIL(WTI)":(20,    200),
+    "^VIX":     (5,      100),   "DXY":     (70,    130),    "US10Y":   (0.5,    15),
+    "SPY":      (100,    900),   "QQQ":     (100,   800),
 }
 
 # Cache quotes for 60 seconds to avoid hammering yfinance on every request
 _quotes_cache: list | None = None
 _quotes_cache_ts: float = 0.0
-_QUOTES_TTL = 60  # seconds
+_QUOTES_TTL = 30  # seconds
 
 
 def _fetch_one(display: str, yf_sym: str):
     """Fetch a single ticker price for the market bar.
 
     Strategy:
-    - FX pairs and DXY: use history(period='2d', interval='1h') — fast_info is
-      unreliable for these and can return nonsense values.
-    - Everything else: try fast_info first (fastest), fall back to history.
+    1. Try fast_info (fastest path).
+    2. Sanity-check against known price bounds — fast_info for futures (GC=F,
+       SI=F, CL=F) and some FX pairs sometimes returns garbage values.
+    3. If the value is out-of-bounds, fall back to hourly history which is
+       more reliable for non-equity instruments.
     """
     import yfinance as yf
 
-    # Tickers where fast_info.last_price is known to return bad values
-    _USE_HISTORY = {"EUR/USD", "GBP/USD", "USD/JPY", "DXY", "US10Y"}
+    lo, hi = _PRICE_BOUNDS.get(display, (0.0, float("inf")))
+
+    def _history_price(t) -> tuple[float, float] | None:
+        hist = t.history(period="5d", interval="1h")
+        if hist is None or hist.empty:
+            return None
+        p  = float(hist["Close"].iloc[-1])
+        pc = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else p
+        return p, pc
 
     try:
         t = yf.Ticker(yf_sym)
 
-        if display in _USE_HISTORY:
-            # Use recent hourly history — accurate, avoids fast_info FX bug
-            hist = t.history(period="2d", interval="1h")
-            if hist is None or hist.empty:
-                return None
-            price      = float(hist["Close"].iloc[-1])
-            prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else price
-        else:
+        # --- Try fast_info first ---
+        price, prev_close = None, None
+        try:
             fi = t.fast_info
-            price      = fi.last_price
-            prev_close = fi.previous_close
-            if not price or not prev_close:
-                return None
-            price      = float(price)
-            prev_close = float(prev_close)
+            _p  = fi.last_price
+            _pc = fi.previous_close
+            if _p and _pc and float(_p) > 0 and float(_pc) > 0:
+                price      = float(_p)
+                prev_close = float(_pc)
+        except Exception:
+            pass
 
-        if price <= 0 or prev_close <= 0:
+        # --- Sanity check: reject if outside expected range ---
+        if price is None or not (lo <= price <= hi):
+            result = _history_price(t)
+            if result is None:
+                return None
+            price, prev_close = result
+
+        # Final guard
+        if price is None or prev_close is None or price <= 0 or prev_close <= 0:
+            return None
+
+        # One more range check on the history-sourced price
+        if not (lo <= price <= hi):
             return None
 
         change     = price - prev_close

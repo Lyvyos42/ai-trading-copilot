@@ -14,22 +14,22 @@ interface Tick {
 // Seed prices — shown instantly on first render and used as fallback if backend is unavailable.
 // Also clamps jitter so the bar never drifts far from real prices between refreshes.
 const SEED_TICKS: Tick[] = [
-  { symbol: "NVDA",     price: 116.63,  change: -0.13,   changePct: -0.11 },
-  { symbol: "TSLA",     price: 228.00,  change: -3.50,   changePct: -1.51 },
-  { symbol: "AAPL",     price: 213.50,  change: -1.20,   changePct: -0.56 },
-  { symbol: "BTC",      price: 83169,   change: -33,     changePct: -0.04 },
-  { symbol: "ETH",      price: 2032,    change:  0.2,    changePct:  0.01 },
-  { symbol: "EUR/USD",  price: 1.0824,  change: -0.0026, changePct: -0.24 },
-  { symbol: "GBP/USD",  price: 1.2947,  change:  0.0006, changePct:  0.05 },
-  { symbol: "USD/JPY",  price: 148.38,  change: -0.08,   changePct: -0.05 },
-  { symbol: "GOLD",     price: 3020.0,  change: -7.2,    changePct: -0.24 },
-  { symbol: "SILVER",   price: 34.53,   change:  0.13,   changePct:  0.38 },
-  { symbol: "OIL(WTI)", price: 68.44,   change:  0.04,   changePct:  0.06 },
-  { symbol: "^VIX",     price: 19.08,   change:  0.17,   changePct:  0.90 },
-  { symbol: "DXY",      price: 103.82,  change:  0.02,   changePct:  0.02 },
-  { symbol: "US10Y",    price: 4.287,   change:  0.006,  changePct:  0.14 },
-  { symbol: "SPY",      price: 558.33,  change:  0.02,   changePct:  0.00 },
-  { symbol: "QQQ",      price: 472.41,  change: -0.08,   changePct: -0.02 },
+  { symbol: "NVDA",     price: 116.85,  change: -0.38,   changePct: -0.32 },
+  { symbol: "TSLA",     price: 192.97,  change: -1.47,   changePct: -0.76 },
+  { symbol: "AAPL",     price: 225.59,  change:  0.90,   changePct:  0.40 },
+  { symbol: "BTC",      price: 82911,   change: -312,    changePct: -0.38 },
+  { symbol: "ETH",      price: 2818,    change:   0.6,   changePct:  0.02 },
+  { symbol: "EUR/USD",  price: 1.0855,  change:  0.0009, changePct:  0.08 },
+  { symbol: "GBP/USD",  price: 1.2988,  change: -0.0040, changePct: -0.31 },
+  { symbol: "USD/JPY",  price: 148.65,  change:  0.15,   changePct:  0.10 },
+  { symbol: "GOLD",     price: 3097.0,  change: -5.3,    changePct: -0.17 },
+  { symbol: "SILVER",   price: 34.37,   change: -0.13,   changePct: -0.38 },
+  { symbol: "OIL(WTI)", price: 68.33,   change: -0.07,   changePct: -0.10 },
+  { symbol: "^VIX",     price: 19.88,   change:  0.03,   changePct:  0.15 },
+  { symbol: "DXY",      price: 103.54,  change: -0.27,   changePct: -0.26 },
+  { symbol: "US10Y",    price: 4.293,   change:  0.004,  changePct:  0.09 },
+  { symbol: "SPY",      price: 558.88,  change: -0.11,   changePct: -0.02 },
+  { symbol: "QQQ",      price: 472.96,  change:  0.03,   changePct:  0.01 },
 ];
 
 function fmt(tick: Tick) {
@@ -72,7 +72,7 @@ export function MarketBar() {
     }
 
     fetchQuotes();
-    const id = setInterval(fetchQuotes, 5 * 60 * 1000); // refresh every 5 min
+    const id = setInterval(fetchQuotes, 90 * 1000); // refresh every 90s
     return () => clearInterval(id);
   }, []);
 

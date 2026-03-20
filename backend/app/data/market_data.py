@@ -203,13 +203,31 @@ async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
         lows    = [round(float(v), 8) for v in df["low"].tolist()]
         volumes = [int(float(v)) for v in df["volume"].fillna(0).tolist()]
 
-        current_close = closes[-1]
-        dec = _price_decimals(current_close)
+        dec = _price_decimals(closes[-1])
 
         closes  = [round(v, dec) for v in closes]
         highs   = [round(v, dec) for v in highs]
         lows    = [round(v, dec) for v in lows]
 
+        # Patch last bar's close with a live price from yfinance.
+        # tvDatafeed daily bars end at the prior session close, which can be
+        # many hours stale for FX/metals/indices during intraday trading.
+        yf_alias = _TICKER_ALIAS.get(ticker.upper())
+        if yf_alias:
+            try:
+                import yfinance as yf
+                fi = yf.Ticker(yf_alias).fast_info
+                if fi.last_price and fi.last_price > 0:
+                    live = round(fi.last_price, dec)
+                    # Sanity: within ±12% of last daily close
+                    if closes[-1] > 0 and 0.88 <= live / closes[-1] <= 1.12:
+                        closes[-1] = live
+                        highs[-1] = max(highs[-1], live)
+                        lows[-1]  = min(lows[-1],  live)
+            except Exception:
+                pass
+
+        current_close    = closes[-1]
         prev_close       = closes[-2] if len(closes) >= 2 else current_close
         price_change_pct = round((current_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
         avg_vol_30       = sum(volumes[-30:]) / 30 if len(volumes) >= 30 else max(volumes[-1], 1)

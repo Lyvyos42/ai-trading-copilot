@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [loading, setLoading]               = useState(false);
   const [analysisError, setAnalysisError]   = useState<string | null>(null);
+  const [tradeOpened, setTradeOpened]       = useState(false);
   const [activeTicker, setActiveTicker]     = useState(() =>
     (typeof window !== "undefined" && localStorage.getItem("dashboard_ticker")) || "AAPL"
   );
@@ -220,6 +221,12 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 </p>
               </div>
             )}
+            {tradeOpened && (
+              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bull/30 bg-bull/5 text-[10px] font-mono text-bull flex items-center justify-between">
+                <span>✓ Paper position opened</span>
+                <a href="/portfolio" className="underline text-bull hover:text-bull/80">View Portfolio →</a>
+              </div>
+            )}
             {signals.map((signal) => (
               <div
                 key={signal.signal_id}
@@ -231,7 +238,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     : "hover:bg-white/[0.02]"
                 )}
               >
-                <SignalCard signal={signal} compact />
+                <SignalCard signal={signal} compact onExecute={() => setTradeOpened(true)} />
               </div>
             ))}
           </div>
