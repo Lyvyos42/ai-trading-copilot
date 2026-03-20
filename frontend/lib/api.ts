@@ -66,6 +66,7 @@ export interface Signal {
   reasoning_chain: string[];
   strategy_sources: string[];
   status: string;
+  outcome?: string;
   timestamp: string;
   expiry_time: string;
   pipeline_latency_ms?: number;
@@ -130,6 +131,13 @@ export async function getPositions(): Promise<Position[]> {
 
 export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   return apiFetch<PortfolioSummary>("/api/v1/portfolio/summary");
+}
+
+export async function resolveSignal(signalId: string, outcome: "WIN" | "LOSS"): Promise<Signal> {
+  return apiFetch<Signal>(`/api/v1/signals/${signalId}/outcome`, {
+    method: "PATCH",
+    body: JSON.stringify({ outcome }),
+  });
 }
 
 export async function executePosition(signalId: string, quantity = 1): Promise<{ id: string }> {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TrendingUp, TrendingDown, Clock, Target, Shield, Zap, ChevronDown, ChevronUp } from "lucide-react";
-import { type Signal, executePosition } from "@/lib/api";
+import { type Signal, executePosition, resolveSignal } from "@/lib/api";
 import { formatPrice, timeAgo, directionBg } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +16,20 @@ const AGENT_SHORT: Record<string, string> = {
 interface SignalCardProps {
   signal: Signal;
   onExecute?: (id: string) => void;
+  onResolve?: (id: string, outcome: "WIN" | "LOSS") => void;
   /** Compact mode for dashboard feed panel */
   compact?: boolean;
 }
 
-export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
+export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executed, setExecuted]   = useState(false);
+  const [resolving, setResolving]   = useState(false);
+  const [resolved, setResolved]     = useState<"WIN" | "LOSS" | null>(
+    signal.status === "WIN" || signal.status === "LOSS" ? (signal.status as "WIN" | "LOSS") : null
+  );
 
   const isLong    = signal.direction === "LONG";
   const riskPct   = Math.abs((signal.stop_loss - signal.entry_price) / signal.entry_price * 100);
@@ -43,6 +48,20 @@ export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
       setExecuteError(err instanceof Error ? err.message : "Failed to execute trade");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResolve = async (e: React.MouseEvent, outcome: "WIN" | "LOSS") => {
+    e.stopPropagation();
+    setResolving(true);
+    try {
+      await resolveSignal(signal.signal_id, outcome);
+      setResolved(outcome);
+      onResolve?.(signal.signal_id, outcome);
+    } catch {
+      // silent — user can retry
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -130,31 +149,59 @@ export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
           )}
         </div>
 
-        {/* Paper trade action row */}
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
-          {executeError && (
-            <span className="text-[8px] font-mono text-bear truncate mr-2">✗ {executeError}</span>
-          )}
-          {executed ? (
-            <span className="text-[8px] font-mono text-bull flex items-center gap-1">
-              ✓ OPENED — <a href="/portfolio" className="underline">View Portfolio</a>
+        {/* Action row: paper trade + outcome buttons */}
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/30">
+          {resolved ? (
+            <span className={cn(
+              "text-[8px] font-mono px-2 py-0.5 rounded border font-bold",
+              resolved === "WIN" ? "bg-bull/10 border-bull/30 text-bull" : "bg-bear/10 border-bear/30 text-bear"
+            )}>
+              {resolved === "WIN" ? "✓ WIN" : "✗ LOSS"}
             </span>
           ) : (
-            <span className="text-[8px] font-mono text-muted-foreground">R:R {rrRatio}x</span>
+            <>
+              <button
+                onClick={(e) => handleResolve(e, "WIN")}
+                disabled={resolving}
+                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bull/10 border-bull/30 text-bull hover:bg-bull/20 disabled:opacity-50"
+              >
+                WIN
+              </button>
+              <button
+                onClick={(e) => handleResolve(e, "LOSS")}
+                disabled={resolving}
+                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bear/10 border-bear/30 text-bear hover:bg-bear/20 disabled:opacity-50"
+              >
+                LOSS
+              </button>
+            </>
           )}
-          <button
-            onClick={handleExecute}
-            disabled={loading || executed}
-            className={cn(
-              "text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors ml-auto",
-              (loading || executed) ? "opacity-50 cursor-not-allowed border-border/30 text-muted-foreground" :
-              isLong
-                ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
-                : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
+          <div className="ml-auto flex items-center gap-1.5">
+            {executeError && (
+              <span className="text-[8px] font-mono text-bear truncate">✗ {executeError}</span>
             )}
-          >
-            {loading ? "…" : executed ? "EXECUTED" : "PAPER TRADE"}
-          </button>
+            {executed ? (
+              <span className="text-[8px] font-mono text-bull">
+                ✓ <a href="/portfolio" className="underline">Portfolio</a>
+              </span>
+            ) : (
+              !resolved && (
+                <button
+                  onClick={handleExecute}
+                  disabled={loading || executed}
+                  className={cn(
+                    "text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors",
+                    (loading || executed) ? "opacity-50 cursor-not-allowed border-border/30 text-muted-foreground" :
+                    isLong
+                      ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
+                      : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
+                  )}
+                >
+                  {loading ? "…" : "PAPER TRADE"}
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
     );

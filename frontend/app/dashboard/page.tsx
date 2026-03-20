@@ -71,6 +71,9 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   }
 
   const activeSignals = signals.filter((s) => s.status === "ACTIVE").length;
+  const activeTickerLocked = signals.some(
+    s => s.ticker === activeTicker && s.status === "ACTIVE"
+  );
   const avgConf       = signals.length
     ? (signals.reduce((a, s) => a + s.confidence_score, 0) / signals.length).toFixed(0)
     : null;
@@ -164,18 +167,19 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               <button
                 onClick={() => {
                   if (!isLoggedIn) { window.location.href = "/login"; return; }
+                  if (activeTickerLocked) return;
                   handleGenerate();
                 }}
-                disabled={loading}
+                disabled={loading || activeTickerLocked}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
-                  loading
-                    ? "border-primary/30 text-primary/50 cursor-not-allowed"
+                  loading || activeTickerLocked
+                    ? "border-border/40 text-muted-foreground/50 cursor-not-allowed"
                     : "border-primary/50 text-primary hover:bg-primary/10"
                 )}
               >
                 <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "ANALYZING… (up to 60s)" : "RUN AI ANALYSIS"}
+                {loading ? "ANALYZING… (up to 60s)" : activeTickerLocked ? "SIGNAL ACTIVE — MARK WIN/LOSS" : "RUN AI ANALYSIS"}
               </button>
               <button
                 onClick={loadData}
@@ -238,7 +242,14 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     : "hover:bg-white/[0.02]"
                 )}
               >
-                <SignalCard signal={signal} compact onExecute={() => setTradeOpened(true)} />
+                <SignalCard
+                  signal={signal}
+                  compact
+                  onExecute={() => setTradeOpened(true)}
+                  onResolve={(id, outcome) => {
+                    setSignals(prev => prev.map(s => s.signal_id === id ? { ...s, status: outcome } : s));
+                  }}
+                />
               </div>
             ))}
           </div>

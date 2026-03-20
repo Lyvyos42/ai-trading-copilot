@@ -162,6 +162,20 @@ async def generate_signal(
             if cached:
                 return {**cached, "cached": True}
 
+            # Block if user already has an ACTIVE signal for this ticker
+            existing = await db.execute(
+                select(Signal)
+                .where(Signal.user_id == user_id)
+                .where(Signal.ticker == body.ticker.upper().strip())
+                .where(Signal.status == "ACTIVE")
+                .limit(1)
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"You already have an active signal for {body.ticker.upper().strip()}. Mark it as WIN or LOSS before generating a new one.",
+                )
+
             # Layer 1: daily quota (DB query — do last to avoid unnecessary I/O)
             await _check_daily_quota(user_id, tier, db)
 
@@ -262,6 +276,35 @@ async def list_signals(
     result = await db.execute(query)
     signals = result.scalars().all()
     return [_signal_to_dict(s) for s in signals]
+
+
+class OutcomeRequest(BaseModel):
+    outcome: str  # "WIN" or "LOSS"
+
+
+@router.patch("/{signal_id}/outcome")
+async def set_signal_outcome(
+    signal_id: str,
+    body: OutcomeRequest,
+    db: AsyncSession = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
+):
+    if body.outcome not in ("WIN", "LOSS"):
+        raise HTTPException(status_code=400, detail="outcome must be WIN or LOSS")
+
+    result = await db.execute(select(Signal).where(Signal.id == signal_id))
+    signal = result.scalar_one_or_none()
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    # Only the owner can resolve their signal
+    if user and signal.user_id and signal.user_id != user.get("sub"):
+        raise HTTPException(status_code=403, detail="Not your signal")
+
+    signal.status = body.outcome
+    await db.commit()
+    await db.refresh(signal)
+    return _signal_to_dict(signal)
 
 
 def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
