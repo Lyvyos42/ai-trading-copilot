@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Zap } from "lucide-react";
+import { Zap, Lock } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, API_URL, type Signal } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 const ASSET_CLASSES = ["stocks", "etfs", "crypto", "forex", "metals", "energy", "indices", "futures", "agriculture"];
 
@@ -34,8 +36,12 @@ export default function SignalsPage() {
   const [assetClass, setAssetClass] = useState("stocks");
   const [customTicker, setCustomTicker] = useState("");
   const [error, setError]           = useState("");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const { isLoggedIn } = useAuth();
 
   async function handleGenerate(ticker: string) {
+    if (!isLoggedIn) { window.location.href = "/login"; return; }
     setError("");
     setWaking(false);
     setLoading(ticker);
@@ -69,6 +75,22 @@ export default function SignalsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+
+      {/* Visitor gate banner */}
+      {!isLoggedIn && (
+        <div className="flex items-center gap-3 px-4 py-3 border border-primary/30 bg-primary/5 rounded-lg">
+          <Lock className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-xs font-mono text-muted-foreground flex-1">
+            Sign in to generate AI signals across 80+ strategies and all asset classes.
+          </span>
+          <a
+            href="/login"
+            className="text-[10px] font-mono font-bold px-3 py-1 border border-primary/50 text-primary hover:bg-primary/10 transition-colors rounded"
+          >
+            SIGN IN
+          </a>
+        </div>
+      )}
 
       {/* Page header */}
       <div className="terminal-panel">
@@ -198,6 +220,14 @@ export default function SignalsPage() {
           ))}
         </div>
       )}
+
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        feature="Unlimited AI Signals"
+        requiredTier="retail"
+        reason="Free accounts can run 3 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
+      />
     </div>
   );
 }

@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, ChevronUp, ChevronDown } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
-import { TradingChart } from "@/components/TradingChart";
+import { TradingViewChart } from "@/components/TradingViewChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, type Signal, type AgentStatus } from "@/lib/api";
 import { formatPrice, formatPct } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/useAuth";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
 
@@ -28,6 +30,9 @@ export default function DashboardPage() {
   const [loading, setLoading]               = useState(false);
   const [activeTicker, setActiveTicker]     = useState("AAPL");
   const [timeframe, setTimeframe]           = useState(TIMEFRAMES[4]); // default 6M
+  const [upgradeOpen, setUpgradeOpen]       = useState(false);
+
+  const { isLoggedIn } = useAuth();
 
   useEffect(() => { loadData(); }, []);
 
@@ -147,7 +152,10 @@ export default function DashboardPage() {
 
             <div className="ml-auto flex items-center gap-2">
               <button
-                onClick={() => handleGenerate()}
+                onClick={() => {
+                  if (!isLoggedIn) { window.location.href = "/login"; return; }
+                  handleGenerate();
+                }}
                 disabled={loading}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
@@ -219,7 +227,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">
-              <TradingChart ticker={activeTicker} signal={selectedSignal} fillContainer period={timeframe.period} interval={timeframe.interval} />
+              <TradingViewChart ticker={activeTicker} interval={timeframe.interval} fillContainer />
             </div>
           </div>
         </div>
@@ -296,6 +304,14 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        feature="Unlimited AI Analysis"
+        requiredTier="retail"
+        reason="Free accounts can run 3 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
+      />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Zap, RefreshCw } from "lucide-react";
+import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Zap, RefreshCw, Lock } from "lucide-react";
 import { getAgentStatus, triggerDebate, type AgentStatus } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 const AGENT_META: Record<string, {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -42,6 +43,8 @@ export default function AgentsPage() {
   const [debateLoading, setDebateLoading] = useState(false);
   const [debateTicker, setDebateTicker]   = useState("AAPL");
 
+  const { isLoggedIn } = useAuth();
+
   useEffect(() => { loadAgents(); }, []);
 
   async function loadAgents() {
@@ -55,6 +58,7 @@ export default function AgentsPage() {
   }
 
   async function handleDebate() {
+    if (!isLoggedIn) { window.location.href = "/login"; return; }
     setDebateLoading(true);
     try {
       const result = await triggerDebate(debateTicker);
@@ -213,8 +217,8 @@ export default function AgentsPage() {
               disabled={debateLoading}
               className="px-3 py-1.5 text-xs font-mono font-semibold border border-warn/40 bg-warn/10 text-warn hover:bg-warn/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
-              <Zap className="h-3 w-3" />
-              {debateLoading ? "RUNNING···" : "START DEBATE"}
+              {!isLoggedIn ? <Lock className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+              {debateLoading ? "RUNNING···" : !isLoggedIn ? "SIGN IN TO DEBATE" : "START DEBATE"}
             </button>
           </div>
 
