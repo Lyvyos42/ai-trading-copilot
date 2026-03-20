@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Zap, Lock } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Zap, Lock, X } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
@@ -39,29 +39,58 @@ export default function SignalsPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const { isLoggedIn } = useAuth();
+  const cancelRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelAnalysis = useCallback(() => {
+    cancelRef.current = true;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setLoading(null);
+    setWaking(false);
+    setError("Analysis cancelled.");
+  }, []);
 
   async function handleGenerate(ticker: string) {
     if (!isLoggedIn) { window.location.href = "/login"; return; }
+    cancelRef.current = false;
     setError("");
     setWaking(false);
     setLoading(ticker);
-    // Pre-warm: ping /health — if it fails, the backend is cold starting.
-    // apiFetch will auto-retry after 22s, so just show waking indicator.
+
+    // Hard 75s timeout — auto-cancel if backend never responds
+    timeoutRef.current = setTimeout(() => {
+      if (cancelRef.current) return;
+      cancelRef.current = true;
+      setLoading(null);
+      setWaking(false);
+      setError("Backend took too long to respond. Render free tier may be sleeping — wait 30s and try again.");
+    }, 75_000);
+
+    // Pre-warm: ping /health to detect cold start
     try {
       const warmRes = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(5_000) });
       if (!warmRes.ok) setWaking(true);
     } catch {
       setWaking(true);
     }
+
+    if (cancelRef.current) return;
+
     try {
       const signal = await generateSignal(ticker, TICKER_ASSET_CLASS[assetClass] ?? assetClass);
-      setSignals((prev) => [signal, ...prev]);
+      if (!cancelRef.current) setSignals((prev) => [signal, ...prev]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to generate signal";
-      setError(`${msg} [backend: ${API_URL}]`);
+      if (!cancelRef.current) {
+        const msg = e instanceof Error ? e.message : "Failed to generate signal";
+        const isColdStart = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network");
+        setError(isColdStart
+          ? "Backend is waking up (Render free tier, ~60s). Wait a moment and try again."
+          : `${msg}`
+        );
+      }
     } finally {
-      setLoading(null);
-      setWaking(false);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (!cancelRef.current) { setLoading(null); setWaking(false); }
     }
   }
 
@@ -78,17 +107,48 @@ export default function SignalsPage() {
 
       {/* Visitor gate banner */}
       {!isLoggedIn && (
-        <div className="flex items-center gap-3 px-4 py-3 border border-primary/30 bg-primary/5 rounded-lg">
-          <Lock className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-xs font-mono text-muted-foreground flex-1">
-            Sign in to generate AI signals across 80+ strategies and all asset classes.
-          </span>
-          <a
-            href="/login"
-            className="text-[10px] font-mono font-bold px-3 py-1 border border-primary/50 text-primary hover:bg-primary/10 transition-colors rounded"
-          >
-            SIGN IN
-          </a>
+        <div className="p-4 border border-primary/30 bg-primary/5 rounded-lg space-y-3">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-xs font-mono font-bold text-primary">SIGN IN TO USE AI SIGNAL GENERATOR</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[10px] font-mono">
+            <div className="p-3 rounded border border-border/40 bg-background/40">
+              <div className="text-muted-foreground font-bold mb-2">FREE ACCOUNT</div>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• 5 AI signals / day</li>
+                <li>• Stocks &amp; ETFs only</li>
+                <li>• Paper trading portfolio</li>
+                <li>• Market intel &amp; news</li>
+              </ul>
+            </div>
+            <div className="p-3 rounded border border-primary/40 bg-primary/5">
+              <div className="text-primary font-bold mb-2">RETAIL — $49/mo</div>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Unlimited signals</li>
+                <li>• All 8 asset classes</li>
+                <li>• All 80+ strategies</li>
+                <li>• Bull/Bear agent debate</li>
+              </ul>
+            </div>
+            <div className="p-3 rounded border border-yellow-400/30 bg-yellow-400/5">
+              <div className="text-yellow-400 font-bold mb-2">PRO — $199/mo</div>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Everything in Retail</li>
+                <li>• Custom agent tuning</li>
+                <li>• API &amp; webhook access</li>
+                <li>• Priority support</li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <a href="/login" className="px-4 py-1.5 text-[10px] font-mono font-bold border border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 transition-colors rounded">
+              SIGN IN FREE
+            </a>
+            <a href="/pricing" className="px-4 py-1.5 text-[10px] font-mono font-bold border border-border/50 text-muted-foreground hover:text-foreground transition-colors rounded">
+              SEE PRICING
+            </a>
+          </div>
         </div>
       )}
 
@@ -182,7 +242,7 @@ export default function SignalsPage() {
                 <Zap className="h-3 w-3 text-warn animate-pulse" />
                 <span className="terminal-label text-warn ml-1">WAKING BACKEND</span>
                 <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
-                <span className="ml-auto text-[9px] font-mono text-warn/70">Render cold start — retrying in ~22s…</span>
+                <span className="mx-auto text-[9px] font-mono text-warn/70">Render cold start — retrying in ~50s…</span>
               </>
             ) : (
               <>
@@ -190,6 +250,12 @@ export default function SignalsPage() {
                 <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
               </>
             )}
+            <button
+              onClick={cancelAnalysis}
+              className="ml-auto flex items-center gap-1 text-[9px] font-mono text-muted-foreground hover:text-bear border border-border/40 hover:border-bear/40 px-2 py-0.5 rounded transition-colors"
+            >
+              <X className="h-2.5 w-2.5" /> CANCEL
+            </button>
           </div>
           <div className="p-4">
             <div className="flex items-center gap-6">
