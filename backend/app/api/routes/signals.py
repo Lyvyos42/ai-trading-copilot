@@ -235,6 +235,7 @@ async def generate_signal(
         agent_votes=agent_votes,
         reasoning_chain=state.get("reasoning_chain", []),
         strategy_sources=final.get("strategy_sources", []),
+        timeframe_levels=final.get("timeframe_levels", {}),
         status="ACTIVE",
         expiry_time=datetime.utcnow() + timedelta(hours=24),
     )
@@ -323,6 +324,7 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
         "agent_votes": signal.agent_votes,
         "reasoning_chain": signal.reasoning_chain,
         "strategy_sources": signal.strategy_sources,
+        "timeframe_levels": signal.timeframe_levels or {},
         "status": signal.status,
         "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
         "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,

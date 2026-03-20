@@ -42,6 +42,7 @@ class Signal(Base):
     agent_votes: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
     reasoning_chain: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
     strategy_sources: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
+    timeframe_levels: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default="ACTIVE")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expiry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TrendingUp, TrendingDown, Clock, Target, Shield, Zap, ChevronDown, ChevronUp } from "lucide-react";
-import { type Signal, executePosition, resolveSignal } from "@/lib/api";
+import { type Signal, type TimeframeLevels, executePosition, resolveSignal } from "@/lib/api";
 import { formatPrice, timeAgo, directionBg } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ interface SignalCardProps {
 
 export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
+  const [tfTab, setTfTab]         = useState<"scalp" | "swing">("swing");
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executed, setExecuted]   = useState(false);
@@ -97,18 +98,26 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           </div>
         </div>
 
-        {/* Row 2: Prices */}
-        <div className="flex items-center gap-3 mt-1.5">
-          <span className="text-[9px] font-mono text-muted-foreground">
-            ENTRY <span className="text-foreground font-semibold">{formatPrice(signal.entry_price)}</span>
-          </span>
-          <span className="text-[9px] font-mono text-muted-foreground">
-            TP1 <span className="text-bull font-semibold">{formatPrice(signal.take_profit_1)}</span>
-          </span>
-          <span className="text-[9px] font-mono text-muted-foreground">
-            SL <span className="text-bear font-semibold">{formatPrice(signal.stop_loss)}</span>
-          </span>
-        </div>
+        {/* Row 2: Prices — prefer swing levels if available */}
+        {(() => {
+          const lv = signal.timeframe_levels?.swing;
+          const entry = lv?.entry ?? signal.entry_price;
+          const tp1   = lv?.take_profit_1 ?? signal.take_profit_1;
+          const sl    = lv?.stop_loss ?? signal.stop_loss;
+          return (
+            <div className="flex items-center gap-3 mt-1.5">
+              <span className="text-[9px] font-mono text-muted-foreground">
+                ENTRY <span className="text-foreground font-semibold">{formatPrice(entry)}</span>
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground">
+                TP1 <span className="text-bull font-semibold">{formatPrice(tp1)}</span>
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground">
+                SL <span className="text-bear font-semibold">{formatPrice(sl)}</span>
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Row 3: Meta */}
         <div className="flex items-center justify-between mt-1.5">
@@ -246,13 +255,41 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           <ConfidenceRing score={signal.confidence_score} />
         </div>
 
-        {/* Price levels */}
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          <PriceBox label="ENTRY" value={signal.entry_price} colorClass="text-primary" borderClass="border-primary/30" />
-          <PriceBox label="SL" value={signal.stop_loss} colorClass="text-bear" borderClass="border-bear/30" />
-          <PriceBox label="TP1" value={signal.take_profit_1} colorClass="text-bull" borderClass="border-bull/30" />
-          <PriceBox label="TP2" value={signal.take_profit_2} colorClass="text-bull/70" borderClass="border-bull/20" />
-        </div>
+        {/* Timeframe tab switcher */}
+        {signal.timeframe_levels?.scalp && signal.timeframe_levels?.swing ? (
+          <div className="mb-3">
+            {/* Tab buttons */}
+            <div className="flex gap-1 mb-2">
+              {(["scalp", "swing"] as const).map((tab) => {
+                const lv = signal.timeframe_levels![tab]!;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setTfTab(tab)}
+                    className={cn(
+                      "flex-1 text-[9px] font-mono font-bold px-2 py-1 rounded border transition-colors",
+                      tfTab === tab
+                        ? "bg-primary/10 border-primary/50 text-primary"
+                        : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                    )}
+                  >
+                    {lv.label}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Active timeframe levels */}
+            <TimeframePriceGrid levels={signal.timeframe_levels[tfTab]!} />
+          </div>
+        ) : (
+          /* Fallback: original flat price boxes */
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <PriceBox label="ENTRY" value={signal.entry_price} colorClass="text-primary" borderClass="border-primary/30" />
+            <PriceBox label="SL" value={signal.stop_loss} colorClass="text-bear" borderClass="border-bear/30" />
+            <PriceBox label="TP1" value={signal.take_profit_1} colorClass="text-bull" borderClass="border-bull/30" />
+            <PriceBox label="TP2" value={signal.take_profit_2} colorClass="text-bull/70" borderClass="border-bull/20" />
+          </div>
+        )}
 
         {/* Risk/reward bar */}
         <div className="flex items-center gap-2 mb-3 text-xs font-mono">
@@ -378,6 +415,28 @@ function ConfBar({ score }: { score: number }) {
   return (
     <div className="h-1.5 w-12 bg-muted rounded overflow-hidden">
       <div className={cn("h-full rounded", color)} style={{ width: `${score}%` }} />
+    </div>
+  );
+}
+
+function TimeframePriceGrid({ levels }: { levels: TimeframeLevels }) {
+  const hasTP3 = levels.take_profit_3 !== undefined;
+  return (
+    <div className="space-y-1.5">
+      <div className={cn("grid gap-2", hasTP3 ? "grid-cols-5" : "grid-cols-4")}>
+        <PriceBox label="ENTRY" value={levels.entry} colorClass="text-primary" borderClass="border-primary/30" />
+        <PriceBox label="SL" value={levels.stop_loss} colorClass="text-bear" borderClass="border-bear/30" />
+        <PriceBox label="TP1" value={levels.take_profit_1} colorClass="text-bull" borderClass="border-bull/30" />
+        <PriceBox label="TP2" value={levels.take_profit_2} colorClass="text-bull/70" borderClass="border-bull/20" />
+        {hasTP3 && (
+          <PriceBox label="TP3" value={levels.take_profit_3!} colorClass="text-bull/50" borderClass="border-bull/15" />
+        )}
+      </div>
+      <div className="flex items-center gap-3 text-[8px] font-mono text-muted-foreground px-0.5">
+        <span>ATR <span className="text-foreground">{formatPrice(levels.atr)}</span></span>
+        <span>SL <span className="text-bear">{levels.risk_pct.toFixed(2)}%</span></span>
+        <span>R:R <span className="text-bull">{(Math.abs(levels.take_profit_1 - levels.entry) / Math.abs(levels.stop_loss - levels.entry)).toFixed(1)}x</span></span>
+      </div>
     </div>
   );
 }

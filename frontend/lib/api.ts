@@ -51,6 +51,17 @@ export function wakeBackend(): void {
 
 // ─── Signals ──────────────────────────────────────────────────────────────────
 
+export interface TimeframeLevels {
+  entry: number;
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  take_profit_3?: number;
+  atr: number;
+  risk_pct: number;
+  label: string;
+}
+
 export interface Signal {
   signal_id: string;
   ticker: string;
@@ -65,6 +76,7 @@ export interface Signal {
   agent_votes: Record<string, { direction?: string; confidence?: number } | boolean>;
   reasoning_chain: string[];
   strategy_sources: string[];
+  timeframe_levels?: { scalp?: TimeframeLevels; swing?: TimeframeLevels };
   status: string;
   outcome?: string;
   timestamp: string;

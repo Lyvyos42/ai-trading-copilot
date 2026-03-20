@@ -334,6 +334,17 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
         if data.get("closes"):
             data["closes"][-1] = round(live_price, dec)
 
+    # Compute intraday (scalp) ATR via sqrt-of-time rule from daily ATR.
+    # sqrt(15min / 390min per session) ≈ 0.196 — gives realistic 15-min ATR
+    # without an extra network call. Used by trader for SCALP level computation.
+    import math as _math
+    atr_daily = data.get("atr", 0) or 0
+    dec = data.get("price_decimals", 2)
+    if atr_daily > 0:
+        data["atr_15m"] = round(atr_daily * _math.sqrt(15 / 390), dec)
+    else:
+        data["atr_15m"] = 0.0
+
     return data
 
 

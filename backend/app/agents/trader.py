@@ -104,11 +104,71 @@ Output JSON only."""
                 if entry and abs(entry - current_price) / max(current_price, 1e-9) > 0.05:
                     # Claude hallucinated a price — recompute all levels from current_price
                     return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+                # Always pin entry to exact current_price — market orders fill at market.
+                # Recompute SL/TP from ATR anchored to the pinned entry.
+                atr = tech.get("atr", market_data.get("atr", current_price * 0.012))
+                if atr <= 0:
+                    atr = current_price * 0.012
+                atr_15m = market_data.get("atr_15m", atr * 0.196)
+                result = self._pin_entry_and_recompute(result, current_price, direction, atr, atr_15m, _dec)
                 return result
             except json.JSONDecodeError:
                 pass
 
         return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+
+    def _pin_entry_and_recompute(self, result: dict, price: float, direction: str, atr: float, atr_15m: float, dec: int) -> dict:
+        """Pin entry to exact current price and recompute SL/TP from ATR."""
+        entry = round(price, dec)
+        result["entry_price"] = entry
+
+        if direction == "LONG":
+            stop     = round(entry - atr * 1.5, dec)
+            risk_amt = entry - stop
+            result["stop_loss"]      = stop
+            result["take_profit_1"] = round(entry + risk_amt * 1.5, dec)
+            result["take_profit_2"] = round(entry + risk_amt * 2.5, dec)
+            result["take_profit_3"] = round(entry + risk_amt * 4.0, dec)
+        else:
+            stop     = round(entry + atr * 1.5, dec)
+            risk_amt = stop - entry
+            result["stop_loss"]      = stop
+            result["take_profit_1"] = round(entry - risk_amt * 1.5, dec)
+            result["take_profit_2"] = round(entry - risk_amt * 2.5, dec)
+            result["take_profit_3"] = round(entry - risk_amt * 4.0, dec)
+
+        result["timeframe_levels"] = self._compute_timeframe_levels(entry, direction, atr, atr_15m, dec)
+        return result
+
+    def _compute_timeframe_levels(self, entry: float, direction: str, atr_daily: float, atr_15m: float, dec: int) -> dict:
+        """Compute SCALP (1-15min) and SWING (30min-1D) entry/SL/TP levels."""
+        scalp_atr = atr_15m if atr_15m > 0 else atr_daily * 0.196
+
+        def _levels(atr_used: float, swing_tp3: bool = False) -> dict:
+            if direction == "LONG":
+                sl       = round(entry - atr_used * 2.0, dec)
+                risk     = entry - sl
+                tp1      = round(entry + risk * 1.5, dec)
+                tp2      = round(entry + risk * 2.5, dec)
+                tp3      = round(entry + risk * 4.0, dec) if swing_tp3 else None
+            else:
+                sl       = round(entry + atr_used * 2.0, dec)
+                risk     = sl - entry
+                tp1      = round(entry - risk * 1.5, dec)
+                tp2      = round(entry - risk * 2.5, dec)
+                tp3      = round(entry - risk * 4.0, dec) if swing_tp3 else None
+            risk_pct = round(abs(sl - entry) / entry * 100, 3)
+            out = {"entry": entry, "stop_loss": sl, "take_profit_1": tp1,
+                   "take_profit_2": tp2, "atr": round(atr_used, dec), "risk_pct": risk_pct}
+            if tp3 is not None:
+                out["take_profit_3"] = tp3
+            return out
+
+        scalp = _levels(scalp_atr, swing_tp3=False)
+        scalp["label"] = "SCALP · 1–15M"
+        swing = _levels(atr_daily, swing_tp3=True)
+        swing["label"] = "SWING · 30M–1D"
+        return {"scalp": scalp, "swing": swing}
 
     def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
         if market_data is None:
@@ -122,19 +182,19 @@ Output JSON only."""
         atr = tech.get("atr", market_data.get("atr", price * 0.012))
         if atr <= 0:
             atr = price * 0.012
+        atr_15m = market_data.get("atr_15m", atr * 0.196)
 
-        # Entry: at market (slight slippage simulation)
-        slippage = atr * rng.uniform(0.02, 0.08)
+        # Entry: always at exact current market price — no simulated slippage.
+        # Paper trading fills at market; signals are generated at the moment of request.
+        entry = round(price, dec)
 
         if direction == "LONG":
-            entry    = round(price + slippage, dec)
             stop     = round(entry - atr * 1.5, dec)        # 1.5 ATR stop
             risk_amt = entry - stop
             tp1      = round(entry + risk_amt * 1.5, dec)   # 1.5R
             tp2      = round(entry + risk_amt * 2.5, dec)   # 2.5R
             tp3      = round(entry + risk_amt * 4.0, dec)   # 4R
         else:
-            entry    = round(price - slippage, dec)
             stop     = round(entry + atr * 1.5, dec)        # 1.5 ATR stop
             risk_amt = stop - entry
             tp1      = round(entry - risk_amt * 1.5, dec)   # 1.5R
@@ -198,4 +258,5 @@ Output JSON only."""
                 f"TP2={tp2:{fmt}}, TP3={tp3:{fmt}}. "
                 f"Conviction: {confidence:.0f}%. Strategies: {', '.join(strategy_sources[:3])}."
             ),
+            "timeframe_levels": self._compute_timeframe_levels(entry, direction, atr, atr_15m, dec),
         }
