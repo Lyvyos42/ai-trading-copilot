@@ -23,6 +23,8 @@ interface SignalCardProps {
 export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
   const [loading, setLoading]     = useState(false);
+  const [executeError, setExecuteError] = useState<string | null>(null);
+  const [executed, setExecuted]   = useState(false);
 
   const isLong    = signal.direction === "LONG";
   const riskPct   = Math.abs((signal.stop_loss - signal.entry_price) / signal.entry_price * 100);
@@ -32,9 +34,16 @@ export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
   const handleExecute = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
-    try { await executePosition(signal.signal_id); onExecute?.(signal.signal_id); }
-    catch {}
-    finally { setLoading(false); }
+    setExecuteError(null);
+    try {
+      await executePosition(signal.signal_id);
+      setExecuted(true);
+      onExecute?.(signal.signal_id);
+    } catch (err) {
+      setExecuteError(err instanceof Error ? err.message : "Failed to execute trade");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ── COMPACT MODE — terminal feed row ─────────────────────────── */
@@ -235,31 +244,43 @@ export function SignalCard({ signal, onExecute, compact }: SignalCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-          <button
-            className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            {expanded ? "HIDE" : "REASONING"}
-          </button>
-          <div className="flex gap-2">
-            <button className="text-[10px] font-mono px-2 py-1 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-              <Target className="h-2.5 w-2.5" /> BACKTEST
-            </button>
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-border/50">
+          {executeError && (
+            <div className="text-[10px] font-mono text-bear bg-bear/10 border border-bear/30 rounded px-2 py-1">
+              ✗ {executeError}
+            </div>
+          )}
+          {executed && (
+            <div className="text-[10px] font-mono text-bull bg-bull/10 border border-bull/30 rounded px-2 py-1">
+              ✓ Paper trade opened — check Portfolio
+            </div>
+          )}
+          <div className="flex items-center justify-between">
             <button
-              onClick={handleExecute}
-              disabled={loading}
-              className={cn(
-                "text-[10px] font-mono px-3 py-1 rounded border font-bold transition-colors",
-                loading ? "opacity-50 cursor-not-allowed" : "",
-                isLong
-                  ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
-                  : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
-              )}
+              className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setExpanded(!expanded)}
             >
-              {loading ? "…" : "PAPER TRADE"}
+              {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              {expanded ? "HIDE" : "REASONING"}
             </button>
+            <div className="flex gap-2">
+              <button className="text-[10px] font-mono px-2 py-1 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                <Target className="h-2.5 w-2.5" /> BACKTEST
+              </button>
+              <button
+                onClick={handleExecute}
+                disabled={loading || executed}
+                className={cn(
+                  "text-[10px] font-mono px-3 py-1 rounded border font-bold transition-colors",
+                  (loading || executed) ? "opacity-50 cursor-not-allowed" : "",
+                  isLong
+                    ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
+                    : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
+                )}
+              >
+                {loading ? "…" : executed ? "EXECUTED" : "PAPER TRADE"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
