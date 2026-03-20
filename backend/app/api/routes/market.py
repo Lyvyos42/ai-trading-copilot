@@ -374,15 +374,40 @@ _QUOTES_TTL = 60  # seconds
 
 
 def _fetch_one(display: str, yf_sym: str):
-    """Fetch a single ticker via fast_info — reliable across all asset classes."""
+    """Fetch a single ticker price for the market bar.
+
+    Strategy:
+    - FX pairs and DXY: use history(period='2d', interval='1h') — fast_info is
+      unreliable for these and can return nonsense values.
+    - Everything else: try fast_info first (fastest), fall back to history.
+    """
     import yfinance as yf
+
+    # Tickers where fast_info.last_price is known to return bad values
+    _USE_HISTORY = {"EUR/USD", "GBP/USD", "USD/JPY", "DXY", "US10Y"}
+
     try:
         t = yf.Ticker(yf_sym)
-        fi = t.fast_info
-        price      = fi.last_price
-        prev_close = fi.previous_close
-        if not price or not prev_close:
+
+        if display in _USE_HISTORY:
+            # Use recent hourly history — accurate, avoids fast_info FX bug
+            hist = t.history(period="2d", interval="1h")
+            if hist is None or hist.empty:
+                return None
+            price      = float(hist["Close"].iloc[-1])
+            prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else price
+        else:
+            fi = t.fast_info
+            price      = fi.last_price
+            prev_close = fi.previous_close
+            if not price or not prev_close:
+                return None
+            price      = float(price)
+            prev_close = float(prev_close)
+
+        if price <= 0 or prev_close <= 0:
             return None
+
         change     = price - prev_close
         change_pct = (change / prev_close * 100) if prev_close else 0.0
 
