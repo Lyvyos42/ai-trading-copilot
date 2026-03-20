@@ -216,7 +216,7 @@ export default function BacktestPage() {
         rightPriceScale: { borderColor:"rgba(255,255,255,0.08)" },
         timeScale: { borderColor:"rgba(255,255,255,0.08)", timeVisible:true, secondsVisible:false },
         width:  chartRef.current.clientWidth,
-        height: 480,
+        height: chartRef.current.clientHeight || 520,
       });
 
       const cSer = chart.addCandlestickSeries({
@@ -258,7 +258,7 @@ export default function BacktestPage() {
       candleSer.current = cSer;
       volSer.current    = vSer;
 
-      const ro = new ResizeObserver(() => chart.applyOptions({ width: chartRef.current!.clientWidth }));
+      const ro = new ResizeObserver(() => chart.applyOptions({ width: chartRef.current!.clientWidth, height: chartRef.current!.clientHeight }));
       ro.observe(chartRef.current);
 
       loadData("EURUSD","1d",2);
@@ -347,34 +347,6 @@ export default function BacktestPage() {
     activeToolRef.current = t;
     pendingPt.current = null;
   };
-
-  const startReplay = useCallback(() => {
-    if (!candleSer.current || !volSer.current || allBarsRef.current.length === 0) return;
-    stopReplay();
-    const all   = allBarsRef.current;
-    const delay = replaySpeed === "fast" ? 8 : replaySpeed === "slow" ? 150 : 40;
-    candleSer.current.setData([]);
-    volSer.current.setData([]);
-    replayActive.current = true;
-    setReplayPlaying(true);
-    setReplayIdx(0);
-    let idx = 0;
-    const tick = () => {
-      if (!replayActive.current || !candleSer.current || !volSer.current) return;
-      const b = all[idx];
-      candleSer.current.update({ time: b.time as any, open: b.open, high: b.high, low: b.low, close: b.close });
-      volSer.current.update({ time: b.time as any, value: b.volume, color: b.close >= b.open ? "rgba(34,197,94,0.35)" : "rgba(230,57,70,0.35)" });
-      idx++;
-      setReplayIdx(idx);
-      if (idx < all.length) {
-        replayTimer.current = setTimeout(tick, delay);
-      } else {
-        replayActive.current = false;
-        setReplayPlaying(false);
-      }
-    };
-    replayTimer.current = setTimeout(tick, delay);
-  }, [replaySpeed, stopReplay]);
 
   const handleLoad = () => { clearAll(); loadData(symbol, timeframe, years); };
 
@@ -500,7 +472,7 @@ export default function BacktestPage() {
           </div>
 
           {/* Chart area + sidebars */}
-          <div className="flex mx-4 gap-0 border border-border/30" style={{height:560}}>
+          <div className="flex mx-4 gap-0 border border-border/30" style={{height:"calc(100vh - 195px)"}}>
 
             {/* Drawing toolbar */}
             <div className="w-12 bg-background border-r border-border/30 flex flex-col items-center pt-3 gap-2">
