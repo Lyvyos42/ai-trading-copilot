@@ -75,11 +75,12 @@ export interface Signal {
 function inferAssetClass(ticker: string): string {
   const u = ticker.toUpperCase();
   if (u.endsWith("-USD") || ["BTC","ETH","SOL","BNB","XRP","ADA","DOGE","AVAX","DOT","LINK","UNI","MATIC","ATOM","LTC","BCH","SHIB","PEPE","WIF","OP","ARB","SUI","NEAR","APT"].some(c => u.startsWith(c))) return "crypto";
-  if (["XAUUSD","XAGUSD","XPTUSD","XPDUSD"].includes(u)) return "metals";
-  if (u.endsWith("=X") || /^(EUR|GBP|USD|AUD|NZD|CAD|CHF|JPY|NOK|SEK|DKK|SGD|HKD|CNH|INR|BRL|KRW|TRY|ZAR|MXN|PLN|HUF|CZK|THB)/.test(u)) return "forex";
+  if (["XAUUSD","XAGUSD","XPTUSD","XPDUSD","HG=F"].includes(u)) return "commodities";
+  if (u.endsWith("=X") || /^(EUR|GBP|USD|AUD|NZD|CAD|CHF|JPY|NOK|SEK|DKK|SGD|HKD|CNH|INR|BRL|KRW|TRY|ZAR|MXN|PLN|HUF|CZK|THB)/.test(u)) return "fx";
   if (["US500","US100","US30","US2000","UK100","GER40","FRA40","JPN225","HK50","AUS200","ESP35","ITA40","STOXX50","SPX","NDX","DJIA","DAX","CAC40"].includes(u)) return "indices";
-  if (["USOIL","UKOIL","NATGAS","RBOB","HEATOIL"].includes(u)) return "energy";
+  if (["USOIL","UKOIL","NATGAS","RBOB","HEATOIL","CL=F","RB=F","HO=F","NG=F"].includes(u)) return "commodities";
   if (["CORN","WHEAT","SOYBEAN","COFFEE","SUGAR","COTTON","COCOA"].includes(u)) return "commodities";
+  if (u.endsWith("=F")) return "futures";
   return "stocks";
 }
 
