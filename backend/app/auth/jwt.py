@@ -137,6 +137,15 @@ async def get_optional_user(
         return None
 
 
+async def get_current_user(
+    token: str | None = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False))
+) -> dict:
+    """Like get_optional_user but raises 401 if no valid token is provided."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return await decode_token_async(token)
+
+
 # ── Password helpers (kept for demo user seeding) ─────────────────────────────
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
