@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Activity, BarChart2, Briefcase, LayoutDashboard, Menu, Newspaper, X, Zap } from "lucide-react";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Activity, BarChart2, Briefcase, LayoutDashboard, LogOut, Menu, Newspaper, X, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 const NAV_ITEMS = [
   { href: "/dashboard",  label: "TERMINAL",  icon: LayoutDashboard },
@@ -17,7 +19,33 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Get current session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      // Also check localStorage demo token
+      if (!session?.user && localStorage.getItem("token")) {
+        setUser({ email: "demo@tradingcopilot.ai" } as User);
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("token");
+    setUser(null);
+    router.push("/login");
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-[hsl(0_0%_2%)]">
@@ -71,12 +99,27 @@ export function Navbar() {
             <span className="text-[9px] font-mono font-bold text-primary">$100,000</span>
           </div>
 
-          <Link
-            href="/login"
-            className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors hidden sm:block"
-          >
-            SIGN IN
-          </Link>
+          {user ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="text-[9px] font-mono text-muted-foreground max-w-[120px] truncate">
+                {user.email}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-1 rounded border border-border/50 text-muted-foreground hover:text-red-400 hover:border-red-400/30 transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors hidden sm:block"
+            >
+              SIGN IN
+            </Link>
+          )}
 
           {/* Mobile toggle */}
           <button

@@ -8,16 +8,30 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    // Supabase puts the session in the URL hash after OAuth redirect.
-    // getSession() processes it automatically.
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const handleCallback = async () => {
+      // PKCE flow: Supabase redirects with ?code= query param
+      const code = new URLSearchParams(window.location.search).get("code");
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (data.session?.access_token) {
+          localStorage.setItem("token", data.session.access_token);
+          router.replace("/dashboard");
+          return;
+        }
+        if (error) console.error("PKCE exchange failed:", error.message);
+      }
+
+      // Fallback: implicit flow (hash fragment)
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
         localStorage.setItem("token", session.access_token);
         router.replace("/dashboard");
       } else {
         router.replace("/login");
       }
-    });
+    };
+
+    handleCallback();
   }, [router]);
 
   return (
