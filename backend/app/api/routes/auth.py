@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user_id, decode_token
+from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user_id, decode_token, decode_token_async
 from fastapi.security import OAuth2PasswordBearer as _Bearer
 _oauth2 = _Bearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 from app.config import settings
@@ -60,7 +60,7 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
 async def me(token: str = Depends(_oauth2), db: AsyncSession = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    payload = decode_token(token)
+    payload = await decode_token_async(token)
     user_id = payload.get("sub")
     email   = payload.get("email", "")
     if not user_id:
