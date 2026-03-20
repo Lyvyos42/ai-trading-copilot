@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Zap, RefreshCw, Lock } from "lucide-react";
 import { getAgentStatus, triggerDebate, type AgentStatus } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 const AGENT_META: Record<string, {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -43,7 +44,8 @@ export default function AgentsPage() {
   const [debateLoading, setDebateLoading] = useState(false);
   const [debateTicker, setDebateTicker]   = useState("AAPL");
 
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isAtLeast } = useAuth();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   useEffect(() => { loadAgents(); }, []);
 
@@ -59,6 +61,7 @@ export default function AgentsPage() {
 
   async function handleDebate() {
     if (!isLoggedIn) { window.location.href = "/login"; return; }
+    if (!isAtLeast("retail")) { setUpgradeOpen(true); return; }
     setDebateLoading(true);
     try {
       const result = await triggerDebate(debateTicker);
@@ -257,6 +260,14 @@ export default function AgentsPage() {
           )}
         </div>
       </div>
+
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        feature="Bull/Bear Agent Debate"
+        requiredTier="retail"
+        reason="Force a live Bull vs Bear debate between the 4 analyst agents and get a final TraderAgent verdict. Available on Retail and above."
+      />
     </div>
   );
 }

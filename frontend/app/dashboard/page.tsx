@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [agents, setAgents]                 = useState<AgentStatus[]>([]);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [loading, setLoading]               = useState(false);
+  const [analysisError, setAnalysisError]   = useState<string | null>(null);
   const [activeTicker, setActiveTicker]     = useState("AAPL");
   const [timeframe, setTimeframe]           = useState(TIMEFRAMES[4]); // default 6M
   const [upgradeOpen, setUpgradeOpen]       = useState(false);
@@ -48,13 +49,14 @@ export default function DashboardPage() {
   async function handleGenerate(ticker?: string) {
     const t = ticker || activeTicker;
     setLoading(true);
+    setAnalysisError(null);
     setActiveTicker(t);
     try {
       const signal = await generateSignal(t);
       setSignals((prev) => [signal, ...prev.slice(0, 9)]);
       setSelectedSignal(signal);
     } catch (e) {
-      console.error(e);
+      setAnalysisError(e instanceof Error ? e.message : "Analysis failed — backend may be waking up, try again in 30s");
     } finally {
       setLoading(false);
     }
@@ -245,7 +247,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {signals.length === 0 && !loading && (
+            {analysisError && (
+              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bear/30 bg-bear/5 text-[10px] font-mono text-bear">
+                {analysisError}
+              </div>
+            )}
+            {signals.length === 0 && !loading && !analysisError && (
               <div className="flex flex-col items-center justify-center h-40 text-center px-4">
                 <Zap className="h-6 w-6 text-muted-foreground/30 mb-2" />
                 <p className="text-[10px] font-mono text-muted-foreground">

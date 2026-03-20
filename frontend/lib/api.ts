@@ -66,10 +66,21 @@ export interface Signal {
   agent_detail?: Record<string, unknown>;
 }
 
-export async function generateSignal(ticker: string, assetClass = "stocks", timeframe = "1D"): Promise<Signal> {
+function inferAssetClass(ticker: string): string {
+  const u = ticker.toUpperCase();
+  if (u.endsWith("-USD") || ["BTC","ETH","SOL","BNB","XRP","ADA","DOGE","AVAX","DOT","LINK","UNI","MATIC","ATOM","LTC","BCH","SHIB","PEPE","WIF","OP","ARB","SUI","NEAR","APT"].some(c => u.startsWith(c))) return "crypto";
+  if (["XAUUSD","XAGUSD","XPTUSD","XPDUSD"].includes(u)) return "metals";
+  if (u.endsWith("=X") || /^(EUR|GBP|USD|AUD|NZD|CAD|CHF|JPY|NOK|SEK|DKK|SGD|HKD|CNH|INR|BRL|KRW|TRY|ZAR|MXN|PLN|HUF|CZK|THB)/.test(u)) return "forex";
+  if (["US500","US100","US30","US2000","UK100","GER40","FRA40","JPN225","HK50","AUS200","ESP35","ITA40","STOXX50","SPX","NDX","DJIA","DAX","CAC40"].includes(u)) return "indices";
+  if (["USOIL","UKOIL","NATGAS","RBOB","HEATOIL"].includes(u)) return "energy";
+  if (["CORN","WHEAT","SOYBEAN","COFFEE","SUGAR","COTTON","COCOA"].includes(u)) return "commodities";
+  return "stocks";
+}
+
+export async function generateSignal(ticker: string, assetClass?: string, timeframe = "1D"): Promise<Signal> {
   return apiFetch<Signal>("/api/v1/signals/generate", {
     method: "POST",
-    body: JSON.stringify({ ticker, asset_class: assetClass, timeframe }),
+    body: JSON.stringify({ ticker, asset_class: assetClass ?? inferAssetClass(ticker), timeframe }),
   });
 }
 
@@ -119,6 +130,10 @@ export async function executePosition(signalId: string, quantity = 1): Promise<{
     method: "POST",
     body: JSON.stringify({ signal_id: signalId, quantity, is_paper: true }),
   });
+}
+
+export async function closePosition(positionId: string): Promise<unknown> {
+  return apiFetch(`/api/v1/portfolio/close/${positionId}`, { method: "POST" });
 }
 
 // ─── Agents ───────────────────────────────────────────────────────────────────
