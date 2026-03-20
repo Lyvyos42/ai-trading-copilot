@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change_me_in_production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
-    # Supabase — set SUPABASE_JWT_SECRET in Render env vars
-    supabase_jwt_secret: str = ""
+    # Supabase — set SUPABASE_URL + SUPABASE_JWT_SECRET in Render env vars
+    supabase_url: str = ""          # e.g. https://xxxx.supabase.co
+    supabase_jwt_secret: str = ""   # optional legacy HS256 secret
 
     # App
     environment: str = "development"
