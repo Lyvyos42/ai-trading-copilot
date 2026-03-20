@@ -116,8 +116,11 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     // Clear previous widget
     container.innerHTML = "";
 
+    // TradingView requires a specific DOM structure:
+    // .tradingview-widget-container > .tradingview-widget-container__widget + <script>
     const widgetDiv = document.createElement("div");
-    widgetDiv.style.height = "100%";
+    widgetDiv.className = "tradingview-widget-container__widget";
+    widgetDiv.style.height = "calc(100% - 32px)";
     widgetDiv.style.width = "100%";
     container.appendChild(widgetDiv);
 
@@ -125,7 +128,8 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
-    script.innerHTML = JSON.stringify({
+    // Must use textContent — TradingView reads the script's text as config JSON
+    script.textContent = JSON.stringify({
       autosize: true,
       symbol: toTVSymbol(ticker),
       interval: toTVInterval(interval),
@@ -133,8 +137,7 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
       theme: "dark",
       style: "1",
       locale: "en",
-      backgroundColor: "rgba(0, 0, 0, 0)",
-      gridColor: "rgba(255, 255, 255, 0.04)",
+      backgroundColor: "#0a0a0a",
       hide_top_toolbar: false,
       hide_legend: false,
       hide_side_toolbar: false,
@@ -153,8 +156,14 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: fillContainer ? "100%" : "380px" }}
       className="tradingview-widget-container"
+      style={{
+        width: "100%",
+        // fillContainer relies on parent having explicit height via flex-1
+        // We also set a min-height so the widget always has room to render
+        height: fillContainer ? "100%" : "380px",
+        minHeight: fillContainer ? "400px" : "380px",
+      }}
     />
   );
 }

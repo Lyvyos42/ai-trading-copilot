@@ -59,16 +59,6 @@ export default function LoginPage() {
         </div>
 
         <div className="p-6 rounded-xl border border-border/50 bg-card space-y-4">
-          {/* Demo credentials hint */}
-          {!isRegister && (
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-center">
-              <span className="text-muted-foreground">Demo: </span>
-              <button className="font-mono text-primary hover:underline" onClick={() => { setEmail("demo@tradingcopilot.ai"); setPassword("demo1234"); }}>
-                demo@tradingcopilot.ai / demo1234
-              </button>
-            </div>
-          )}
-
           {/* Google OAuth */}
           <button onClick={handleGoogle} disabled={googleLoading}
             className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-md border border-border/50 bg-background hover:bg-accent/50 transition-colors text-sm font-medium disabled:opacity-50">

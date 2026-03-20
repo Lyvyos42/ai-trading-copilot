@@ -226,7 +226,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "400px" }}>
               <TradingViewChart ticker={activeTicker} interval={timeframe.interval} fillContainer />
             </div>
           </div>
