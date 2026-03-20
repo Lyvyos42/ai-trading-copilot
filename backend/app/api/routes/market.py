@@ -389,15 +389,22 @@ def _fetch_one(display: str, yf_sym: str):
     """Fetch a single ticker price for the market bar.
 
     Strategy:
-    1. Try fast_info (fastest path).
-    2. Sanity-check against known price bounds — fast_info for futures (GC=F,
-       SI=F, CL=F) and some FX pairs sometimes returns garbage values.
-    3. If the value is out-of-bounds, fall back to hourly history which is
-       more reliable for non-equity instruments.
+    - Equities / ETFs / Crypto (no special suffix): fast_info is reliable → use it.
+    - Futures (=F), FX (=X), indices (^…), and our named non-equity symbols
+      (GOLD, SILVER, OIL, DXY, ^VIX, US10Y): fast_info returns stale contract
+      prices that can be 10-40% wrong.  Always use hourly history for these.
     """
     import yfinance as yf
 
-    lo, hi = _PRICE_BOUNDS.get(display, (0.0, float("inf")))
+    # Symbols where fast_info is known to return wrong/stale values
+    _NON_EQUITY = {"EUR/USD", "GBP/USD", "USD/JPY", "DXY", "US10Y",
+                   "GOLD", "SILVER", "OIL(WTI)", "^VIX"}
+    use_history = (
+        display in _NON_EQUITY
+        or yf_sym.endswith("=F")
+        or yf_sym.endswith("=X")
+        or yf_sym.startswith("^")
+    )
 
     def _history_price(t) -> tuple[float, float] | None:
         hist = t.history(period="5d", interval="1h")
@@ -405,36 +412,29 @@ def _fetch_one(display: str, yf_sym: str):
             return None
         p  = float(hist["Close"].iloc[-1])
         pc = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else p
+        if p <= 0:
+            return None
         return p, pc
 
     try:
         t = yf.Ticker(yf_sym)
 
-        # --- Try fast_info first ---
-        price, prev_close = None, None
-        try:
-            fi = t.fast_info
-            _p  = fi.last_price
-            _pc = fi.previous_close
-            if _p and _pc and float(_p) > 0 and float(_pc) > 0:
-                price      = float(_p)
-                prev_close = float(_pc)
-        except Exception:
-            pass
-
-        # --- Sanity check: reject if outside expected range ---
-        if price is None or not (lo <= price <= hi):
+        if use_history:
             result = _history_price(t)
             if result is None:
                 return None
             price, prev_close = result
+        else:
+            # fast_info for stocks/ETFs/crypto
+            fi = t.fast_info
+            _p  = fi.last_price
+            _pc = fi.previous_close
+            if not _p or not _pc or float(_p) <= 0 or float(_pc) <= 0:
+                return None
+            price      = float(_p)
+            prev_close = float(_pc)
 
-        # Final guard
-        if price is None or prev_close is None or price <= 0 or prev_close <= 0:
-            return None
-
-        # One more range check on the history-sourced price
-        if not (lo <= price <= hi):
+        if price <= 0 or prev_close <= 0:
             return None
 
         change     = price - prev_close

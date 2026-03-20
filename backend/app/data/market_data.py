@@ -209,24 +209,11 @@ async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
         highs   = [round(v, dec) for v in highs]
         lows    = [round(v, dec) for v in lows]
 
-        # Patch last bar's close with a live price from yfinance.
-        # tvDatafeed daily bars end at the prior session close, which can be
-        # many hours stale for FX/metals/indices during intraday trading.
-        yf_alias = _TICKER_ALIAS.get(ticker.upper())
-        if yf_alias:
-            try:
-                import yfinance as yf
-                fi = yf.Ticker(yf_alias).fast_info
-                if fi.last_price and fi.last_price > 0:
-                    live = round(fi.last_price, dec)
-                    # Sanity: within ±12% of last daily close
-                    if closes[-1] > 0 and 0.88 <= live / closes[-1] <= 1.12:
-                        closes[-1] = live
-                        highs[-1] = max(highs[-1], live)
-                        lows[-1]  = min(lows[-1],  live)
-            except Exception:
-                pass
-
+        # tvDatafeed daily bars include the current in-progress bar as the last
+        # entry, so closes[-1] already reflects the latest traded price.
+        # We do NOT patch with yfinance fast_info here because fast_info returns
+        # stale/wrong prices for futures and FX instruments (proven: GC=F gives
+        # ~$3,097 when gold is actually ~$4,497).  Trust tvDatafeed's own data.
         current_close    = closes[-1]
         prev_close       = closes[-2] if len(closes) >= 2 else current_close
         price_change_pct = round((current_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
@@ -301,15 +288,21 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
         except Exception:
             pass
 
-        # Use fast_info.last_price for the live current price — history() only
-        # returns the previous session's close which can be hours stale.
+        # fast_info.last_price is reliable for stocks/ETFs but consistently
+        # returns stale/wrong values for futures (=F), FX (=X), and index
+        # tickers (^VIX, ^TNX, ^GSPC …).  For those instruments the daily
+        # history bars already contain accurate recent prices, so we skip the
+        # live-price patch entirely for non-equity tickers.
+        is_equity = not (ticker.endswith("=F") or ticker.endswith("=X") or ticker.startswith("^"))
+
         live_price = None
-        try:
-            fi = tk.fast_info
-            if fi.last_price and fi.last_price > 0:
-                live_price = fi.last_price
-        except Exception:
-            pass
+        if is_equity:
+            try:
+                fi = tk.fast_info
+                if fi.last_price and fi.last_price > 0:
+                    live_price = fi.last_price
+            except Exception:
+                pass
 
         # Determine decimal precision from price magnitude
         sample_price = live_price or float(hist["Close"].iloc[-1])
@@ -320,11 +313,11 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
         lows    = [round(float(p), dec) for p in hist["Low"].tolist()]
         volumes = [int(v) for v in hist["Volume"].tolist()]
 
-        # Patch the last close with the live price so entry/SL/TP are calculated
-        # from the current market price, not yesterday's close.
+        # For equities only: patch the last close with the live intraday price.
+        # We skip this for futures/FX/indices because fast_info returns stale
+        # contract prices that are often far from the current market price.
         if live_price:
             closes[-1] = round(live_price, dec)
-            # Also update last high/low to reflect intraday range
             try:
                 highs[-1] = max(highs[-1], closes[-1])
                 lows[-1]  = min(lows[-1],  closes[-1])
