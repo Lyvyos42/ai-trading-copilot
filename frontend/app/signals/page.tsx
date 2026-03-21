@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Zap, Lock, X } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, API_URL, type Signal } from "@/lib/api";
@@ -37,11 +37,24 @@ export default function SignalsPage() {
   const [customTicker, setCustomTicker] = useState("");
   const [error, setError]           = useState("");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [pipelineStage, setPipelineStage] = useState(0);
 
   const { isLoggedIn } = useAuth();
   const cancelRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickerRef = useRef<string>("");
+
+  // Pipeline stage progression — advances through 6 stages while loading.
+  // Cumulative delays match rough pipeline timing: Data→News→Analysis→Risk→Debate→Signal.
+  const STAGE_DELAYS = [0, 4_000, 11_000, 25_000, 31_000, 37_000]; // ms from start
+  useEffect(() => {
+    if (!loading) { setPipelineStage(0); return; }
+    setPipelineStage(0);
+    const timers = STAGE_DELAYS.slice(1).map((delay, i) =>
+      setTimeout(() => setPipelineStage(i + 1), delay)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cancelAnalysis = useCallback(() => {
     cancelRef.current = true;
@@ -271,16 +284,42 @@ export default function SignalsPage() {
               <X className="h-2.5 w-2.5" /> CANCEL
             </button>
           </div>
-          <div className="p-4">
-            <div className="flex items-center gap-6">
-              {AGENTS.map((agent, i) => (
-                <div key={agent} className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${waking ? "bg-warn" : "bg-primary"} animate-pulse`} style={{ animationDelay: `${i * 200}ms` }} />
-                  <span className="text-[10px] font-mono text-muted-foreground">{agent.replace("Analyst", "")}</span>
+          <div className="p-4 space-y-3">
+            {/* Stage progress bar */}
+            {(() => {
+              const stages = [
+                { label: "01 Market Data",      icon: "📡" },
+                { label: "02 News Intel",        icon: "📰" },
+                { label: "03 Analyst Debate",    icon: "🧠" },
+                { label: "04 Risk Manager",      icon: "🛡️" },
+                { label: "05 Debate Protocol",   icon: "⚖️" },
+                { label: "06 Trader Signal",     icon: "⚡" },
+              ];
+              return (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {stages.map((s, i) => {
+                    const done    = i < pipelineStage;
+                    const active  = i === pipelineStage;
+                    return (
+                      <div key={s.label} className="flex items-center gap-1">
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[9px] font-mono font-bold transition-all ${
+                          done   ? "bg-primary/20 text-primary border border-primary/40" :
+                          active ? "bg-primary/10 text-primary border border-primary/30 animate-pulse" :
+                                   "bg-transparent text-muted-foreground/40 border border-border/20"
+                        }`}>
+                          <span>{s.icon}</span>
+                          <span>{s.label}</span>
+                          {done && <span className="text-primary ml-0.5">✓</span>}
+                        </div>
+                        {i < stages.length - 1 && (
+                          <span className={`text-[8px] ${done ? "text-primary/60" : "text-muted-foreground/20"}`}>→</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-              <span className="text-[10px] font-mono text-muted-foreground ml-2">→ Debate → TraderAgent → RiskManager</span>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
