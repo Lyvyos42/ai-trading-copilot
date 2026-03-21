@@ -42,8 +42,15 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
-      setSignals(sigs.value);
-      if (sigs.value.length > 0 && !selectedSignal) setSelectedSignal(sigs.value[0]);
+      // Deduplicate: keep only the most recent signal per ticker
+      const seen = new Set<string>();
+      const deduped = sigs.value.filter(s => {
+        if (seen.has(s.ticker)) return false;
+        seen.add(s.ticker);
+        return true;
+      });
+      setSignals(deduped);
+      if (deduped.length > 0 && !selectedSignal) setSelectedSignal(deduped[0]);
     }
     if (agentData.status === "fulfilled") setAgents(agentData.value.agents);
   }
@@ -55,7 +62,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setActiveTicker(t);
     try {
       const signal = await generateSignal(t);
-      setSignals((prev) => [signal, ...prev.slice(0, 9)]);
+      // Deduplicate: replace existing signal for same ticker, keep latest
+      setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)]);
       setSelectedSignal(signal);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Analysis failed";
@@ -84,7 +92,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
 
       {/* ── TOP STATS BAR ──────────────────────────────────────────── */}
-      <div className="flex items-stretch border-b border-border bg-[hsl(0_0%_3%)] shrink-0">
+      <div className="grid grid-cols-2 md:flex items-stretch border-b border-border bg-[hsl(0_0%_3%)] shrink-0">
         {[
           {
             label: "ACTIVE SIGNALS",
@@ -135,10 +143,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
       </div>
 
       {/* ── MAIN PANELS ──────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
 
         {/* LEFT — Chart + Controls */}
-        <div className="flex flex-col flex-1 min-w-0 border-r border-border">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 lg:border-r border-border border-b lg:border-b-0">
 
           {/* Control bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0 flex-wrap">
@@ -194,14 +202,14 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
-            <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "400px" }}>
+            <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "300px" }}>
               <TradingViewChart ticker={activeTicker} fillContainer />
             </div>
           </div>
         </div>
 
         {/* CENTER — Signal Feed */}
-        <div className="w-72 flex flex-col border-r border-border shrink-0">
+        <div className="flex flex-col lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-r border-border max-h-64 lg:max-h-none overflow-hidden">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">SIGNAL FEED</span>
             {loading && (
@@ -256,8 +264,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR — Agents + Pipeline */}
-        <div className="w-64 flex flex-col shrink-0">
+        {/* RIGHT SIDEBAR — Agents + Pipeline (desktop only) */}
+        <div className="hidden xl:flex flex-col w-64 shrink-0">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">AGENT NETWORK</span>
             <span className="ml-auto font-mono text-[9px] text-bull">{healthyAgents}/6 HEALTHY</span>
