@@ -13,23 +13,24 @@ interface Tick {
 
 // Seed prices — shown instantly on first render and used as fallback if backend is unavailable.
 // Also clamps jitter so the bar never drifts far from real prices between refreshes.
+// Last updated: Mar 2026
 const SEED_TICKS: Tick[] = [
-  { symbol: "NVDA",     price: 116.85,  change: -0.38,   changePct: -0.32 },
-  { symbol: "TSLA",     price: 192.97,  change: -1.47,   changePct: -0.76 },
-  { symbol: "AAPL",     price: 225.59,  change:  0.90,   changePct:  0.40 },
-  { symbol: "BTC",      price: 82911,   change: -312,    changePct: -0.38 },
-  { symbol: "ETH",      price: 2818,    change:   0.6,   changePct:  0.02 },
-  { symbol: "EUR/USD",  price: 1.0855,  change:  0.0009, changePct:  0.08 },
-  { symbol: "GBP/USD",  price: 1.2988,  change: -0.0040, changePct: -0.31 },
-  { symbol: "USD/JPY",  price: 148.65,  change:  0.15,   changePct:  0.10 },
-  { symbol: "GOLD",     price: 3097.0,  change: -5.3,    changePct: -0.17 },
-  { symbol: "SILVER",   price: 34.37,   change: -0.13,   changePct: -0.38 },
-  { symbol: "OIL(WTI)", price: 68.33,   change: -0.07,   changePct: -0.10 },
-  { symbol: "^VIX",     price: 19.88,   change:  0.03,   changePct:  0.15 },
-  { symbol: "DXY",      price: 103.54,  change: -0.27,   changePct: -0.26 },
-  { symbol: "US10Y",    price: 4.293,   change:  0.004,  changePct:  0.09 },
-  { symbol: "SPY",      price: 558.88,  change: -0.11,   changePct: -0.02 },
-  { symbol: "QQQ",      price: 472.96,  change:  0.03,   changePct:  0.01 },
+  { symbol: "NVDA",     price: 124.30,  change: -1.20,   changePct: -0.96 },
+  { symbol: "TSLA",     price: 280.50,  change:  3.40,   changePct:  1.23 },
+  { symbol: "AAPL",     price: 228.70,  change: -0.85,   changePct: -0.37 },
+  { symbol: "BTC",      price: 84500,   change:  620,    changePct:  0.74 },
+  { symbol: "ETH",      price: 2190,    change: -18,     changePct: -0.82 },
+  { symbol: "EUR/USD",  price: 1.0840,  change: -0.0012, changePct: -0.11 },
+  { symbol: "GBP/USD",  price: 1.2940,  change:  0.0020, changePct:  0.15 },
+  { symbol: "USD/JPY",  price: 149.80,  change:  0.25,   changePct:  0.17 },
+  { symbol: "GOLD",     price: 3120.0,  change: 12.5,    changePct:  0.40 },
+  { symbol: "SILVER",   price: 33.85,   change:  0.22,   changePct:  0.65 },
+  { symbol: "OIL(WTI)", price: 67.90,   change: -0.45,   changePct: -0.66 },
+  { symbol: "^VIX",     price: 22.14,   change:  0.88,   changePct:  4.14 },
+  { symbol: "DXY",      price: 104.12,  change:  0.18,   changePct:  0.17 },
+  { symbol: "US10Y",    price: 4.318,   change:  0.012,  changePct:  0.28 },
+  { symbol: "SPY",      price: 562.40,  change: -3.20,   changePct: -0.57 },
+  { symbol: "QQQ",      price: 478.30,  change: -2.10,   changePct: -0.44 },
 ];
 
 function fmt(tick: Tick) {
@@ -49,10 +50,11 @@ function fmtChg(tick: Tick) {
 
 export function MarketBar() {
   // Start with seeds — renders immediately without waiting for the backend
-  const [ticks,      setTicks]      = useState<Tick[]>(SEED_TICKS);
+  const [ticks,   setTicks]  = useState<Tick[]>(SEED_TICKS);
+  const [isLive,  setIsLive] = useState(false); // true once we get real prices from backend
   const realPrices = useRef<Tick[]>(SEED_TICKS); // latest real prices to clamp jitter around
 
-  // Fetch real prices from the backend, refresh every 5 minutes
+  // Fetch real prices from the backend, refresh every 90s
   useEffect(() => {
     async function fetchQuotes() {
       try {
@@ -66,8 +68,9 @@ export function MarketBar() {
         const merged = SEED_TICKS.map(seed => map.get(seed.symbol) ?? seed);
         realPrices.current = merged;
         setTicks(merged);
+        setIsLive(true);
       } catch {
-        // Backend unavailable (cold start etc.) — keep showing seeds + jitter
+        // Backend unavailable (cold start etc.) — keep showing seeds + jitter, isLive stays false
       }
     }
 
@@ -107,7 +110,17 @@ export function MarketBar() {
   return (
     <div className="market-bar border-b border-border bg-[hsl(0_0%_2%)]">
       <div className="shrink-0 px-3 flex items-center gap-2 border-r border-border/50 h-full">
-        <span className="live-dot" />
+        {isLive ? (
+          <span className="live-dot" />
+        ) : (
+          <span
+            title="Showing seed prices — backend not yet reachable"
+            className="font-mono text-[8px] font-bold tracking-widest px-1.5 py-0.5 rounded"
+            style={{ background: "rgba(255,160,0,0.15)", color: "#ffa000", border: "1px solid rgba(255,160,0,0.3)" }}
+          >
+            STALE
+          </span>
+        )}
         <span className="font-mono text-[9px] font-bold text-muted-foreground tracking-widest">MARKETS</span>
       </div>
 
