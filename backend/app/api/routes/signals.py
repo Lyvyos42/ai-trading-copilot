@@ -60,7 +60,8 @@ _DAILY_QUOTA: dict[str, int] = {
 
 async def _check_daily_quota(user_id: str, tier: str, db: AsyncSession) -> None:
     quota = _DAILY_QUOTA.get(tier, 5)
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now_utc = datetime.now(timezone.utc)
+    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(func.count()).select_from(Signal)
         .where(Signal.user_id == user_id)
@@ -68,10 +69,13 @@ async def _check_daily_quota(user_id: str, tier: str, db: AsyncSession) -> None:
     )
     count_today = result.scalar() or 0
     if count_today >= quota:
+        # Retry-After = seconds until next midnight UTC
+        next_midnight = today_start + timedelta(days=1)
+        retry_after = int((next_midnight - now_utc).total_seconds())
         raise HTTPException(
             status_code=429,
             detail=f"Daily signal quota reached ({count_today}/{quota} for {tier} tier). Resets at midnight UTC.",
-            headers={"Retry-After": "3600"},
+            headers={"Retry-After": str(retry_after)},
         )
 
 # ── Layer 2: Per-user cooldown — minimum 60s between consecutive requests ────────

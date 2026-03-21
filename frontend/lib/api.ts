@@ -256,6 +256,7 @@ export async function loginWithGoogle(): Promise<void> {
 export async function logout(): Promise<void> {
   await supabase.auth.signOut();
   localStorage.removeItem("token");
+  localStorage.removeItem("dashboard_ticker");
 }
 
 export async function getMe() {
