@@ -26,21 +26,29 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   };
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, reqOptions);
-  } catch {
-    // Network error — Render free tier cold start takes 45-60s.
-    // Wait 50s then retry once; the loading indicator stays visible during this time.
-    await new Promise(r => setTimeout(r, 50_000));
-    res = await fetch(`${API_URL}${path}`, reqOptions);
+  // Exponential backoff — 3 retries on network errors (handles Render cold-start).
+  // Delays: 2s → 6s → 18s. Total max wait ~26s vs the old 50s single retry.
+  const DELAYS = [2_000, 6_000, 18_000];
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
+    try {
+      const res = await fetch(`${API_URL}${path}`, reqOptions);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Request failed" }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      lastError = err;
+      // Don't retry on HTTP errors (4xx/5xx) — only on network-level failures.
+      if (err instanceof Error && !err.message.startsWith("HTTP ") && attempt < DELAYS.length) {
+        await new Promise(r => setTimeout(r, DELAYS[attempt]));
+        continue;
+      }
+      throw err;
+    }
   }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
+  throw lastError;
 }
 
 /** Fire-and-forget: ping the backend health endpoint to wake Render from sleep.

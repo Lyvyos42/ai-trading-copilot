@@ -41,6 +41,7 @@ export default function SignalsPage() {
   const { isLoggedIn } = useAuth();
   const cancelRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTickerRef = useRef<string>("");
 
   const cancelAnalysis = useCallback(() => {
     cancelRef.current = true;
@@ -53,6 +54,7 @@ export default function SignalsPage() {
   async function handleGenerate(ticker: string) {
     if (!isLoggedIn) { window.location.href = "/login"; return; }
     cancelRef.current = false;
+    lastTickerRef.current = ticker;
     setError("");
     setWaking(false);
     setLoading(ticker);
@@ -63,7 +65,7 @@ export default function SignalsPage() {
       cancelRef.current = true;
       setLoading(null);
       setWaking(false);
-      setError("Backend took too long to respond. Render free tier may be sleeping — wait 30s and try again.");
+      setError("Backend took too long to respond. Render free tier may be sleeping — please retry.");
     }, 75_000);
 
     // Pre-warm: ping /health to detect cold start
@@ -230,8 +232,16 @@ export default function SignalsPage() {
           </form>
 
           {error && (
-            <div className="text-xs font-mono text-bear bg-bear/10 border border-bear/20 px-3 py-2">
-              ERR — {error}
+            <div className="flex items-center gap-3 text-xs font-mono text-bear bg-bear/10 border border-bear/20 px-3 py-2">
+              <span className="flex-1">ERR — {error}</span>
+              {lastTickerRef.current && (
+                <button
+                  onClick={() => handleGenerate(lastTickerRef.current)}
+                  className="shrink-0 px-2 py-0.5 text-[10px] font-bold border border-bear/40 hover:bg-bear/20 transition-colors rounded"
+                >
+                  RETRY
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -246,7 +256,7 @@ export default function SignalsPage() {
                 <Zap className="h-3 w-3 text-warn animate-pulse" />
                 <span className="terminal-label text-warn ml-1">WAKING BACKEND</span>
                 <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
-                <span className="mx-auto text-[9px] font-mono text-warn/70">Render cold start — retrying in ~50s…</span>
+                <span className="mx-auto text-[9px] font-mono text-warn/70">Render cold start — auto-retrying (~26s max)…</span>
               </>
             ) : (
               <>
