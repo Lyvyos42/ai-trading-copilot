@@ -23,7 +23,7 @@ interface SignalCardProps {
 
 export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
-  const [tfTab, setTfTab]         = useState<"scalp" | "swing">("swing");
+  const [tfTab, setTfTab]         = useState<"scalp" | "swing">("scalp");
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executed, setExecuted]   = useState(false);
@@ -98,9 +98,9 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           </div>
         </div>
 
-        {/* Row 2: Prices — prefer swing levels if available */}
+        {/* Row 2: Prices — prefer scalp levels if available (tighter, more actionable) */}
         {(() => {
-          const lv = signal.timeframe_levels?.swing;
+          const lv = signal.timeframe_levels?.scalp ?? signal.timeframe_levels?.swing;
           const entry = lv?.entry ?? signal.entry_price;
           const tp1   = lv?.take_profit_1 ?? signal.take_profit_1;
           const sl    = lv?.stop_loss ?? signal.stop_loss;

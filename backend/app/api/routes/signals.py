@@ -110,7 +110,7 @@ def _check_burst(user_id: str) -> None:
 
 # ── Layer 4: Result cache — same user+ticker within 10 min returns cached signal ─
 _signal_cache: dict[str, tuple[float, dict]] = {}  # key → (expires_at, signal_dict)
-_CACHE_TTL_S = 120  # 2 minutes
+_CACHE_TTL_S = 30  # 30 seconds — keeps price fresh, avoids duplicate API calls
 
 def _get_cached_signal(user_id: str, ticker: str) -> dict | None:
     key = f"{user_id}:{ticker}"

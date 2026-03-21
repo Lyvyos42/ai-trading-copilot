@@ -6,6 +6,7 @@ import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
+import { ScannerPanel } from "@/components/ScannerPanel";
 import { formatPrice } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
@@ -285,6 +286,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Agent Scanner */}
+            <div className="border-t border-border">
+              <ScannerPanel />
             </div>
           </div>
         </div>

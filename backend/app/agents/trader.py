@@ -99,18 +99,21 @@ Output JSON only."""
         if raw:
             try:
                 result = json.loads(raw)
-                # Validate entry_price is anchored to current_price (within 5% tolerance)
+                # Use Claude's direction (final synthesis), not vote-aggregated fallback
+                final_direction = result.get("direction", direction)
+                if final_direction not in ("LONG", "SHORT"):
+                    final_direction = direction
+                # Tight 1% price validation — anything beyond that is hallucinated context
                 entry = result.get("entry_price", 0)
-                if entry and abs(entry - current_price) / max(current_price, 1e-9) > 0.05:
-                    # Claude hallucinated a price — recompute all levels from current_price
-                    return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+                if entry and abs(entry - current_price) / max(current_price, 1e-9) > 0.01:
+                    return self._compute_signal(ticker, current_price, final_direction, votes, tech, risk, fund, sent, macro, market_data)
                 # Always pin entry to exact current_price — market orders fill at market.
                 # Recompute SL/TP from ATR anchored to the pinned entry.
                 atr = tech.get("atr", market_data.get("atr", current_price * 0.012))
                 if atr <= 0:
                     atr = current_price * 0.012
                 atr_15m = market_data.get("atr_15m", atr * 0.196)
-                result = self._pin_entry_and_recompute(result, current_price, direction, atr, atr_15m, _dec)
+                result = self._pin_entry_and_recompute(result, current_price, final_direction, atr, atr_15m, _dec)
                 return result
             except json.JSONDecodeError:
                 pass
