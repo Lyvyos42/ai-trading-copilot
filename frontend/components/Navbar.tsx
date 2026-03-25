@@ -2,20 +2,33 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart2, Briefcase, ChevronDown, Crown, LayoutDashboard, LogOut, Menu, Newspaper, Shield, X, Zap, BellRing } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import type { UserTier } from "@/lib/useAuth";
+import {
+  IconTerminal,
+  IconSignal,
+  IconIntel,
+  IconPortfolio,
+  IconAgents,
+  IconBacktest,
+  IconLogout,
+  IconCrown,
+  IconChevronDown,
+  IconMenu,
+  IconX,
+  IconShield,
+} from "@/components/icons/GeoIcons";
 
 const NAV_ITEMS = [
-  { href: "/dashboard",  label: "TERMINAL",  icon: LayoutDashboard },
-  { href: "/signals",    label: "SIGNALS",   icon: Zap },
-  { href: "/news",       label: "INTEL",     icon: Newspaper },
-  { href: "/portfolio",  label: "PORTFOLIO", icon: Briefcase },
-  { href: "/agents",     label: "AGENTS",    icon: Activity },
-  { href: "/backtest",   label: "BACKTEST",  icon: BarChart2 },
+  { href: "/dashboard",  label: "TERMINAL",  Icon: IconTerminal },
+  { href: "/signals",    label: "SIGNALS",   Icon: IconSignal },
+  { href: "/news",       label: "INTEL",     Icon: IconIntel },
+  { href: "/portfolio",  label: "PORTFOLIO", Icon: IconPortfolio },
+  { href: "/agents",     label: "AGENTS",    Icon: IconAgents },
+  { href: "/backtest",   label: "BACKTEST",  Icon: IconBacktest },
 ];
 
 const TIER_LABEL: Record<UserTier, string> = {
@@ -28,11 +41,11 @@ const TIER_LABEL: Record<UserTier, string> = {
 };
 
 const TIER_COLOR: Record<UserTier, string> = {
-  visitor:    "text-muted-foreground border-border/50",
-  free:       "text-muted-foreground border-border/50",
-  retail:     "text-primary border-primary/40",
-  pro:        "text-yellow-400 border-yellow-400/40",
-  enterprise: "text-yellow-400 border-yellow-400/40",
+  visitor:    "text-[hsl(var(--muted-foreground))] border-[hsl(var(--border-strong))]",
+  free:       "text-[hsl(var(--muted-foreground))] border-[hsl(var(--border-strong))]",
+  retail:     "text-[hsl(var(--primary))] border-[hsl(var(--primary)/0.4)]",
+  pro:        "text-amber-400 border-amber-400/40",
+  enterprise: "text-amber-400 border-amber-400/40",
   admin:      "text-red-400 border-red-400/40",
 };
 
@@ -59,7 +72,6 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
   const [signalsToday, setSignalsToday] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!dropdownOpen) return;
     function onClickOutside(e: MouseEvent) {
@@ -71,7 +83,6 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [dropdownOpen]);
 
-  // Fetch today's signal count when dropdown opens
   useEffect(() => {
     if (!dropdownOpen || !isLoggedIn) return;
     (async () => {
@@ -105,25 +116,55 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
   const isPremium   = tier === "pro" || tier === "enterprise" || tier === "admin";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-[hsl(0_0%_2%)]">
+    <header
+      className="fixed top-0 left-0 right-0 z-50 border-b border-[hsl(var(--border))]"
+      style={{
+        background: "hsl(var(--surface-1))",
+        /* Top-edge specular highlight — material surface quality */
+        boxShadow: "inset 0 1px 0 hsl(0 0% 20% / 0.5), 0 1px 0 hsl(0 0% 0% / 0.6)",
+      }}
+    >
       <div className="px-3 h-10 flex items-center justify-between gap-4">
 
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="h-5 w-5 rounded-sm bg-primary/20 border border-primary/40 flex items-center justify-center">
-            <Zap className="h-3 w-3 text-primary" />
+        {/* Logo — wordmark + geometric mark */}
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          {/* Geometric logo mark — rotating octahedron silhouette */}
+          <div
+            className="h-5 w-5 flex items-center justify-center shrink-0"
+            style={{
+              background: "hsl(var(--primary) / 0.12)",
+              border: "1px solid hsl(var(--primary) / 0.35)",
+              borderRadius: "2px",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="hsl(var(--primary))" strokeWidth="1.2" strokeLinecap="round">
+              <polygon points="6,1 11,6 6,11 1,6" />
+              <line x1="6" y1="1" x2="6" y2="11" strokeWidth="0.6" opacity="0.4" />
+              <line x1="1" y1="6" x2="11" y2="6" strokeWidth="0.6" opacity="0.4" />
+            </svg>
           </div>
-          <span className="hidden sm:block font-mono text-xs font-bold tracking-widest text-primary uppercase">
+          <span
+            className="hidden sm:block text-[11px] font-bold tracking-[0.18em] uppercase"
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
+          >
             QuantNeural
           </span>
-          <span className="hidden lg:block font-mono text-[9px] font-medium tracking-wider text-muted-foreground border border-border px-1 rounded">
+          <span
+            className="hidden lg:block text-[8px] font-medium tracking-[0.12em] uppercase px-1.5 py-0.5"
+            style={{
+              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+              color: "hsl(var(--muted-foreground))",
+              border: "1px solid hsl(var(--border-strong))",
+              borderRadius: "2px",
+            }}
+          >
             TERMINAL
           </span>
         </Link>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center h-full">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {NAV_ITEMS.map(({ href, label, Icon }) => {
             const active  = pathname === href || pathname.startsWith(href + "/");
             const isIntel = href === "/news";
             return (
@@ -131,16 +172,30 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 h-10 text-[10px] font-mono font-bold tracking-widest transition-colors border-b-2",
-                  active
-                    ? "text-primary border-primary bg-primary/5"
-                    : "text-muted-foreground hover:text-foreground border-transparent hover:border-border hover:bg-white/[0.02]"
+                  "relative flex items-center gap-1.5 px-3 h-10 transition-colors",
+                  "text-[9px] font-bold tracking-[0.12em] uppercase",
+                  "border-b-[1.5px]",
                 )}
+                style={{
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  color: active ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                  borderBottomColor: active ? "hsl(var(--primary))" : "transparent",
+                  background: active ? "hsl(var(--primary) / 0.04)" : "transparent",
+                }}
+                onMouseEnter={e => {
+                  if (!active) (e.currentTarget as HTMLElement).style.color = "hsl(var(--foreground))";
+                }}
+                onMouseLeave={e => {
+                  if (!active) (e.currentTarget as HTMLElement).style.color = "hsl(var(--muted-foreground))";
+                }}
               >
-                <Icon className="h-3 w-3" />
+                <Icon size={11} color="currentColor" strokeWidth={active ? 2 : 1.5} />
                 {label}
                 {isIntel && unreadAlerts > 0 && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-bear animate-pulse" />
+                  <span
+                    className="absolute top-2.5 right-1.5 h-1.5 w-1.5 rounded-full"
+                    style={{ background: "hsl(var(--bear))", animation: "pulse-live 1.6s ease-in-out infinite" }}
+                  />
                 )}
               </Link>
             );
@@ -151,15 +206,35 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
         <div className="flex items-center gap-2 shrink-0">
 
           {/* Live indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground">
+          <div className="hidden sm:flex items-center gap-1.5">
             <span className="live-dot" />
-            <span className="text-bull font-semibold">LIVE</span>
+            <span
+              className="text-[8px] font-bold tracking-[0.12em]"
+              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
+            >
+              LIVE
+            </span>
           </div>
 
+          {/* Divider */}
+          <div className="hidden sm:block h-5 w-px" style={{ background: "hsl(var(--border-strong))" }} />
+
           {/* Paper equity */}
-          <div className="hidden lg:flex items-center gap-1 border border-border/50 rounded px-2 py-0.5">
-            <span className="text-[9px] font-mono text-muted-foreground">PAPER</span>
-            <span className="text-[9px] font-mono font-bold text-primary">$100,000</span>
+          <div
+            className="hidden lg:flex items-center gap-1.5 px-2 py-1"
+            style={{
+              border: "1px solid hsl(var(--border-strong))",
+              borderRadius: "2px",
+              background: "hsl(var(--surface-0))",
+            }}
+          >
+            <span className="terminal-label">PAPER</span>
+            <span
+              className="text-[9px] font-bold"
+              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+            >
+              $100,000
+            </span>
           </div>
 
           {/* Account area */}
@@ -167,103 +242,215 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
             isLoggedIn && user ? (
               <div className="relative hidden sm:block" ref={dropdownRef}>
 
-                {/* Trigger button */}
+                {/* Trigger */}
                 <button
                   type="button"
                   onClick={() => setDropdownOpen((v) => !v)}
                   className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 border transition-colors text-[9px] font-mono rounded",
-                    dropdownOpen
-                      ? "border-primary/60 bg-primary/10 text-primary"
-                      : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                    "flex items-center gap-1.5 px-2 py-1 transition-colors",
+                    "text-[9px] font-bold tracking-[0.08em]",
                   )}
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    border: "1px solid",
+                    borderColor: dropdownOpen ? "hsl(var(--primary) / 0.5)" : "hsl(var(--border-strong))",
+                    borderRadius: "2px",
+                    background: dropdownOpen ? "hsl(var(--primary) / 0.06)" : "hsl(var(--surface-0))",
+                    color: dropdownOpen ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                  }}
                 >
-                  <span className="h-4 w-4 rounded-sm bg-primary/20 border border-primary/30 flex items-center justify-center text-[8px] font-bold text-primary shrink-0">
+                  {/* Avatar mark */}
+                  <span
+                    className="h-4 w-4 flex items-center justify-center text-[8px] font-bold shrink-0"
+                    style={{
+                      background: "hsl(var(--primary) / 0.15)",
+                      border: "1px solid hsl(var(--primary) / 0.3)",
+                      borderRadius: "2px",
+                      color: "hsl(var(--primary))",
+                      fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    }}
+                  >
                     {getInitials(user.email)}
                   </span>
-                  <span className="max-w-[110px] truncate">{user.email}</span>
-                  <ChevronDown className={cn("h-2.5 w-2.5 shrink-0 transition-transform duration-150", dropdownOpen && "rotate-180")} />
+                  <span className="max-w-[100px] truncate hidden md:inline">{user.email}</span>
+                  <IconChevronDown
+                    size={11}
+                    color="currentColor"
+                    className="shrink-0 transition-transform duration-150"
+                    style={{ transform: dropdownOpen ? "rotate(180deg)" : "none" }}
+                  />
                 </button>
 
-                {/* Dropdown panel */}
+                {/* Dropdown */}
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-[calc(100%+4px)] w-64 border border-border bg-[hsl(0_0%_3%)] shadow-2xl rounded-sm z-[100]">
+                  <div
+                    className="absolute right-0 top-[calc(100%+4px)] w-64 z-[100]"
+                    style={{
+                      background: "hsl(var(--surface-3))",
+                      border: "1px solid hsl(var(--border-strong))",
+                      borderRadius: "2px",
+                      /* Raised surface specular */
+                      boxShadow: "inset 0 1px 0 hsl(0 0% 30% / 0.5), 0 8px 32px hsl(0 0% 0% / 0.6)",
+                    }}
+                  >
+                    {/* Surface top highlight */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-px"
+                      style={{
+                        background: "linear-gradient(90deg, transparent, hsl(0 0% 35% / 0.8) 50%, transparent)",
+                        zIndex: 1,
+                      }}
+                    />
 
                     {/* User header */}
-                    <div className="px-4 py-3 border-b border-border/50">
+                    <div
+                      className="px-4 py-3"
+                      style={{ borderBottom: "1px solid hsl(var(--border))" }}
+                    >
                       <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-sm bg-primary/15 border border-primary/25 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                        <div
+                          className="h-7 w-7 flex items-center justify-center text-xs font-bold shrink-0"
+                          style={{
+                            background: "hsl(var(--primary) / 0.12)",
+                            border: "1px solid hsl(var(--primary) / 0.25)",
+                            borderRadius: "2px",
+                            color: "hsl(var(--primary))",
+                            fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                          }}
+                        >
                           {getInitials(user.email)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[10px] font-mono text-foreground truncate">{user.email}</div>
-                          <div className={cn(
-                            "inline-flex items-center gap-1 text-[8px] font-mono font-bold px-1.5 py-0.5 border rounded mt-1",
-                            TIER_COLOR[tier]
-                          )}>
-                            {isPremium && <Crown className="h-2 w-2" />}
+                          <div
+                            className="text-[10px] truncate"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
+                          >
+                            {user.email}
+                          </div>
+                          <div
+                            className={cn(
+                              "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 border mt-1",
+                              TIER_COLOR[tier]
+                            )}
+                            style={{ borderRadius: "2px", fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace" }}
+                          >
+                            {isPremium && <IconCrown size={9} color="currentColor" />}
                             {TIER_LABEL[tier]}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Signals usage meter */}
+                    {/* Usage meter */}
                     {quota !== null && (
-                      <div className="px-4 py-2.5 border-b border-border/40">
+                      <div
+                        className="px-4 py-2.5"
+                        style={{ borderBottom: "1px solid hsl(var(--border))" }}
+                      >
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[9px] font-mono text-muted-foreground">SIGNALS TODAY</span>
-                          <span className="text-[9px] font-mono font-bold text-foreground">
+                          <span className="terminal-label">SIGNALS TODAY</span>
+                          <span
+                            className="text-[9px] font-bold"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
+                          >
                             {signalsToday ?? "—"} / {quota}
                           </span>
                         </div>
-                        <div className="h-1 w-full bg-border/50 rounded-full overflow-hidden">
+                        {/* Precise progress bar */}
+                        <div
+                          className="h-[3px] w-full overflow-hidden"
+                          style={{ background: "hsl(var(--border-strong))", borderRadius: "1px" }}
+                        >
                           <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              usagePct >= 100 ? "bg-bear" : usagePct >= 80 ? "bg-yellow-400" : "bg-primary"
-                            )}
-                            style={{ width: `${usagePct}%` }}
+                            className="h-full transition-all duration-500"
+                            style={{
+                              width: `${usagePct}%`,
+                              borderRadius: "1px",
+                              background: usagePct >= 100
+                                ? "hsl(var(--bear))"
+                                : usagePct >= 80
+                                ? "hsl(var(--warn))"
+                                : "hsl(var(--primary))",
+                            }}
                           />
                         </div>
                         {usagePct >= 100 && (
-                          <p className="text-[8px] font-mono text-bear mt-1">Quota reached — resets at midnight UTC</p>
+                          <p
+                            className="text-[8px] mt-1"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bear))" }}
+                          >
+                            Quota reached — resets at midnight UTC
+                          </p>
                         )}
                       </div>
                     )}
 
                     {/* Upgrade CTA */}
                     {showUpgrade && (
-                      <div className="px-3 py-2.5 border-b border-border/40">
+                      <div className="px-3 py-2.5" style={{ borderBottom: "1px solid hsl(var(--border))" }}>
                         <Link
                           href="/pricing"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center justify-between w-full px-3 py-2 border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors rounded-sm group"
+                          className="flex items-center justify-between w-full px-3 py-2 group transition-colors"
+                          style={{
+                            border: "1px solid hsl(var(--primary) / 0.25)",
+                            borderRadius: "2px",
+                            background: "hsl(var(--primary) / 0.04)",
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--primary) / 0.08)"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--primary) / 0.04)"; }}
                         >
                           <div>
-                            <div className="text-[9px] font-mono font-bold text-primary">UPGRADE TO RETAIL</div>
-                            <div className="text-[8px] font-mono text-muted-foreground">Unlimited · All asset classes</div>
+                            <div
+                              className="text-[9px] font-bold"
+                              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+                            >
+                              UPGRADE TO RETAIL
+                            </div>
+                            <div
+                              className="text-[8px] mt-0.5"
+                              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+                            >
+                              Unlimited · All asset classes
+                            </div>
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-primary group-hover:translate-x-0.5 transition-transform">
-                            $49/mo →
+                          <span
+                            className="text-[9px] font-bold transition-transform group-hover:translate-x-0.5"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+                          >
+                            $49/mo
                           </span>
                         </Link>
                       </div>
                     )}
 
                     {/* Nav links */}
-                    <div className="px-2 py-1.5 border-b border-border/40">
+                    <div className="px-2 py-1.5" style={{ borderBottom: "1px solid hsl(var(--border))" }}>
                       {[
-                        { href: "/portfolio", label: "Portfolio",       icon: Briefcase },
-                        { href: "/pricing",   label: "Pricing & Plans", icon: Shield    },
-                      ].map(({ href, label, icon: Icon }) => (
+                        { href: "/portfolio", label: "Portfolio",       Icon: IconPortfolio },
+                        { href: "/pricing",   label: "Pricing & Plans", Icon: IconShield },
+                      ].map(({ href, label, Icon }) => (
                         <Link
                           key={href}
                           href={href}
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-sm text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+                          className="flex items-center gap-2 px-2 py-1.5 transition-colors"
+                          style={{
+                            borderRadius: "2px",
+                            color: "hsl(var(--muted-foreground))",
+                            fontSize: "10px",
+                            fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLElement).style.color = "hsl(var(--foreground))";
+                            (e.currentTarget as HTMLElement).style.background = "hsl(var(--surface-4))";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLElement).style.color = "hsl(var(--muted-foreground))";
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                          }}
                         >
-                          <Icon className="h-3 w-3" />
+                          <Icon size={11} color="currentColor" />
                           {label}
                         </Link>
                       ))}
@@ -274,20 +461,48 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-sm text-[10px] font-mono text-muted-foreground hover:text-bear hover:bg-bear/5 transition-colors"
+                        className="flex items-center gap-2 w-full px-2 py-1.5 transition-colors"
+                        style={{
+                          borderRadius: "2px",
+                          color: "hsl(var(--muted-foreground))",
+                          fontSize: "10px",
+                          fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.color = "hsl(var(--bear))";
+                          (e.currentTarget as HTMLElement).style.background = "hsl(var(--bear) / 0.05)";
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.color = "hsl(var(--muted-foreground))";
+                          (e.currentTarget as HTMLElement).style.background = "transparent";
+                        }}
                       >
-                        <LogOut className="h-3 w-3" />
+                        <IconLogout size={11} color="currentColor" />
                         Sign out
                       </button>
                     </div>
-
                   </div>
                 )}
               </div>
             ) : (
               <Link
                 href="/login"
-                className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors hidden sm:block"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 transition-colors"
+                style={{
+                  border: "1px solid hsl(var(--primary) / 0.3)",
+                  borderRadius: "2px",
+                  color: "hsl(var(--primary))",
+                  fontSize: "9px",
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  background: "hsl(var(--primary) / 0.04)",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--primary) / 0.10)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--primary) / 0.04)"; }}
               >
                 SIGN IN
               </Link>
@@ -297,42 +512,64 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           {/* Mobile toggle */}
           <button
             type="button"
-            className="md:hidden p-1.5 rounded hover:bg-accent"
+            className="md:hidden p-1.5 transition-colors"
+            style={{ color: "hsl(var(--muted-foreground))", background: "none", border: "none", cursor: "pointer" }}
             onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            {mobileOpen ? <IconX size={14} color="currentColor" /> : <IconMenu size={14} color="currentColor" />}
           </button>
         </div>
       </div>
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-[hsl(0_0%_3%)] px-3 py-2 space-y-0.5">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+        <div
+          className="md:hidden border-t px-3 py-2 space-y-0.5"
+          style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface-2))" }}
+        >
+          {NAV_ITEMS.map(({ href, label, Icon }) => (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded text-xs font-mono font-bold tracking-widest transition-colors",
-                pathname === href
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                "flex items-center gap-2 px-3 py-2 transition-colors",
+                "text-xs font-bold tracking-[0.1em]",
               )}
+              style={{
+                borderRadius: "2px",
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                color: pathname === href ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                background: pathname === href ? "hsl(var(--primary) / 0.06)" : "transparent",
+              }}
               onClick={() => setMobileOpen(false)}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon size={12} color="currentColor" />
               {label}
             </Link>
           ))}
           {isLoggedIn && user && (
-            <div className="pt-2 mt-2 border-t border-border/50 space-y-0.5">
-              <div className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground truncate">{user.email}</div>
+            <div className="pt-2 mt-2 space-y-0.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+              <div
+                className="px-3 py-1.5 text-[10px] truncate"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+              >
+                {user.email}
+              </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded text-xs font-mono text-muted-foreground hover:text-bear hover:bg-bear/5 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 transition-colors"
+                style={{
+                  borderRadius: "2px",
+                  color: "hsl(var(--muted-foreground))",
+                  fontSize: "12px",
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <IconLogout size={12} color="currentColor" />
                 Sign out
               </button>
             </div>

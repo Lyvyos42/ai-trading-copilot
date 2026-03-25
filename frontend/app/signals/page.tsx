@@ -1,13 +1,27 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Zap, Lock, X } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import {
+  IconSignal,
+  IconLock,
+  IconX,
+  IconShield,
+  IconAgents,
+  GeoOctahedron,
+  GeoCylinder,
+  GeoSphere,
+  GeoIcosahedron,
+  GeoTorus,
+  GeoCube,
+} from "@/components/icons/GeoIcons";
 
-const ASSET_CLASSES = ["stocks", "etfs", "crypto", "forex", "metals", "energy", "indices", "futures", "agriculture"];
+const ASSET_CLASSES = [
+  "stocks", "etfs", "crypto", "forex", "metals", "energy", "indices", "futures", "agriculture"
+];
 
 const POPULAR_TICKERS: Record<string, string[]> = {
   stocks:      ["AAPL","NVDA","MSFT","TSLA","AMZN","GOOGL","META","JPM","GS","V","NFLX","AMD","PLTR","COIN","LLY"],
@@ -27,7 +41,68 @@ const TICKER_ASSET_CLASS: Record<string, string> = {
   indices: "indices", futures: "futures", agriculture: "commodities",
 };
 
-const AGENTS = ["FundamentalAnalyst", "TechnicalAnalyst", "SentimentAnalyst", "MacroAnalyst"];
+// Pipeline stages — geometric icons replace emoji
+const PIPELINE_STAGES = [
+  {
+    label: "MARKET DATA",
+    desc: "OHLCV fetch",
+    Icon: () => (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+        <polyline points="1,10 3.5,5 6,7 8.5,3.5 11,2" />
+        <line x1="1" y1="12" x2="13" y2="12" />
+        <line x1="1" y1="2" x2="1" y2="12" />
+      </svg>
+    ),
+  },
+  {
+    label: "NEWS INTEL",
+    desc: "Headline scan",
+    Icon: () => (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="2" width="11" height="10" rx="1" />
+        <line x1="4" y1="5" x2="10" y2="5" />
+        <line x1="4" y1="7" x2="10" y2="7" />
+        <line x1="4" y1="9" x2="7" y2="9" />
+      </svg>
+    ),
+  },
+  {
+    label: "ANALYST DEBATE",
+    desc: "4 agents parallel",
+    Icon: () => <IconAgents size={14} color="currentColor" strokeWidth={1.2} />,
+  },
+  {
+    label: "RISK CHECK",
+    desc: "Kelly + exposure",
+    Icon: () => <IconShield size={14} color="currentColor" strokeWidth={1.2} />,
+  },
+  {
+    label: "DEBATE PROTOCOL",
+    desc: "Bull vs Bear",
+    Icon: () => (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="7" y1="1" x2="7" y2="13" />
+        <polyline points="3,4 7,7 11,4" />
+        <polyline points="3,10 7,7 11,10" />
+      </svg>
+    ),
+  },
+  {
+    label: "TRADER SIGNAL",
+    desc: "Final synthesis",
+    Icon: () => <IconSignal size={14} color="currentColor" strokeWidth={1.2} />,
+  },
+];
+
+// Agent shapes for the visual pipeline while running
+const PIPELINE_AGENTS = [
+  { name: "FUND",  Geo: GeoOctahedron,   color: "#2563eb" },
+  { name: "TECH",  Geo: GeoCylinder,      color: "#f59e0b" },
+  { name: "SENT",  Geo: GeoSphere,        color: "#7c3aed" },
+  { name: "MACRO", Geo: GeoIcosahedron,   color: "#06b6d4" },
+  { name: "RISK",  Geo: GeoTorus,         color: "#f97316" },
+  { name: "TRADE", Geo: GeoCube,          color: "#22c55e" },
+];
 
 export default function SignalsPage() {
   const [signals, setSignals]       = useState<Signal[]>([]);
@@ -44,9 +119,7 @@ export default function SignalsPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickerRef = useRef<string>("");
 
-  // Pipeline stage progression — advances through 6 stages while loading.
-  // Cumulative delays match rough pipeline timing: Data→News→Analysis→Risk→Debate→Signal.
-  const STAGE_DELAYS = [0, 4_000, 11_000, 25_000, 31_000, 37_000]; // ms from start
+  const STAGE_DELAYS = [0, 4_000, 11_000, 25_000, 31_000, 37_000];
   useEffect(() => {
     if (!loading) { setPipelineStage(0); return; }
     setPipelineStage(0);
@@ -72,7 +145,6 @@ export default function SignalsPage() {
     setWaking(false);
     setLoading(ticker);
 
-    // Hard 75s timeout — auto-cancel if backend never responds
     timeoutRef.current = setTimeout(() => {
       if (cancelRef.current) return;
       cancelRef.current = true;
@@ -81,7 +153,6 @@ export default function SignalsPage() {
       setError("Backend took too long to respond. Render free tier may be sleeping — please retry.");
     }, 75_000);
 
-    // Pre-warm: ping /health to detect cold start
     try {
       const warmRes = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(5_000) });
       if (!warmRes.ok) setWaking(true);
@@ -112,7 +183,6 @@ export default function SignalsPage() {
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customTicker.trim()) {
-      // Cancel any in-progress run before starting new one
       if (loading) cancelAnalysis();
       setTimeout(() => {
         handleGenerate(customTicker.trim().toUpperCase());
@@ -124,61 +194,105 @@ export default function SignalsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
-      {/* Visitor gate banner */}
+      {/* Visitor gate */}
       {!isLoggedIn && (
-        <div className="p-4 border border-primary/30 bg-primary/5 rounded-lg space-y-3">
-          <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-xs font-mono font-bold text-primary">SIGN IN TO USE AI SIGNAL GENERATOR</span>
+        <div
+          className="panel"
+          style={{ borderColor: "hsl(var(--primary) / 0.2)" }}
+        >
+          <div className="panel-header">
+            <IconLock size={12} color="hsl(var(--primary))" />
+            <span
+              className="text-[9px] font-bold tracking-[0.1em]"
+              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+            >
+              SIGN IN TO USE AI SIGNAL GENERATOR
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[10px] font-mono">
-            <div className="p-3 rounded border border-border/40 bg-background/40">
-              <div className="text-muted-foreground font-bold mb-2">FREE ACCOUNT</div>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>• 5 AI signals / day</li>
-                <li>• Stocks &amp; ETFs only</li>
-                <li>• Paper trading portfolio</li>
-                <li>• Market intel &amp; news</li>
-              </ul>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["5 AI signals / day", "Stocks & ETFs only", "Paper trading portfolio", "Market intel & news"] },
+                { label: "RETAIL — $49/mo", color: "hsl(var(--primary))", features: ["Unlimited signals", "All 8 asset classes", "All 80+ strategies", "Bull/Bear agent debate"] },
+                { label: "PRO — $199/mo", color: "#f59e0b", features: ["Everything in Retail", "Custom agent tuning", "API & webhook access", "Priority support"] },
+              ].map(({ label, color, features }) => (
+                <div
+                  key={label}
+                  className="p-3"
+                  style={{
+                    border: `1px solid ${color}25`,
+                    borderRadius: "2px",
+                    background: `${color}04`,
+                  }}
+                >
+                  <div
+                    className="text-[9px] font-bold mb-2 tracking-[0.1em]"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
+                  >
+                    {label}
+                  </div>
+                  <ul className="space-y-1">
+                    {features.map(f => (
+                      <li
+                        key={f}
+                        className="flex items-center gap-1.5 text-[10px]"
+                        style={{ color: "hsl(var(--muted-foreground))" }}
+                      >
+                        <div className="h-1 w-1 shrink-0" style={{ background: color, borderRadius: "0.5px" }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-            <div className="p-3 rounded border border-primary/40 bg-primary/5">
-              <div className="text-primary font-bold mb-2">RETAIL — $49/mo</div>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>• Unlimited signals</li>
-                <li>• All 8 asset classes</li>
-                <li>• All 80+ strategies</li>
-                <li>• Bull/Bear agent debate</li>
-              </ul>
+            <div className="flex gap-2">
+              <a
+                href="/login"
+                className="px-4 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+                style={{
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  border: "1px solid hsl(var(--primary) / 0.4)",
+                  borderRadius: "2px",
+                  background: "hsl(var(--primary) / 0.08)",
+                  color: "hsl(var(--primary))",
+                }}
+              >
+                SIGN IN FREE
+              </a>
+              <a
+                href="/pricing"
+                className="px-4 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+                style={{
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  border: "1px solid hsl(var(--border-strong))",
+                  borderRadius: "2px",
+                  color: "hsl(var(--muted-foreground))",
+                }}
+              >
+                SEE PRICING
+              </a>
             </div>
-            <div className="p-3 rounded border border-yellow-400/30 bg-yellow-400/5">
-              <div className="text-yellow-400 font-bold mb-2">PRO — $199/mo</div>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>• Everything in Retail</li>
-                <li>• Custom agent tuning</li>
-                <li>• API &amp; webhook access</li>
-                <li>• Priority support</li>
-              </ul>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <a href="/login" className="px-4 py-1.5 text-[10px] font-mono font-bold border border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 transition-colors rounded">
-              SIGN IN FREE
-            </a>
-            <a href="/pricing" className="px-4 py-1.5 text-[10px] font-mono font-bold border border-border/50 text-muted-foreground hover:text-foreground transition-colors rounded">
-              SEE PRICING
-            </a>
           </div>
         </div>
       )}
 
-      {/* Page header */}
-      <div className="terminal-panel">
-        <div className="terminal-header">
-          <Zap className="h-3 w-3 text-primary" />
-          <span className="terminal-label">Signal Generator — 6-Agent LangGraph Pipeline</span>
+      {/* Generator panel */}
+      <div className="panel panel-active">
+        <div className="panel-header">
+          <IconSignal size={12} color="hsl(var(--primary))" />
+          <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
+          <span className="text-[9px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
+            — 6-Agent LangGraph Pipeline
+          </span>
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="terminal-label text-primary">LIVE</span>
+            <span className="live-dot" />
+            <span
+              className="text-[8px] font-bold"
+              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
+            >
+              LIVE
+            </span>
           </div>
         </div>
         <div className="p-4 space-y-4">
@@ -189,31 +303,48 @@ export default function SignalsPage() {
               <button
                 key={ac}
                 onClick={() => setAssetClass(ac)}
-                className={`px-3 py-1 text-[10px] font-mono font-semibold uppercase tracking-wider border transition-colors ${
-                  assetClass === ac
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                }`}
+                className="px-3 py-1 text-[9px] font-bold tracking-[0.08em] uppercase transition-colors"
+                style={{
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  border: "1px solid",
+                  borderColor: assetClass === ac ? "hsl(var(--primary) / 0.5)" : "hsl(var(--border-strong))",
+                  borderRadius: "2px",
+                  background: assetClass === ac ? "hsl(var(--primary) / 0.08)" : "transparent",
+                  color: assetClass === ac ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                  cursor: "pointer",
+                }}
               >
                 {ac.replace("_", " ")}
               </button>
             ))}
           </div>
 
-          {/* Quick ticker grid */}
+          {/* Quick tickers */}
           <div>
-            <div className="terminal-label mb-2">Quick Pick — {assetClass.replace("_", " ").toUpperCase()}</div>
+            <span className="terminal-label mb-2 block">
+              QUICK PICK — {assetClass.replace("_", " ").toUpperCase()}
+            </span>
             <div className="flex gap-1.5 flex-wrap">
               {(POPULAR_TICKERS[assetClass] || []).map((ticker) => (
                 <button
                   key={ticker}
-                  onClick={() => { setAssetClass(TICKER_ASSET_CLASS[assetClass] ?? assetClass); handleGenerate(ticker); }}
+                  onClick={() => {
+                    setAssetClass(TICKER_ASSET_CLASS[assetClass] ?? assetClass);
+                    handleGenerate(ticker);
+                  }}
                   disabled={loading !== null}
-                  className={`px-2.5 py-1 text-xs font-mono font-semibold border transition-all ${
-                    loading === ticker
-                      ? "border-primary bg-primary/15 text-primary animate-pulse"
-                      : "border-border/40 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
+                  className="px-2.5 py-1 text-[10px] font-bold transition-all"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    border: "1px solid",
+                    borderColor: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--border-strong))",
+                    borderRadius: "2px",
+                    background: loading === ticker ? "hsl(var(--primary) / 0.12)" : "transparent",
+                    color: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                    cursor: loading !== null ? "not-allowed" : "pointer",
+                    opacity: loading !== null && loading !== ticker ? 0.5 : 1,
+                    animation: loading === ticker ? "pulse-live 1.6s ease-in-out infinite" : "none",
+                  }}
                 >
                   {loading === ticker ? "···" : ticker.replace("=X","").replace("-USD","").replace("=F","")}
                 </button>
@@ -223,34 +354,67 @@ export default function SignalsPage() {
 
           {/* Custom ticker */}
           <form onSubmit={handleCustomSubmit} className="flex gap-2 items-center">
-            <div className="terminal-label shrink-0">CUSTOM TICKER</div>
+            <span className="terminal-label shrink-0">CUSTOM TICKER</span>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 terminal-label">›</span>
+              <span
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
+              >
+                &rsaquo;
+              </span>
               <input
                 type="text"
                 value={customTicker}
                 onChange={(e) => setCustomTicker(e.target.value.toUpperCase())}
                 placeholder="e.g. COIN, RIVN, NQ=F"
-                className="pl-6 pr-3 py-1.5 bg-background border border-border/50 text-xs font-mono text-foreground focus:outline-none focus:border-primary/50 w-52 placeholder:text-muted-foreground/40"
+                className="input-terminal pl-6 w-52"
               />
             </div>
             <button
               type="submit"
               disabled={!customTicker.trim()}
-              className="px-3 py-1.5 text-xs font-mono font-semibold border border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+              style={{
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                border: "1px solid hsl(var(--primary) / 0.4)",
+                borderRadius: "2px",
+                background: "hsl(var(--primary) / 0.08)",
+                color: "hsl(var(--primary))",
+                cursor: !customTicker.trim() ? "not-allowed" : "pointer",
+                opacity: !customTicker.trim() ? 0.4 : 1,
+              }}
             >
-              <Zap className="h-3 w-3" />
+              <IconSignal size={11} color="currentColor" />
               ANALYZE
             </button>
           </form>
 
+          {/* Error */}
           {error && (
-            <div className="flex items-center gap-3 text-xs font-mono text-bear bg-bear/10 border border-bear/20 px-3 py-2">
+            <div
+              className="flex items-center gap-3 px-3 py-2 text-[10px]"
+              style={{
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                color: "hsl(var(--bear))",
+                background: "hsl(var(--bear) / 0.05)",
+                border: "1px solid hsl(var(--bear) / 0.2)",
+                borderRadius: "2px",
+              }}
+            >
               <span className="flex-1">ERR — {error}</span>
               {lastTickerRef.current && (
                 <button
                   onClick={() => handleGenerate(lastTickerRef.current)}
-                  className="shrink-0 px-2 py-0.5 text-[10px] font-bold border border-bear/40 hover:bg-bear/20 transition-colors rounded"
+                  className="shrink-0 px-2 py-0.5 font-bold border transition-colors"
+                  style={{
+                    borderColor: "hsl(var(--bear) / 0.4)",
+                    borderRadius: "2px",
+                    background: "transparent",
+                    color: "hsl(var(--bear))",
+                    cursor: "pointer",
+                    fontSize: "9px",
+                    letterSpacing: "0.1em",
+                  }}
                 >
                   RETRY
                 </button>
@@ -262,73 +426,200 @@ export default function SignalsPage() {
 
       {/* Pipeline running indicator */}
       {loading && (
-        <div className={`terminal-panel ${waking ? "border-warn/40" : "border-primary/30"}`}>
-          <div className={`terminal-header ${waking ? "bg-warn/5" : "bg-primary/5"}`}>
+        <div
+          className="panel"
+          style={{ borderColor: waking ? "hsl(var(--warn) / 0.3)" : "hsl(var(--primary) / 0.25)" }}
+        >
+          <div
+            className="panel-header"
+            style={{ background: waking ? "hsl(var(--warn) / 0.04)" : "hsl(var(--primary) / 0.04)" }}
+          >
             {waking ? (
               <>
-                <Zap className="h-3 w-3 text-warn animate-pulse" />
-                <span className="terminal-label text-warn ml-1">WAKING BACKEND</span>
-                <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
-                <span className="mx-auto text-[9px] font-mono text-warn/70">Render cold start — auto-retrying (~26s max)…</span>
+                <div style={{ animation: "agent-pulse 0.8s ease-in-out infinite" }}>
+                  <IconSignal size={12} color="hsl(var(--warn))" />
+                </div>
+                <span
+                  className="text-[9px] font-bold tracking-[0.1em] ml-1"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn))" }}
+                >
+                  WAKING BACKEND
+                </span>
+                <span
+                  className="ml-2 text-[9px]"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.7)" }}
+                >
+                  {loading}
+                </span>
+                <span
+                  className="mx-auto text-[9px]"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn) / 0.6)" }}
+                >
+                  Render cold start — auto-retrying (~26s max)
+                </span>
               </>
             ) : (
               <>
-                <span className="terminal-label text-primary">PIPELINE RUNNING</span>
-                <span className="ml-2 terminal-label text-foreground font-mono">{loading}</span>
+                <span
+                  className="text-[9px] font-bold tracking-[0.1em]"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+                >
+                  PIPELINE RUNNING
+                </span>
+                <span
+                  className="ml-2 text-[9px]"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.8)" }}
+                >
+                  {loading}
+                </span>
               </>
             )}
             <button
               onClick={cancelAnalysis}
-              className="ml-auto flex items-center gap-1 text-[9px] font-mono text-muted-foreground hover:text-bear border border-border/40 hover:border-bear/40 px-2 py-0.5 rounded transition-colors"
+              className="ml-auto flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 transition-colors"
+              style={{
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                border: "1px solid hsl(var(--border-strong))",
+                borderRadius: "2px",
+                background: "none",
+                color: "hsl(var(--muted-foreground))",
+                cursor: "pointer",
+                letterSpacing: "0.08em",
+              }}
             >
-              <X className="h-2.5 w-2.5" /> CANCEL
+              <IconX size={10} color="currentColor" />
+              CANCEL
             </button>
           </div>
-          <div className="p-4 space-y-3">
-            {/* Stage progress bar */}
-            {(() => {
-              const stages = [
-                { label: "01 Market Data",      icon: "📡" },
-                { label: "02 News Intel",        icon: "📰" },
-                { label: "03 Analyst Debate",    icon: "🧠" },
-                { label: "04 Risk Manager",      icon: "🛡️" },
-                { label: "05 Debate Protocol",   icon: "⚖️" },
-                { label: "06 Trader Signal",     icon: "⚡" },
-              ];
-              return (
-                <div className="flex items-center gap-1 flex-wrap">
-                  {stages.map((s, i) => {
-                    const done    = i < pipelineStage;
-                    const active  = i === pipelineStage;
-                    return (
-                      <div key={s.label} className="flex items-center gap-1">
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[9px] font-mono font-bold transition-all ${
-                          done   ? "bg-primary/20 text-primary border border-primary/40" :
-                          active ? "bg-primary/10 text-primary border border-primary/30 animate-pulse" :
-                                   "bg-transparent text-muted-foreground/40 border border-border/20"
-                        }`}>
-                          <span>{s.icon}</span>
-                          <span>{s.label}</span>
-                          {done && <span className="text-primary ml-0.5">✓</span>}
-                        </div>
-                        {i < stages.length - 1 && (
-                          <span className={`text-[8px] ${done ? "text-primary/60" : "text-muted-foreground/20"}`}>→</span>
-                        )}
+
+          <div className="p-4 space-y-4">
+
+            {/* 3D agent shapes — animate while pipeline runs */}
+            <div className="flex items-center justify-center gap-3 flex-wrap py-2">
+              {PIPELINE_AGENTS.map(({ name, Geo, color }, i) => {
+                const isCurrentStage = i === Math.min(pipelineStage, 5);
+                const isPastStage = i < pipelineStage;
+                return (
+                  <div key={name} className="flex flex-col items-center gap-1.5">
+                    <div
+                      className="flex items-center justify-center"
+                      style={{
+                        width: 40,
+                        height: 40,
+                        background: isPastStage ? `${color}15` : isCurrentStage ? `${color}10` : "transparent",
+                        border: `1px solid ${isPastStage ? color + "40" : isCurrentStage ? color + "30" : "hsl(var(--border))"}`,
+                        borderRadius: "3px",
+                        transition: "all 400ms ease",
+                        opacity: isPastStage ? 0.5 : isCurrentStage ? 1 : 0.25,
+                      }}
+                    >
+                      <div style={{ animation: isCurrentStage ? "agent-pulse 0.8s ease-in-out infinite" : `rotate-idle-octahedron 14s linear infinite`, transformStyle: "preserve-3d" }}>
+                        <Geo size={26} color={color} strokeWidth={1} active={isCurrentStage} />
                       </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+                    </div>
+                    <span
+                      className="text-[8px] font-bold"
+                      style={{
+                        fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                        color: isCurrentStage ? color : isPastStage ? `${color}80` : "hsl(var(--muted-foreground) / 0.3)",
+                      }}
+                    >
+                      {name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Stage progress — text indicators */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {PIPELINE_STAGES.map((s, i) => {
+                const done   = i < pipelineStage;
+                const active = i === pipelineStage;
+                const { Icon } = s;
+                return (
+                  <div key={s.label} className="flex items-center gap-1">
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 relative overflow-hidden"
+                      style={{
+                        border: "1px solid",
+                        borderColor: done
+                          ? "hsl(var(--primary) / 0.35)"
+                          : active
+                          ? "hsl(var(--primary) / 0.25)"
+                          : "hsl(var(--border))",
+                        borderRadius: "2px",
+                        background: done
+                          ? "hsl(var(--primary) / 0.08)"
+                          : active
+                          ? "hsl(var(--primary) / 0.04)"
+                          : "transparent",
+                        transition: "all 300ms ease",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: done ? "hsl(var(--primary))" : active ? "hsl(var(--primary) / 0.7)" : "hsl(var(--muted-foreground) / 0.3)",
+                          display: "flex",
+                          alignItems: "center",
+                          animation: active ? "agent-pulse 0.8s ease-in-out infinite" : "none",
+                        }}
+                      >
+                        <Icon />
+                      </span>
+                      <span
+                        className="text-[8px] font-bold tracking-[0.08em] whitespace-nowrap"
+                        style={{
+                          fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                          color: done
+                            ? "hsl(var(--primary))"
+                            : active
+                            ? "hsl(var(--primary) / 0.8)"
+                            : "hsl(var(--muted-foreground) / 0.3)",
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                      {done && (
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="hsl(var(--primary))" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="1.5,4 3,5.5 6.5,2" />
+                        </svg>
+                      )}
+                      {/* Active stage fill animation */}
+                      {active && (
+                        <div
+                          className="absolute bottom-0 left-0 h-[1px]"
+                          style={{
+                            background: "hsl(var(--primary))",
+                            animation: "stage-fill 4s linear forwards",
+                          }}
+                        />
+                      )}
+                    </div>
+                    {i < PIPELINE_STAGES.length - 1 && (
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="shrink-0">
+                        <line x1="0" y1="4" x2="8" y2="4" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" />
+                        <polyline points="5,1.5 8.5,4 5,6.5" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
       {/* Signal output */}
       {signals.length === 0 && !loading ? (
-        <div className="terminal-panel">
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="text-primary/20 font-mono text-4xl">[ ]</div>
+        <div className="panel">
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            {/* Empty state — icosahedron wireframe */}
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="hsl(var(--primary) / 0.15)" strokeWidth="1">
+              <polygon points="20,3 35,13.5 29,30 11,30 5,13.5" />
+              <line x1="20" y1="3" x2="20" y2="30" />
+              <line x1="35" y1="13.5" x2="5" y2="13.5" />
+            </svg>
             <span className="terminal-label">NO SIGNALS YET — SELECT A TICKER ABOVE</span>
           </div>
         </div>
@@ -345,7 +636,7 @@ export default function SignalsPage() {
         onClose={() => setUpgradeOpen(false)}
         feature="Unlimited AI Signals"
         requiredTier="retail"
-        reason="Free accounts can run 3 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
+        reason="Free accounts can run 5 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
       />
     </div>
   );

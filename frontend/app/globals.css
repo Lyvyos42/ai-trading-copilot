@@ -1,232 +1,642 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+/* ─────────────────────────────────────────────────────────────────────────────
+   QuantNeural Terminal — 2026 Design System
+   Spatial computing aesthetics. Material surfaces. Industrial precision.
+   Primary accent: Electric Blue #2563eb (committed, no drift)
+   Typography: Berkeley Mono (data/labels) + IBM Plex Sans (UI prose)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+/* Berkeley Mono — loaded via @font-face if self-hosted, otherwise fall back to IBM Plex Mono */
+@font-face {
+  font-family: 'BerkeleyMono';
+  src: local('Berkeley Mono'), local('BerkeleyMono-Regular');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'BerkeleyMono';
+  src: local('Berkeley Mono Bold'), local('BerkeleyMono-Bold');
+  font-weight: 700;
+  font-style: normal;
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ─────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* Bloomberg Terminal palette */
-    --background: 0 0% 2%;
-    --foreground: 0 0% 88%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 88%;
-    --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 88%;
+    /* Elevation ladder — dark mode uses lightness, not shadow */
+    --surface-0:  0 0% 3.1%;    /* #080808 — canvas */
+    --surface-1:  0 0% 5.9%;    /* #0f0f0f — panels */
+    --surface-2:  0 0% 8.6%;    /* #161616 — raised surfaces */
+    --surface-3:  0 0% 11%;     /* #1c1c1c — overlays */
+    --surface-4:  0 0% 14%;     /* #242424 — tooltips / popovers */
 
-    /* Terminal green as primary */
-    --primary: 151 100% 45%;
-    --primary-foreground: 0 0% 2%;
+    /* Semantic tokens */
+    --background:          var(--surface-0);
+    --foreground:          0 0% 87%;   /* #dedede */
+    --card:                var(--surface-1);
+    --card-foreground:     0 0% 87%;
+    --popover:             var(--surface-3);
+    --popover-foreground:  0 0% 87%;
 
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 70%;
+    /* Electric blue — single committed accent */
+    --primary:             220 91% 54%;   /* #2563eb */
+    --primary-foreground:  0 0% 98%;
+    --primary-dim:         220 91% 54% / 0.12;
+    --primary-glow:        220 91% 54% / 0.06;
 
-    --muted: 0 0% 7%;
-    --muted-foreground: 0 0% 45%;
-
-    --accent: 0 0% 10%;
-    --accent-foreground: 0 0% 88%;
-
-    --destructive: 0 72% 51%;
+    --secondary:           0 0% 9%;
+    --secondary-foreground:0 0% 65%;
+    --muted:               0 0% 7%;
+    --muted-foreground:    0 0% 42%;
+    --accent:              0 0% 11%;
+    --accent-foreground:   0 0% 87%;
+    --destructive:         0 68% 52%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 12%;
-    --input: 0 0% 10%;
-    --ring: 151 100% 45%;
+    /* Borders — ambient occlusion proxy */
+    --border:              0 0% 13%;     /* #212121 */
+    --border-strong:       0 0% 20%;     /* #333 */
+    --input:               0 0% 9%;
+    --ring:                220 91% 54%;
 
-    /* Semantic trading tokens */
-    --bull: 142 71% 45%;
-    --bear: 0 72% 51%;
-    --warn: 38 92% 50%;
-    --info: 201 96% 52%;
+    /* Semantic trading signals */
+    --bull:   142 65% 42%;   /* #22c55e family — slightly desaturated for professionalism */
+    --bear:   0 68% 52%;     /* #e63946 */
+    --warn:   38 85% 52%;    /* #f59e0b */
+    --info:   210 90% 56%;   /* #38bdf8 */
 
-    --radius: 0.2rem;
+    /* Geometry colors — one per agent role */
+    --geo-researcher:  220 91% 54%;   /* blue  — octahedron */
+    --geo-analyst:     38 85% 52%;    /* amber — cylinder */
+    --geo-generator:   142 65% 42%;   /* green — cube */
+    --geo-evaluator:   280 75% 58%;   /* violet — sphere */
+    --geo-orchestrator:201 90% 52%;   /* cyan  — icosahedron */
+    --geo-executor:    0 68% 52%;     /* red   — torus */
+
+    /* Spatial depth — used in transform-3d contexts */
+    --depth-unit:      40px;
+    --perspective:     800px;
+
+    /* Typography scale — tight, tool-grade */
+    --text-xs:    11px;
+    --text-sm:    12px;
+    --text-base:  14px;
+    --text-lg:    16px;
+    --text-xl:    19px;
+    --text-2xl:   23px;
+    --text-3xl:   28px;
+
+    --radius: 2px;
   }
 }
 
+/* ── Base Layer ─────────────────────────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; box-sizing: border-box; }
 
   html {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    /* Subtle scanline effect */
-    background-image: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.03) 2px,
-      rgba(0, 0, 0, 0.03) 4px
-    );
+    font-size: var(--text-base);
+    line-height: 1.5;
+    /* Subtle grain — physical texture, not scanlines */
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
   }
 
-  /* Monospace for all numeric/financial data */
-  .font-mono, code, kbd, pre,
-  [class*="font-mono"] {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Berkeley Mono or IBM Plex Mono for all data/code contexts */
+  .font-mono, code, kbd, pre, [class*="font-mono"],
+  .terminal-label, [data-type="numeric"], .data-cell-value {
+    font-family: 'BerkeleyMono', 'IBM Plex Mono', 'Fira Code', monospace;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  ::selection {
+    background: hsl(220 91% 54% / 0.25);
+    color: hsl(0 0% 95%);
   }
 }
 
-/* ── Scrollbar ──────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: hsl(var(--background)); }
-::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: hsl(var(--surface-0)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border-strong)); border-radius: 1px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 
-/* ── Terminal panel utility classes ─────────────────────────────────── */
-.terminal-panel {
-  background: hsl(var(--card));
+/* ── Material Surface System ────────────────────────────────────────────────── */
+/*
+  Elevation is expressed through lightness, not box-shadow.
+  Panels have a top-edge specular highlight — as if lit from above.
+  This is the key differentiator from flat terminal UI.
+*/
+
+.surface-0 { background: hsl(var(--surface-0)); }
+.surface-1 { background: hsl(var(--surface-1)); }
+.surface-2 { background: hsl(var(--surface-2)); }
+.surface-3 { background: hsl(var(--surface-3)); }
+.surface-4 { background: hsl(var(--surface-4)); }
+
+/* The canonical panel — replaces terminal-panel */
+.panel {
+  background: hsl(var(--surface-1));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   position: relative;
   overflow: hidden;
+
+  /* Top-edge specular — material surface catching light */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 25% / 0.6) 20%,
+      hsl(0 0% 30% / 0.8) 50%,
+      hsl(0 0% 25% / 0.6) 80%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
 }
 
-.terminal-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.4), transparent);
+/* Raised panel — modals, popovers, command palettes */
+.panel-raised {
+  background: hsl(var(--surface-3));
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 35% / 0.7) 30%,
+      hsl(0 0% 40% / 1) 50%,
+      hsl(0 0% 35% / 0.7) 70%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+/* Active panel — primary accent edge */
+.panel-active {
+  background: hsl(var(--surface-1));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.3) 20%,
+      hsl(var(--primary) / 0.7) 50%,
+      hsl(var(--primary) / 0.3) 80%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+/* ── Panel Header ───────────────────────────────────────────────────────────── */
+.panel-header {
+  padding: 6px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--surface-2));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 0;
+}
+
+/* Legacy alias — keeps existing code working */
+.terminal-panel {
+  background: hsl(var(--surface-1));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 22% / 0.6) 30%,
+      hsl(0 0% 28% / 0.8) 50%,
+      hsl(0 0% 22% / 0.6) 70%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
 }
 
 .terminal-header {
   padding: 6px 12px;
   border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--muted));
+  background: hsl(var(--surface-2));
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .terminal-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
   font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
 }
 
-/* ── Bull / Bear color utilities ─────────────────────────────────── */
+/* ── Depth / 3D Context ─────────────────────────────────────────────────────── */
+.scene-3d {
+  perspective: var(--perspective);
+  transform-style: preserve-3d;
+}
+
+.depth-card {
+  transform-style: preserve-3d;
+  transition: transform 400ms cubic-bezier(0.23, 1, 0.32, 1);
+
+  &:hover {
+    transform: translateZ(4px) rotateX(-1deg) rotateY(1deg);
+  }
+}
+
+/* Ambient occlusion simulation — inner shadow at panel base */
+.panel-ao {
+  box-shadow:
+    inset 0 -1px 0 hsl(0 0% 0% / 0.4),
+    inset 0 1px 0 hsl(0 0% 20% / 0.3);
+}
+
+/* ── Geometric Agent Icon System ────────────────────────────────────────────── */
+/* SVG-based geometric marks — 1-2px stroke, no fill, no emoji */
+
+.geo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 3D shape container — used in agent cards */
+.shape-3d-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Rotation animations — idle state */
+@keyframes rotate-idle-octahedron {
+  0%   { transform: rotateX(0deg)   rotateY(0deg)   rotateZ(0deg); }
+  33%  { transform: rotateX(8deg)   rotateY(120deg) rotateZ(4deg); }
+  66%  { transform: rotateX(-4deg)  rotateY(240deg) rotateZ(-4deg); }
+  100% { transform: rotateX(0deg)   rotateY(360deg) rotateZ(0deg); }
+}
+
+@keyframes rotate-idle-cylinder {
+  0%   { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(0deg) rotateY(360deg); }
+}
+
+@keyframes rotate-idle-cube {
+  0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg); }
+}
+
+@keyframes rotate-idle-sphere {
+  0%   { transform: rotateX(15deg) rotateY(0deg); }
+  100% { transform: rotateX(15deg) rotateY(360deg); }
+}
+
+@keyframes rotate-idle-icosahedron {
+  0%   { transform: rotateX(10deg) rotateY(0deg) rotateZ(0deg); }
+  50%  { transform: rotateX(-10deg) rotateY(180deg) rotateZ(10deg); }
+  100% { transform: rotateX(10deg) rotateY(360deg) rotateZ(0deg); }
+}
+
+@keyframes rotate-idle-torus {
+  0%   { transform: rotateX(70deg) rotateY(0deg); }
+  100% { transform: rotateX(70deg) rotateY(360deg); }
+}
+
+/* Pulse animation — agent active state */
+@keyframes agent-pulse {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.6; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes agent-process {
+  0%   { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.shape-researcher { animation: rotate-idle-octahedron   14s linear infinite; }
+.shape-analyst    { animation: rotate-idle-cylinder      10s linear infinite; }
+.shape-generator  { animation: rotate-idle-cube          12s linear infinite; }
+.shape-evaluator  { animation: rotate-idle-sphere        16s linear infinite; }
+.shape-orchestrator { animation: rotate-idle-icosahedron 18s linear infinite; }
+.shape-executor   { animation: rotate-idle-torus         8s  linear infinite; }
+
+/* Active/processing state overrides rotation with pulse */
+.shape-active {
+  animation: agent-pulse 0.8s ease-in-out infinite !important;
+}
+
+/* ── Trading Semantic Colors ────────────────────────────────────────────────── */
 .text-bull { color: hsl(var(--bull)); }
 .text-bear { color: hsl(var(--bear)); }
 .text-warn { color: hsl(var(--warn)); }
 .text-info { color: hsl(var(--info)); }
+
+.bg-bull\/5  { background: hsl(var(--bull) / 0.05); }
 .bg-bull\/10 { background: hsl(var(--bull) / 0.1); }
+.bg-bull\/20 { background: hsl(var(--bull) / 0.2); }
+.bg-bear\/5  { background: hsl(var(--bear) / 0.05); }
 .bg-bear\/10 { background: hsl(var(--bear) / 0.1); }
+.bg-bear\/20 { background: hsl(var(--bear) / 0.2); }
+.bg-warn\/5  { background: hsl(var(--warn) / 0.05); }
 .bg-warn\/10 { background: hsl(var(--warn) / 0.1); }
 
-/* ── Animations ──────────────────────────────────────────────────── */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.2; }
+.border-bull\/20 { border-color: hsl(var(--bull) / 0.2); }
+.border-bull\/30 { border-color: hsl(var(--bull) / 0.3); }
+.border-bear\/20 { border-color: hsl(var(--bear) / 0.2); }
+.border-bear\/30 { border-color: hsl(var(--bear) / 0.3); }
+
+/* ── Market Bar ─────────────────────────────────────────────────────────────── */
+.market-bar {
+  background: hsl(var(--surface-1));
+  border-bottom: 1px solid hsl(var(--border));
+  height: 30px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  /* Top specular — the bar has physical presence */
+  box-shadow: inset 0 1px 0 hsl(0 0% 22% / 0.5);
 }
 
+/* ── Ticker Scroll ─────────────────────────────────────────────────────────── */
 @keyframes ticker-scroll {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
 
-@keyframes signal-flash {
-  0%   { background: hsl(var(--primary) / 0.2); }
-  50%  { background: hsl(var(--primary) / 0.05); }
-  100% { background: transparent; }
+.ticker-track {
+  display: flex;
+  white-space: nowrap;
+  animation: ticker-scroll 70s linear infinite;
+  will-change: transform;
+}
+.ticker-track:hover { animation-play-state: paused; }
+
+/* ── Live Indicator ─────────────────────────────────────────────────────────── */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
 }
 
-@keyframes pulse-ring {
-  0%   { transform: scale(1); opacity: 1; }
-  100% { transform: scale(2.4); opacity: 0; }
+@keyframes pulse-ring-expand {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 
-/* Live indicator dot */
 .live-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: hsl(var(--bull));
   display: inline-block;
-  animation: blink 1.4s ease-in-out infinite;
+  animation: pulse-live 1.6s ease-in-out infinite;
   position: relative;
+  flex-shrink: 0;
 }
 .live-dot::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
   border-radius: 50%;
-  background: hsl(var(--bull) / 0.4);
-  animation: pulse-ring 1.4s ease-out infinite;
+  background: hsl(var(--bull) / 0.35);
+  animation: pulse-ring-expand 1.6s ease-out infinite;
 }
 
-/* News ticker bar */
-.ticker-track {
-  display: flex;
-  white-space: nowrap;
-  animation: ticker-scroll 60s linear infinite;
-}
-.ticker-track:hover {
-  animation-play-state: paused;
+/* ── Signal Flash ────────────────────────────────────────────────────────────── */
+@keyframes signal-appear {
+  0%   { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-/* Signal flash on new entry */
 .signal-new {
-  animation: signal-flash 1.2s ease-out forwards;
+  animation: signal-appear 250ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-/* ── Market overview bar ─────────────────────────────────────────── */
-.market-bar {
-  background: hsl(0 0% 3%);
-  border-bottom: 1px solid hsl(var(--border));
-  height: 32px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-}
-
-/* ── Bloomberg-style data cell ───────────────────────────────────── */
-.data-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
+/* ── Bloomberg Data Cell ─────────────────────────────────────────────────────── */
+.data-cell { display: flex; flex-direction: column; gap: 1px; }
 .data-cell-label {
+  font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
-  font-family: 'JetBrains Mono', monospace;
 }
 .data-cell-value {
+  font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
   font-size: 13px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
   line-height: 1;
 }
 
-/* ── TradingView chart container ─────────────────────────────────── */
+/* ── Keyboard Focus Ring ─────────────────────────────────────────────────────── */
+/* Never remove focus — make it precise and intentional */
+:focus-visible {
+  outline: 1px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* ── Button Base ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+  white-space: nowrap;
+  user-select: none;
+  padding: 5px 10px;
+}
+
+.btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(0 0% 98%);
+  box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+
+  &:hover:not(:disabled) {
+    background: hsl(220 91% 60%);
+    box-shadow: 0 0 12px hsl(var(--primary) / 0.25);
+  }
+
+  &:active:not(:disabled) {
+    background: hsl(220 91% 46%);
+    transform: translateY(1px);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: hsl(var(--border-strong));
+  color: hsl(var(--muted-foreground));
+
+  &:hover:not(:disabled) {
+    border-color: hsl(var(--primary) / 0.5);
+    color: hsl(var(--foreground));
+    background: hsl(var(--primary) / 0.04);
+  }
+
+  &:active:not(:disabled) {
+    background: hsl(var(--primary) / 0.08);
+  }
+}
+
+.btn-destructive {
+  background: transparent;
+  border-color: hsl(var(--bear) / 0.4);
+  color: hsl(var(--bear));
+
+  &:hover:not(:disabled) {
+    background: hsl(var(--bear) / 0.08);
+    border-color: hsl(var(--bear) / 0.7);
+  }
+}
+
+/* ── Pipeline Stage Indicator ───────────────────────────────────────────────── */
+@keyframes stage-fill {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+
+.pipeline-stage-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 1px;
+  background: hsl(var(--primary));
+  animation: stage-fill 4s linear forwards;
+}
+
+/* ── TradingView Chart Container ─────────────────────────────────────────────── */
 .tv-chart-container {
   position: relative;
   width: 100%;
-  height: 400px;
+  height: 100%;
 }
 
-/* ── Card override for terminal feel ─────────────────────────────── */
-.card-terminal {
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+/* ── Geometric Icon SVG Defaults ─────────────────────────────────────────────── */
+.geo-svg {
+  overflow: visible;
 }
+.geo-svg * {
+  vector-effect: non-scaling-stroke;
+}
+
+/* ── Input — Precise & Tool-grade ───────────────────────────────────────────── */
+.input-terminal {
+  background: hsl(var(--surface-0));
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: var(--radius);
+  color: hsl(var(--foreground));
+  font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 5px 10px;
+  transition: border-color 100ms ease, box-shadow 100ms ease;
+  outline: none;
+
+  &::placeholder {
+    color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  &:focus {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.08);
+  }
+}
+
+/* ── Confidence Ring Animation ───────────────────────────────────────────────── */
+@keyframes ring-draw {
+  0%   { stroke-dashoffset: 101; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.conf-ring-animate {
+  animation: ring-draw 600ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* ── Blink cursor ────────────────────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.cursor-blink { animation: blink 1.1s step-end infinite; }

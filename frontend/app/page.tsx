@@ -1,35 +1,45 @@
 import Link from "next/link";
-import { ArrowRight, Brain, Shield, BarChart2, Zap, TrendingUp, Activity } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal, GeoOctahedron, GeoCylinder, GeoCube, GeoSphere, GeoIcosahedron, GeoTorus } from "@/components/icons/GeoIcons";
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+const AGENTS = [
+  { name: "Fundamental",  geo: GeoOctahedron,   color: "#2563eb", model: "sonnet-4-6" },
+  { name: "Technical",    geo: GeoCylinder,      color: "#f59e0b", model: "sonnet-4-6" },
+  { name: "Sentiment",    geo: GeoSphere,        color: "#7c3aed", model: "sonnet-4-6" },
+  { name: "Macro",        geo: GeoIcosahedron,   color: "#06b6d4", model: "sonnet-4-6" },
+  { name: "Risk",         geo: GeoTorus,         color: "#f97316", model: "sonnet-4-6" },
+  { name: "Trader",       geo: GeoCube,          color: "#22c55e", model: "opus-4-6" },
+];
 
 const FEATURES = [
   {
-    icon: Brain,
+    icon: IconAgents,
     title: "6 Specialized AI Agents",
-    description: "Fundamental, Technical, Sentiment, Macro analysts debate every signal. Final decision by TraderAgent powered by Claude Opus 4.",
+    description: "Fundamental, Technical, Sentiment, Macro analysts debate every signal. Final decision by TraderAgent powered by Claude Opus.",
   },
   {
-    icon: BarChart2,
+    icon: IconBacktest,
     title: "80+ Quant Strategies",
-    description: "Peer-reviewed strategies from '151 Trading Strategies' (Kakushadze & Serur, 2018) — momentum, mean-reversion, carry, stat-arb, and more.",
+    description: "Peer-reviewed strategies from Kakushadze & Serur 2018 — momentum, mean-reversion, carry, stat-arb, and more.",
   },
   {
-    icon: TrendingUp,
+    icon: IconTrendUp,
     title: "Multi-Asset Coverage",
     description: "Stocks, ETFs, Fixed Income, FX, Commodities, Crypto, Futures across all major global markets.",
   },
   {
-    icon: Shield,
+    icon: IconTerminal,
     title: "Explainable Signals",
     description: "Full reasoning chain from each agent. See exactly which strategies triggered and why — no black boxes.",
   },
   {
-    icon: Activity,
+    icon: IconSignal,
     title: "Real-Time Pipeline",
-    description: "LangGraph multi-agent DAG processes signals in <30 seconds. WebSocket stream for live alerts.",
+    description: "LangGraph multi-agent DAG processes signals in under 30 seconds. WebSocket stream for live alerts.",
   },
   {
-    icon: Zap,
+    icon: IconShield,
     title: "Kelly Criterion Sizing",
     description: "Risk Manager enforces half-Kelly position sizing, max 15% drawdown circuit breaker, and correlation limits.",
   },
@@ -39,17 +49,20 @@ const TIERS = [
   {
     name: "Free",
     price: "$0",
-    features: ["Paper trading", "3 strategies", "1 asset class", "Delayed data"],
+    period: null,
+    features: ["Paper trading", "5 signals / day", "1 asset class", "Delayed data"],
     cta: "Start Free",
     highlight: false,
+    color: "hsl(var(--muted-foreground))",
   },
   {
     name: "Retail",
     price: "$49",
     period: "/mo",
-    features: ["All 80+ strategies", "All asset classes", "Real-time data", "100 signals/day"],
+    features: ["All 80+ strategies", "All asset classes", "Real-time data", "100 signals / day"],
     cta: "Get Started",
     highlight: false,
+    color: "hsl(var(--primary))",
   },
   {
     name: "Pro",
@@ -58,126 +71,397 @@ const TIERS = [
     features: ["Custom agent tuning", "API access", "Webhook execution", "Priority support"],
     cta: "Go Pro",
     highlight: true,
+    color: "hsl(var(--bull))",
   },
   {
     name: "Enterprise",
     price: "$499",
     period: "/mo",
-    features: ["Dedicated infra", "Custom models", "White-label", "SLA guarantee"],
+    features: ["Dedicated infra", "Custom models", "White-label option", "SLA guarantee"],
     cta: "Contact Sales",
     highlight: false,
+    color: "#f59e0b",
   },
 ];
 
+const STATS = [
+  { value: "80+",   label: "Strategies" },
+  { value: "6",     label: "AI Agents" },
+  { value: "<30s",  label: "Per Signal" },
+  { value: "8",     label: "Asset Classes" },
+];
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      {/* Hero */}
-      <section className="relative max-w-7xl mx-auto px-4 pt-20 pb-16 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs font-medium mb-6">
-          <Activity className="h-3 w-3 animate-pulse" />
-          6 AI Agents Live — LangGraph + Claude Opus 4
+    <div
+      className="min-h-screen"
+      style={{ background: "hsl(var(--surface-0))" }}
+    >
+
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-20">
+
+        {/* Spatial background — grid of faint lines suggesting depth */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `
+              linear-gradient(hsl(0 0% 15% / 0.15) 1px, transparent 1px),
+              linear-gradient(90deg, hsl(0 0% 15% / 0.15) 1px, transparent 1px)
+            `,
+            backgroundSize: "60px 60px",
+            maskImage: "radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 100%)",
+          }}
+        />
+
+        {/* Status badge */}
+        <div className="flex justify-center mb-8">
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5"
+            style={{
+              border: "1px solid hsl(var(--primary) / 0.25)",
+              borderRadius: "2px",
+              background: "hsl(var(--primary) / 0.04)",
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: "hsl(var(--bull))", animation: "pulse-live 1.6s ease-in-out infinite" }}
+            />
+            <span
+              className="text-[9px] font-bold tracking-[0.12em]"
+              style={{
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                color: "hsl(var(--primary))",
+              }}
+            >
+              6 AI AGENTS LIVE — LANGGRAPH + CLAUDE OPUS 4
+            </span>
+          </div>
         </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
-          AI Multi-Agent<br />
-          <span className="text-primary">Trading Copilot</span>
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          80+ peer-reviewed quantitative strategies. 6 specialized AI agents that debate every trade.
-          Full reasoning chain. No black boxes.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link href="/dashboard">
-            <Button size="lg" className="gap-2 w-full sm:w-auto">
-              Launch Dashboard <ArrowRight className="h-4 w-4" />
-            </Button>
+
+        {/* Hero text */}
+        <div className="text-center max-w-3xl mx-auto mb-10 relative">
+          <h1
+            className="font-bold mb-5"
+            style={{
+              fontSize: "clamp(32px, 5vw, 52px)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.04em",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            AI Multi-Agent
+            <br />
+            <span style={{ color: "hsl(var(--primary))" }}>Trading Copilot</span>
+          </h1>
+          <p
+            className="text-base leading-relaxed max-w-xl mx-auto"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            80+ peer-reviewed quantitative strategies. 6 specialized AI agents that debate every trade.
+            Full reasoning chain. No black boxes.
+          </p>
+        </div>
+
+        {/* CTA buttons */}
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center mb-16">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 transition-all"
+            style={{
+              background: "hsl(var(--primary))",
+              border: "1px solid hsl(var(--primary))",
+              borderRadius: "2px",
+              color: "hsl(0 0% 98%)",
+              fontSize: "11px",
+              fontWeight: 700,
+              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            <IconTerminal size={13} color="currentColor" />
+            LAUNCH TERMINAL
+            <IconArrowRight size={13} color="currentColor" />
           </Link>
-          <Link href="/signals">
-            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
-              <Zap className="h-4 w-4" /> Generate Signal
-            </Button>
+          <Link
+            href="/signals"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 transition-all"
+            style={{
+              background: "transparent",
+              border: "1px solid hsl(var(--border-strong))",
+              borderRadius: "2px",
+              color: "hsl(var(--foreground))",
+              fontSize: "11px",
+              fontWeight: 700,
+              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            <IconSignal size={13} color="currentColor" />
+            GENERATE SIGNAL
           </Link>
+        </div>
+
+        {/* Agent geometry display — 6 rotating 3D shapes */}
+        <div className="flex items-center justify-center gap-4 flex-wrap mb-16">
+          {AGENTS.map((agent) => {
+            const GeoComp = agent.geo;
+            return (
+              <div key={agent.name} className="flex flex-col items-center gap-2">
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: 60,
+                    height: 60,
+                    background: `${agent.color}08`,
+                    border: `1px solid ${agent.color}20`,
+                    borderRadius: "3px",
+                    /* Ambient occlusion */
+                    boxShadow: `inset 0 -2px 4px ${agent.color}10, inset 0 1px 0 ${agent.color}18`,
+                  }}
+                >
+                  <div style={{ animation: `rotate-idle-${agent.name === "Fundamental" ? "octahedron" : agent.name === "Technical" ? "cylinder" : agent.name === "Sentiment" ? "sphere" : agent.name === "Macro" ? "icosahedron" : agent.name === "Risk" ? "torus" : "cube"} ${agent.name === "Risk" ? "8s" : agent.name === "Technical" ? "10s" : agent.name === "Fundamental" ? "14s" : agent.name === "Sentiment" ? "16s" : agent.name === "Macro" ? "18s" : "12s"} linear infinite`, transformStyle: "preserve-3d" }}>
+                    <GeoComp size={38} color={agent.color} strokeWidth={1.1} />
+                  </div>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span
+                    className="text-[9px] font-bold tracking-[0.08em]"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: agent.color }}
+                  >
+                    {agent.name.toUpperCase()}
+                  </span>
+                  <span
+                    className="text-[8px]"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
+                  >
+                    {agent.model}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-6 mt-16 max-w-lg mx-auto">
-          {[
-            { value: "80+", label: "Strategies" },
-            { value: "6", label: "AI Agents" },
-            { value: "<30s", label: "Per Signal" },
-          ].map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <div className="text-2xl font-bold text-primary font-mono">{value}</div>
-              <div className="text-xs text-muted-foreground mt-1">{label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold mb-3">Why AI Trading Copilot?</h2>
-          <p className="text-muted-foreground">The only platform combining peer-reviewed quant strategies with multi-agent explainable AI.</p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="p-5 rounded-lg border border-border/50 bg-card hover:border-primary/30 transition-colors">
-              <div className="h-8 w-8 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
-                <Icon className="h-4 w-4 text-primary" />
+        <div
+          className="grid grid-cols-2 md:grid-cols-4 gap-px max-w-2xl mx-auto"
+          style={{
+            background: "hsl(var(--border))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: "2px",
+            overflow: "hidden",
+          }}
+        >
+          {STATS.map(({ value, label }) => (
+            <div
+              key={label}
+              className="flex flex-col items-center justify-center py-4 px-2"
+              style={{ background: "hsl(var(--surface-1))" }}
+            >
+              <div
+                className="text-2xl font-bold mb-0.5"
+                style={{
+                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                  color: "hsl(var(--primary))",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {value}
               </div>
-              <h3 className="font-semibold text-sm mb-2">{title}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+              <div className="terminal-label">{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold mb-3">Transparent Pricing</h2>
-          <p className="text-muted-foreground">Start free with paper trading. Upgrade when you're ready to go live.</p>
+      {/* ── Features ───────────────────────────────────────────────────────── */}
+      <section
+        className="max-w-7xl mx-auto px-6 py-20"
+        style={{ borderTop: "1px solid hsl(var(--border))" }}
+      >
+        <div className="mb-12">
+          <p
+            className="text-[9px] font-bold tracking-[0.18em] mb-3"
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+          >
+            CAPABILITIES
+          </p>
+          <h2
+            className="font-bold max-w-lg"
+            style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
+          >
+            The only platform combining peer-reviewed quant strategies with multi-agent explainable AI.
+          </h2>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {TIERS.map(({ name, price, period, features, cta, highlight }) => (
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-px"
+          style={{
+            background: "hsl(var(--border))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: "2px",
+            overflow: "hidden",
+          }}
+        >
+          {FEATURES.map(({ icon: Icon, title, description }) => (
+            <div
+              key={title}
+              className="p-5 group transition-colors"
+              style={{ background: "hsl(var(--surface-1))" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--surface-2))"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--surface-1))"; }}
+            >
+              <div
+                className="h-8 w-8 flex items-center justify-center mb-3"
+                style={{
+                  background: "hsl(var(--primary) / 0.08)",
+                  border: "1px solid hsl(var(--primary) / 0.2)",
+                  borderRadius: "2px",
+                  boxShadow: "inset 0 1px 0 hsl(var(--primary) / 0.15)",
+                }}
+              >
+                <Icon size={14} color="hsl(var(--primary))" strokeWidth={1.5} />
+              </div>
+              <h3
+                className="font-semibold mb-1.5"
+                style={{ fontSize: "13px", color: "hsl(var(--foreground))" }}
+              >
+                {title}
+              </h3>
+              <p
+                className="text-[11px] leading-relaxed"
+                style={{ color: "hsl(var(--muted-foreground))" }}
+              >
+                {description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Pricing ────────────────────────────────────────────────────────── */}
+      <section
+        className="max-w-7xl mx-auto px-6 py-20"
+        style={{ borderTop: "1px solid hsl(var(--border))" }}
+      >
+        <div className="mb-12">
+          <p
+            className="text-[9px] font-bold tracking-[0.18em] mb-3"
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+          >
+            PRICING
+          </p>
+          <h2
+            className="font-bold"
+            style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
+          >
+            Start free. Upgrade when you are ready.
+          </h2>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {TIERS.map(({ name, price, period, features, cta, highlight, color }) => (
             <div
               key={name}
-              className={`p-5 rounded-lg border ${highlight ? "border-primary/50 bg-primary/5" : "border-border/50 bg-card"} relative`}
+              className="panel panel-ao relative flex flex-col"
+              style={{
+                borderColor: highlight ? "hsl(var(--bull) / 0.35)" : undefined,
+                background: highlight ? "hsl(var(--surface-2))" : undefined,
+              }}
             >
               {highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-primary text-primary-foreground text-xs rounded-full font-medium">
-                  Most Popular
+                <div
+                  className="absolute top-0 left-0 right-0 h-px"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, hsl(var(--bull) / 0.7) 50%, transparent)",
+                    zIndex: 2,
+                  }}
+                />
+              )}
+
+              {highlight && (
+                <div
+                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-[8px] font-bold tracking-[0.1em]"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    background: "hsl(var(--bull))",
+                    color: "hsl(0 0% 5%)",
+                    borderRadius: "2px",
+                  }}
+                >
+                  MOST POPULAR
                 </div>
               )}
-              <div className="mb-4">
-                <div className="text-sm text-muted-foreground mb-1">{name}</div>
-                <div className="text-3xl font-bold">
-                  {price}
-                  {period && <span className="text-sm font-normal text-muted-foreground">{period}</span>}
+
+              <div className="p-5 flex-1">
+                <div className="mb-4">
+                  <div
+                    className="text-[9px] font-bold tracking-[0.12em] mb-2"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
+                  >
+                    {name.toUpperCase()}
+                  </div>
+                  <div className="flex items-baseline gap-0.5">
+                    <span
+                      className="text-3xl font-bold"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", letterSpacing: "-0.03em", color: "hsl(var(--foreground))" }}
+                    >
+                      {price}
+                    </span>
+                    {period && (
+                      <span
+                        className="text-[11px]"
+                        style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+                      >
+                        {period}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                <ul className="space-y-2 mb-5">
+                  {features.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-center gap-2 text-[11px]"
+                      style={{ color: "hsl(var(--muted-foreground))" }}
+                    >
+                      {/* Geometric bullet — small square, not a circle */}
+                      <div
+                        className="h-1 w-1 shrink-0"
+                        style={{ background: color, borderRadius: "0.5px" }}
+                      />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="space-y-2 mb-5">
-                {features.map((f) => (
-                  <li key={f} className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <div className="h-1 w-1 rounded-full bg-primary shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/login">
-                <Button
-                  variant={highlight ? "default" : "outline"}
-                  size="sm"
-                  className="w-full text-xs"
+
+              <div className="px-5 pb-5">
+                <Link
+                  href="/login"
+                  className="flex items-center justify-center gap-1.5 w-full py-2 transition-all text-[10px] font-bold tracking-[0.08em] uppercase"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    border: `1px solid ${highlight ? "hsl(var(--bull))" : "hsl(var(--border-strong))"}`,
+                    borderRadius: "2px",
+                    background: highlight ? "hsl(var(--bull))" : "transparent",
+                    color: highlight ? "hsl(0 0% 5%)" : "hsl(var(--foreground))",
+                  }}
                 >
                   {cta}
-                </Button>
-              </Link>
+                </Link>
+              </div>
             </div>
           ))}
         </div>
       </section>
+
     </div>
   );
 }
