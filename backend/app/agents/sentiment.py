@@ -36,7 +36,7 @@ The "top_headlines" field must list the 2-3 most impactful headlines you identif
 
 class SentimentAnalyst(BaseAgent):
     def __init__(self):
-        super().__init__("SentimentAnalyst", model="claude-sonnet-4-6")
+        super().__init__("SentimentAnalyst", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker      = state.get("ticker", "UNKNOWN")

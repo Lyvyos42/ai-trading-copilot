@@ -38,7 +38,7 @@ The "key_news_drivers" field must list the 2-3 real headlines that most shaped y
 
 class MacroAnalyst(BaseAgent):
     def __init__(self):
-        super().__init__("MacroAnalyst", model="claude-sonnet-4-6")
+        super().__init__("MacroAnalyst", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker     = state.get("ticker", "UNKNOWN")

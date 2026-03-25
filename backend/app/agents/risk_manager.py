@@ -41,7 +41,7 @@ def kelly_criterion(win_prob: float, reward_risk_ratio: float) -> float:
 
 class RiskManager(BaseAgent):
     def __init__(self):
-        super().__init__("RiskManager", model="claude-sonnet-4-6")
+        super().__init__("RiskManager", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker = state.get("ticker", "UNKNOWN")

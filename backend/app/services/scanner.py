@@ -13,10 +13,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
-import anthropic
 import structlog
 
 from app.config import settings
+from app.providers.router import model_router
 from app.data.market_data import fetch_market_data, resolve_ticker
 from app.db.database import AsyncSessionLocal
 from app.models.alert import MarketAlert, ScannerConfig
@@ -77,14 +77,12 @@ async def _screen_symbol(ticker: str, news_headlines: list[str]) -> dict | None:
             headlines=headlines_str,
         )
 
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-        msg    = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        raw = await model_router.complete(
+            user=prompt,
+            tier="lightweight",
             max_tokens=150,
-            messages=[{"role": "user", "content": prompt}],
+            agent_name="Scanner",
         )
-
-        raw  = msg.content[0].text.strip()
         result = json.loads(raw)
 
         score     = int(result.get("score", 0))

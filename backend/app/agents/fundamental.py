@@ -24,7 +24,7 @@ Respond ONLY with a valid JSON object (no markdown, no prose) with these exact k
 
 class FundamentalAnalyst(BaseAgent):
     def __init__(self):
-        super().__init__("FundamentalAnalyst", model="claude-sonnet-4-6")
+        super().__init__("FundamentalAnalyst", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker = state.get("ticker", "UNKNOWN")

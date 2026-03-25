@@ -69,7 +69,7 @@ def _rsi(prices: list[float], period: int = 14) -> float:
 
 class TechnicalAnalyst(BaseAgent):
     def __init__(self):
-        super().__init__("TechnicalAnalyst", model="claude-sonnet-4-6")
+        super().__init__("TechnicalAnalyst", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker = state.get("ticker", "UNKNOWN")

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # Admin — set ADMIN_SECRET in Render env vars to protect the promote endpoint
     admin_secret: str = "change_me_admin_secret"
 
+    # Provider tier configuration (format: "provider:model")
+    provider_tier_premium: str = "anthropic:claude-opus-4-6"
+    provider_tier_standard: str = "anthropic:claude-sonnet-4-6"
+    provider_tier_lightweight: str = "anthropic:claude-haiku-4-5-20251001"
+
     # App
     environment: str = "development"
     log_level: str = "INFO"

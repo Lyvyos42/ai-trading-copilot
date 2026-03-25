@@ -43,7 +43,7 @@ Respond ONLY with a valid JSON object:
 class TraderAgent(BaseAgent):
     def __init__(self):
         # Use the most capable model for the final decision
-        super().__init__("TraderAgent", model="claude-opus-4-6")
+        super().__init__("TraderAgent", tier="premium")
 
     async def analyze(self, state: TradingState) -> dict:
         ticker = state.get("ticker", "UNKNOWN")
