@@ -7,10 +7,13 @@ import { formatPrice, timeAgo, directionBg } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const AGENT_SHORT: Record<string, string> = {
-  fundamental: "FUND",
-  technical:   "TECH",
-  sentiment:   "SENT",
-  macro:       "MACRO",
+  fundamental:   "FUND",
+  technical:     "TECH",
+  sentiment:     "SENT",
+  macro:         "MACRO",
+  order_flow:    "FLOW",
+  regime_change: "RGME",
+  correlation:   "CORR",
 };
 
 interface SignalCardProps {
@@ -136,7 +139,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         {/* Agent votes row */}
         <div className="flex gap-1 mt-2 flex-wrap">
           {Object.entries(signal.agent_votes).map(([agent, vote]) => {
-            if (agent === "risk_approved" || typeof vote !== "object" || !vote) return null;
+            if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
             const v = vote as { direction?: string };
             return (
               <span key={agent} className={cn(
@@ -147,6 +150,14 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               </span>
             );
           })}
+          {signal.agent_votes.quant_validated !== undefined && (
+            <span className={cn(
+              "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
+              signal.agent_votes.quant_validated ? "bg-bull/10 text-bull border-bull/20" : "bg-warn/10 text-warn border-warn/20"
+            )}>
+              {signal.agent_votes.quant_validated ? "QNT✓" : "QNT?"}
+            </span>
+          )}
           {signal.agent_votes.risk_approved !== undefined && (
             <span className={cn(
               "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
@@ -307,15 +318,24 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         {/* Agent votes */}
         <div className="flex gap-1.5 mb-3 flex-wrap">
           {Object.entries(signal.agent_votes).map(([agent, vote]) => {
-            if (agent === "risk_approved") return null;
+            if (["risk_approved", "quant_validated"].includes(agent)) return null;
             if (typeof vote !== "object" || !vote) return null;
-            const v = vote as { direction?: string };
+            const v = vote as { direction?: string; confidence?: number };
             return (
               <div key={agent} className={cn("text-xs font-mono px-2 py-0.5 rounded border", directionBg(v.direction || "NEUTRAL"))}>
                 {AGENT_SHORT[agent] || agent}: {v.direction || "N/A"}
+                {v.confidence ? <span className="text-muted-foreground ml-1">{Math.round(v.confidence)}%</span> : null}
               </div>
             );
           })}
+          {signal.agent_votes.quant_validated !== undefined && (
+            <div className={cn(
+              "text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1",
+              signal.agent_votes.quant_validated ? "bg-bull/10 text-bull border-bull/20" : "bg-warn/10 text-warn border-warn/20"
+            )}>
+              QUANT {signal.agent_votes.quant_validated ? "VALIDATED" : "UNCONFIRMED"}
+            </div>
+          )}
           {signal.agent_votes.risk_approved !== undefined && (
             <div className={cn(
               "text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1",
@@ -323,6 +343,16 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
             )}>
               <Shield className="h-3 w-3" />
               RISK {signal.agent_votes.risk_approved ? "APPROVED" : "REJECTED"}
+            </div>
+          )}
+          {signal.conviction_tier && (
+            <div className={cn(
+              "text-xs font-mono px-2 py-0.5 rounded border font-bold",
+              signal.conviction_tier === "HIGH" ? "bg-bull/10 text-bull border-bull/20" :
+              signal.conviction_tier === "MODERATE" ? "bg-warn/10 text-warn border-warn/20" :
+              "bg-muted text-muted-foreground border-border/30"
+            )}>
+              {signal.conviction_tier}
             </div>
           )}
         </div>

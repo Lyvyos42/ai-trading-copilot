@@ -203,26 +203,26 @@ async def generate_signal(
     if direction not in ("LONG", "SHORT"):
         direction = "LONG"
 
-    # Build agent_votes summary
-    agent_votes = {
-        "fundamental": {
-            "direction": state.get("fundamental_analysis", {}).get("direction"),
-            "confidence": state.get("fundamental_analysis", {}).get("confidence"),
-        },
-        "technical": {
-            "direction": state.get("technical_analysis", {}).get("direction"),
-            "confidence": state.get("technical_analysis", {}).get("confidence"),
-        },
-        "sentiment": {
-            "direction": state.get("sentiment_analysis", {}).get("direction"),
-            "confidence": state.get("sentiment_analysis", {}).get("confidence"),
-        },
-        "macro": {
-            "direction": state.get("macro_analysis", {}).get("direction"),
-            "confidence": state.get("macro_analysis", {}).get("confidence"),
-        },
-        "risk_approved": state.get("risk_assessment", {}).get("approved", True),
-    }
+    # Build agent_votes summary (all 7 analysts + risk + quant)
+    agent_votes = {}
+    for key, label in [
+        ("fundamental_analysis", "fundamental"),
+        ("technical_analysis", "technical"),
+        ("sentiment_analysis", "sentiment"),
+        ("macro_analysis", "macro"),
+        ("order_flow_analysis", "order_flow"),
+        ("regime_change_analysis", "regime_change"),
+        ("correlation_analysis", "correlation"),
+    ]:
+        analysis = state.get(key, {})
+        agent_votes[label] = {
+            "direction": analysis.get("direction"),
+            "confidence": analysis.get("confidence"),
+            "bullish_contribution": analysis.get("bullish_contribution"),
+            "bearish_contribution": analysis.get("bearish_contribution"),
+        }
+    agent_votes["risk_approved"] = state.get("risk_assessment", {}).get("approved", True)
+    agent_votes["quant_validated"] = state.get("quant_validation", {}).get("statistical_edge")
 
     user_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
 
@@ -276,13 +276,7 @@ async def generate_signal(
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "expiry_time": (datetime.utcnow() + timedelta(hours=24)).isoformat() + "Z",
         "pipeline_latency_ms": state.get("pipeline_latency_ms"),
-        "agent_detail": {
-            "fundamental": state.get("fundamental_analysis"),
-            "technical": state.get("technical_analysis"),
-            "sentiment": state.get("sentiment_analysis"),
-            "macro": state.get("macro_analysis"),
-            "risk": state.get("risk_assessment"),
-        },
+        "agent_detail": _build_agent_detail(state),
     }
 
     # Store in cache so repeat requests for the same ticker are instant
@@ -374,11 +368,22 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
     }
     if state:
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")
-        d["agent_detail"] = {
-            "fundamental": state.get("fundamental_analysis"),
-            "technical": state.get("technical_analysis"),
-            "sentiment": state.get("sentiment_analysis"),
-            "macro": state.get("macro_analysis"),
-            "risk": state.get("risk_assessment"),
-        }
+        d["agent_detail"] = _build_agent_detail(state)
     return d
+
+
+def _build_agent_detail(state: dict) -> dict:
+    """Build the full agent detail dict including all 9 agents."""
+    return {
+        "fundamental": state.get("fundamental_analysis"),
+        "technical": state.get("technical_analysis"),
+        "sentiment": state.get("sentiment_analysis"),
+        "macro": state.get("macro_analysis"),
+        "order_flow": state.get("order_flow_analysis"),
+        "regime_change": state.get("regime_change_analysis"),
+        "correlation": state.get("correlation_analysis"),
+        "quant": state.get("quant_validation"),
+        "risk": state.get("risk_assessment"),
+        "risk_gate": state.get("risk_gate_result"),
+        "agent_attribution": state.get("final_signal", {}).get("agent_attribution", []),
+    }

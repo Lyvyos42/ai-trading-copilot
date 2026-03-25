@@ -70,6 +70,13 @@ export interface TimeframeLevels {
   label: string;
 }
 
+export interface AgentVote {
+  direction?: string;
+  confidence?: number;
+  bullish_contribution?: number;
+  bearish_contribution?: number;
+}
+
 export interface Signal {
   signal_id: string;
   ticker: string;
@@ -81,7 +88,7 @@ export interface Signal {
   take_profit_2: number;
   take_profit_3: number;
   confidence_score: number;
-  agent_votes: Record<string, { direction?: string; confidence?: number } | boolean>;
+  agent_votes: Record<string, AgentVote | boolean | null>;
   reasoning_chain: string[];
   strategy_sources: string[];
   timeframe_levels?: { scalp?: TimeframeLevels; swing?: TimeframeLevels };
@@ -90,6 +97,7 @@ export interface Signal {
   timestamp: string;
   expiry_time: string;
   pipeline_latency_ms?: number;
+  conviction_tier?: string;
   agent_detail?: Record<string, unknown>;
 }
 
@@ -177,6 +185,8 @@ export interface AgentStatus {
   name: string;
   role: string;
   model: string;
+  tier?: string;
+  stage?: string;
   strategies: string[];
   status: string;
   avg_latency_ms: number;
