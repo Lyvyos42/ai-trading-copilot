@@ -22,10 +22,11 @@ def _build_engine_args(raw_url: str):
         url = "postgresql+asyncpg://" + url[len("postgresql://"):]
     # If already postgresql+asyncpg:// leave as-is
 
-    # Strip sslmode from query string — asyncpg requires ssl= context, not sslmode=
+    # Strip params asyncpg doesn't support as keyword arguments
     parsed = urlparse(url)
     qs = parse_qs(parsed.query, keep_blank_values=True)
     qs.pop("sslmode", None)
+    qs.pop("channel_binding", None)
     clean_url = urlunparse(parsed._replace(query=urlencode(qs, doseq=True)))
 
     _ssl_ctx = _ssl.create_default_context()

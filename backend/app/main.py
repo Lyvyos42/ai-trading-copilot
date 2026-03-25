@@ -108,11 +108,15 @@ app = FastAPI(
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# Open to all origins — auth uses Bearer tokens (not cookies), so wildcard is safe.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex=(
+        r"https://.*\.vercel\.app"
+        r"|https://app\.quantneuraledge\.com"
+        r"|https://quantneuraledge\.com"
+        r"|http://localhost:\d+"
+    ),
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
