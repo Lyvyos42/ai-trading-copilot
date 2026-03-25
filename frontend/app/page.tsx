@@ -311,10 +311,7 @@ export default function HomePage() {
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <div
               key={title}
-              className="p-5 group transition-colors"
-              style={{ background: "hsl(var(--surface-1))" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--surface-2))"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "hsl(var(--surface-1))"; }}
+              className="p-5 group transition-colors feature-card"
             >
               <div
                 className="h-8 w-8 flex items-center justify-center mb-3"
