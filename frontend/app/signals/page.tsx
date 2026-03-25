@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, API_URL, type Signal } from "@/lib/api";
+import { generateSignal, listSignals, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import {
@@ -119,6 +119,14 @@ export default function SignalsPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickerRef = useRef<string>("");
 
+  // Load existing signals from DB on mount
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    listSignals(50)
+      .then((data) => setSignals(data))
+      .catch(() => {}); // silent — signals will appear when generated
+  }, [isLoggedIn]);
+
   const STAGE_DELAYS = [0, 4_000, 11_000, 25_000, 31_000, 37_000];
   useEffect(() => {
     if (!loading) { setPipelineStage(0); return; }
@@ -164,7 +172,11 @@ export default function SignalsPage() {
 
     try {
       const signal = await generateSignal(ticker, TICKER_ASSET_CLASS[assetClass] ?? assetClass);
-      if (!cancelRef.current) setSignals((prev) => [signal, ...prev]);
+      if (!cancelRef.current) setSignals((prev) => {
+        // Avoid duplicate if signal was already loaded from DB
+        const exists = prev.some((s) => s.signal_id === signal.signal_id);
+        return exists ? prev : [signal, ...prev];
+      });
     } catch (e: unknown) {
       if (!cancelRef.current) {
         const msg = e instanceof Error ? e.message : "Failed to generate signal";
