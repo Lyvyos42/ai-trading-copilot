@@ -147,7 +147,7 @@ async def generate_signal(
 
     # ── Authenticated user guards ────────────────────────────────────────────────
     if user:
-        user_id = user.get("sub", "")
+        user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
         # Fetch real tier from DB — Supabase JWTs don't carry a tier claim
         db_user_result = await db.execute(select(User).where(User.id == user_id))
         db_user = db_user_result.scalar_one_or_none()
@@ -224,8 +224,10 @@ async def generate_signal(
         "risk_approved": state.get("risk_assessment", {}).get("approved", True),
     }
 
+    user_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
+
     signal = Signal(
-        user_id=user["sub"] if user else None,
+        user_id=user_id,
         ticker=ticker,
         asset_class=body.asset_class,
         timeframe=body.timeframe,
@@ -243,13 +245,47 @@ async def generate_signal(
         status="ACTIVE",
         expiry_time=datetime.utcnow() + timedelta(hours=24),
     )
-    db.add(signal)
-    await db.commit()
-    await db.refresh(signal)
 
-    result = _signal_to_dict(signal, state)
+    # Save to DB — non-blocking: return signal even if DB write fails
+    signal_id = None
+    try:
+        db.add(signal)
+        await db.commit()
+        await db.refresh(signal)
+        signal_id = str(signal.id)
+    except Exception:
+        pass  # DB unavailable — analysis result is still returned
 
-    # Store in cache so repeat requests for the same ticker in the next 10 min are instant
+    result = _signal_to_dict(signal, state) if signal_id else {
+        "signal_id": None,
+        "ticker": ticker,
+        "asset_class": body.asset_class,
+        "timeframe": body.timeframe,
+        "direction": direction,
+        "entry_price": final.get("entry_price", 0),
+        "stop_loss": final.get("stop_loss", 0),
+        "take_profit_1": final.get("take_profit_1", 0),
+        "take_profit_2": final.get("take_profit_2", 0),
+        "take_profit_3": final.get("take_profit_3", 0),
+        "confidence_score": final.get("confidence_score", 0),
+        "agent_votes": agent_votes,
+        "reasoning_chain": state.get("reasoning_chain", []),
+        "strategy_sources": final.get("strategy_sources", []),
+        "timeframe_levels": final.get("timeframe_levels", {}),
+        "status": "ACTIVE",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "expiry_time": (datetime.utcnow() + timedelta(hours=24)).isoformat() + "Z",
+        "pipeline_latency_ms": state.get("pipeline_latency_ms"),
+        "agent_detail": {
+            "fundamental": state.get("fundamental_analysis"),
+            "technical": state.get("technical_analysis"),
+            "sentiment": state.get("sentiment_analysis"),
+            "macro": state.get("macro_analysis"),
+            "risk": state.get("risk_assessment"),
+        },
+    }
+
+    # Store in cache so repeat requests for the same ticker are instant
     if user:
         _cache_signal(user.get("sub", ""), ticker, result)
 
@@ -277,7 +313,9 @@ async def list_signals(
 ):
     query = select(Signal).order_by(desc(Signal.created_at)).limit(min(limit, 100))
     if user:
-        query = query.where(Signal.user_id == user["sub"])
+        uid = user.get("sub") or user.get("id") or user.get("user_id")
+        if uid:
+            query = query.where(Signal.user_id == uid)
     result = await db.execute(query)
     signals = result.scalars().all()
     return [_signal_to_dict(s) for s in signals]
@@ -303,7 +341,8 @@ async def set_signal_outcome(
         raise HTTPException(status_code=404, detail="Signal not found")
 
     # Only the owner can resolve their signal
-    if user and signal.user_id and signal.user_id != user.get("sub"):
+    owner_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
+    if user and signal.user_id and signal.user_id != owner_id:
         raise HTTPException(status_code=403, detail="Not your signal")
 
     signal.status = body.outcome
