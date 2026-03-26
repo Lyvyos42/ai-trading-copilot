@@ -259,10 +259,10 @@ async def run_fund_manager(state: TradingState) -> TradingState:
     }
 
     # Conviction tier (based on probability score, not raw confidence)
-    prob = signal.get("probability_score", signal.get("confidence_score", signal.get("confidence", 50)))
-    conf = signal.get("confidence_score", signal.get("confidence", 50))
+    prob = signal.get("probability_score") or signal.get("confidence_score") or signal.get("confidence") or 50
+    conf = signal.get("confidence_score") or signal.get("confidence") or 50
     # Use the stronger of probability_score or confidence for conviction
-    conviction_input = max(prob, conf) if prob and conf else (prob or conf or 50)
+    conviction_input = max(prob, conf)
     if conviction_input >= 75:
         signal["conviction_tier"] = "HIGH"
     elif conviction_input >= 60:
@@ -279,7 +279,7 @@ async def run_fund_manager(state: TradingState) -> TradingState:
         signal.setdefault(key, None)
 
     reasoning = state.get("reasoning_chain", [])
-    lean = "BULLISH" if (prob or 50) >= 50 else "BEARISH"
+    lean = "BULLISH" if prob >= 50 else "BEARISH"
     reasoning.append(
         f"Fund Manager: {signal['status']} "
         f"— {prob:.0f}% {lean}, position size {signal.get('position_size_pct', 0):.1f}% of equity. "
