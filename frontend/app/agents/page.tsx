@@ -20,7 +20,7 @@ const AGENT_META: Record<string, {
   seq: number;
   role: string;
 }> = {
-  FundamentalAnalyst: { color: "#2563eb", model: "sonnet-4-6", seq: 1, role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
+  FundamentalAnalyst: { color: "#D4A240", model: "sonnet-4-6", seq: 1, role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
   TechnicalAnalyst:   { color: "#f59e0b", model: "sonnet-4-6", seq: 2, role: "Price action. EMA crossovers, RSI divergence, volume-weighted momentum." },
   SentimentAnalyst:   { color: "#7c3aed", model: "sonnet-4-6", seq: 3, role: "Market sentiment. News NLP, social positioning, fear/greed index." },
   MacroAnalyst:       { color: "#06b6d4", model: "sonnet-4-6", seq: 4, role: "Macro regime. GDP, CPI, Fed policy, carry trades, cross-asset correlation." },
@@ -124,7 +124,7 @@ function PipelineDiagram() {
 
 /** 3D Agent Card — the core visual identity piece */
 function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?: boolean }) {
-  const meta = AGENT_META[agent.name] || { color: "#2563eb", model: "sonnet-4-6", seq: 0, role: "" };
+  const meta = AGENT_META[agent.name] || { color: "#D4A240", model: "sonnet-4-6", seq: 0, role: "" };
   const geo = ROLE_GEOMETRY[agent.name];
   const GeoComponent = geo?.Component;
   const animClass = geo?.animationClass || "shape-researcher";

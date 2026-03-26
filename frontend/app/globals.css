@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   QuantNeural Terminal — 2026 Design System
+   MONOLITH — QuantNeural Terminal Design System
    Spatial computing aesthetics. Material surfaces. Industrial precision.
-   Primary accent: Electric Blue #2563eb (committed, no drift)
+   Primary accent: Institutional Gold #D4A240 (MONOLITH direction)
    Typography: Berkeley Mono (data/labels) + IBM Plex Sans (UI prose)
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -43,11 +43,11 @@
     --popover:             var(--surface-3);
     --popover-foreground:  0 0% 87%;
 
-    /* Electric blue — single committed accent */
-    --primary:             220 91% 54%;   /* #2563eb */
-    --primary-foreground:  0 0% 98%;
-    --primary-dim:         220 91% 54% / 0.12;
-    --primary-glow:        220 91% 54% / 0.06;
+    /* MONOLITH gold — institutional accent */
+    --primary:             42 78% 50%;    /* #D4A240 — warm gold */
+    --primary-foreground:  0 0% 4%;       /* near-black text on gold */
+    --primary-dim:         42 78% 50% / 0.12;
+    --primary-glow:        42 78% 50% / 0.06;
 
     --secondary:           0 0% 9%;
     --secondary-foreground:0 0% 65%;
@@ -62,7 +62,7 @@
     --border:              0 0% 13%;     /* #212121 */
     --border-strong:       0 0% 20%;     /* #333 */
     --input:               0 0% 9%;
-    --ring:                220 91% 54%;
+    --ring:                42 78% 50%;
 
     /* Semantic trading signals */
     --bull:   142 65% 42%;   /* #22c55e family — slightly desaturated for professionalism */
@@ -71,7 +71,7 @@
     --info:   210 90% 56%;   /* #38bdf8 */
 
     /* Geometry colors — one per agent role */
-    --geo-researcher:  220 91% 54%;   /* blue  — octahedron */
+    --geo-researcher:  42 78% 50%;    /* gold  — octahedron */
     --geo-analyst:     38 85% 52%;    /* amber — cylinder */
     --geo-generator:   142 65% 42%;   /* green — cube */
     --geo-evaluator:   280 75% 58%;   /* violet — sphere */
@@ -130,7 +130,7 @@
   }
 
   ::selection {
-    background: hsl(220 91% 54% / 0.25);
+    background: hsl(42 78% 50% / 0.25);
     color: hsl(0 0% 95%);
   }
 }
@@ -162,7 +162,7 @@
   position: relative;
   overflow: hidden;
 
-  /* Top-edge specular — material surface catching light */
+  /* Top-edge specular — warm gold light source */
   &::before {
     content: '';
     position: absolute;
@@ -171,9 +171,9 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      hsl(0 0% 25% / 0.6) 20%,
-      hsl(0 0% 30% / 0.8) 50%,
-      hsl(0 0% 25% / 0.6) 80%,
+      hsl(42 40% 25% / 0.5) 20%,
+      hsl(42 50% 35% / 0.7) 50%,
+      hsl(42 40% 25% / 0.5) 80%,
       transparent 100%
     );
     pointer-events: none;
@@ -197,9 +197,9 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      hsl(0 0% 35% / 0.7) 30%,
-      hsl(0 0% 40% / 1) 50%,
-      hsl(0 0% 35% / 0.7) 70%,
+      hsl(42 30% 35% / 0.6) 30%,
+      hsl(42 40% 45% / 0.8) 50%,
+      hsl(42 30% 35% / 0.6) 70%,
       transparent 100%
     );
     pointer-events: none;
@@ -261,9 +261,9 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      hsl(0 0% 22% / 0.6) 30%,
-      hsl(0 0% 28% / 0.8) 50%,
-      hsl(0 0% 22% / 0.6) 70%,
+      hsl(42 30% 22% / 0.5) 30%,
+      hsl(42 40% 30% / 0.7) 50%,
+      hsl(42 30% 22% / 0.5) 70%,
       transparent 100%
     );
     pointer-events: none;
@@ -415,8 +415,8 @@
   overflow: hidden;
   display: flex;
   align-items: center;
-  /* Top specular — the bar has physical presence */
-  box-shadow: inset 0 1px 0 hsl(0 0% 22% / 0.5);
+  /* Top specular — warm gold light */
+  box-shadow: inset 0 1px 0 hsl(42 30% 22% / 0.5);
 }
 
 /* ── Ticker Scroll ─────────────────────────────────────────────────────────── */
@@ -535,12 +535,12 @@
   box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
 
   &:hover:not(:disabled) {
-    background: hsl(220 91% 60%);
+    background: hsl(42 78% 56%);
     box-shadow: 0 0 12px hsl(var(--primary) / 0.25);
   }
 
   &:active:not(:disabled) {
-    background: hsl(220 91% 46%);
+    background: hsl(42 78% 42%);
     transform: translateY(1px);
   }
 }

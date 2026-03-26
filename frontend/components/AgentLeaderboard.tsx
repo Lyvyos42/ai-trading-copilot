@@ -8,7 +8,7 @@ interface AgentLeaderboardProps {
 }
 
 const AGENT_COLORS: Record<string, string> = {
-  fundamental: "text-[hsl(220,91%,54%)]",
+  fundamental: "text-[hsl(42,78%,50%)]",
   technical: "text-[hsl(38,85%,52%)]",
   sentiment: "text-[hsl(142,65%,42%)]",
   macro: "text-[hsl(280,75%,58%)]",

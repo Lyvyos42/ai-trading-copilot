@@ -96,7 +96,7 @@ const PIPELINE_STAGES = [
 
 // Agent shapes for the visual pipeline while running
 const PIPELINE_AGENTS = [
-  { name: "FUND",  Geo: GeoOctahedron,   color: "#2563eb" },
+  { name: "FUND",  Geo: GeoOctahedron,   color: "#D4A240" },
   { name: "TECH",  Geo: GeoCylinder,      color: "#f59e0b" },
   { name: "SENT",  Geo: GeoSphere,        color: "#7c3aed" },
   { name: "MACRO", Geo: GeoIcosahedron,   color: "#06b6d4" },

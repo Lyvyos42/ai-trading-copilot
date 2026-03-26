@@ -4,7 +4,7 @@ import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBa
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const AGENTS = [
-  { name: "Fundamental",  geo: GeoOctahedron,   color: "#2563eb", model: "sonnet-4-6" },
+  { name: "Fundamental",  geo: GeoOctahedron,   color: "#D4A240", model: "sonnet-4-6" },
   { name: "Technical",    geo: GeoCylinder,      color: "#f59e0b", model: "sonnet-4-6" },
   { name: "Sentiment",    geo: GeoSphere,        color: "#7c3aed", model: "sonnet-4-6" },
   { name: "Macro",        geo: GeoIcosahedron,   color: "#06b6d4", model: "sonnet-4-6" },
