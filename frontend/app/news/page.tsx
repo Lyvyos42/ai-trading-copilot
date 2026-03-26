@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2, BellRing } from "lucide-react";
+import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2, BellRing, BarChart3, PieChart, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils";
 import { ScannerPanel } from "@/components/ScannerPanel";
+import { supabase } from "@/lib/supabase";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return session.access_token;
+  } catch {}
+  return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+}
 
 interface ScannerAlert {
   id:         string;
@@ -41,13 +50,13 @@ interface Summary {
 
 const CATEGORIES = ["ALL", "MARKETS", "MACRO", "EARNINGS", "FED", "GEOPOLITICAL", "CRISIS"] as const;
 
-const CATEGORY_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  MARKETS:      { label: "Markets",      icon: TrendingUp,     color: "text-primary border-primary/30 bg-primary/5" },
-  MACRO:        { label: "Macro",        icon: Globe,          color: "text-info border-info/30 bg-info/5" },
-  EARNINGS:     { label: "Earnings",     icon: DollarSign,     color: "text-bull border-bull/30 bg-bull/5" },
-  FED:          { label: "Fed",          icon: Building2,      color: "text-warn border-warn/30 bg-warn/5" },
-  GEOPOLITICAL: { label: "Geopolitical", icon: Globe,          color: "text-bear border-bear/30 bg-bear/5" },
-  CRISIS:       { label: "Crisis",       icon: AlertTriangle,  color: "text-bear border-bear/50 bg-bear/10" },
+const CATEGORY_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; barColor: string }> = {
+  MARKETS:      { label: "Markets",      icon: TrendingUp,     color: "text-primary border-primary/30 bg-primary/5",   barColor: "bg-primary" },
+  MACRO:        { label: "Macro",        icon: Globe,          color: "text-info border-info/30 bg-info/5",             barColor: "bg-info" },
+  EARNINGS:     { label: "Earnings",     icon: DollarSign,     color: "text-bull border-bull/30 bg-bull/5",             barColor: "bg-bull" },
+  FED:          { label: "Fed",          icon: Building2,      color: "text-warn border-warn/30 bg-warn/5",             barColor: "bg-warn" },
+  GEOPOLITICAL: { label: "Geopolitical", icon: Globe,          color: "text-bear border-bear/30 bg-bear/5",             barColor: "bg-bear" },
+  CRISIS:       { label: "Crisis",       icon: AlertTriangle,  color: "text-bear border-bear/50 bg-bear/10",            barColor: "bg-bear" },
 };
 
 const SENTIMENT_META = {
@@ -84,7 +93,7 @@ export default function NewsPage() {
   useEffect(() => {
     async function loadAlerts() {
       try {
-        const token = localStorage.getItem("sb-access-token") || localStorage.getItem("token");
+        const token = await getAuthToken();
         if (!token) return;
         const res = await fetch(`${API}/api/v1/alerts?limit=10`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -99,7 +108,7 @@ export default function NewsPage() {
     setFetchError(null);
     const params = category !== "ALL" ? `?category=${category}&limit=100` : "?limit=100";
 
-    async function tryFetch(attempt: number) {
+    async function tryFetch(_attempt: number) {
       const [artRes, sumRes] = await Promise.all([
         fetch(`${API}/api/v1/news${params}`),
         fetch(`${API}/api/v1/news/summary`),
@@ -112,7 +121,6 @@ export default function NewsPage() {
     try {
       await tryFetch(0);
     } catch {
-      // Render free tier cold start — retry after 22s then 22s again
       setWaking(true);
       for (let attempt = 1; attempt <= 2; attempt++) {
         await new Promise(r => setTimeout(r, 22_000));
@@ -133,7 +141,6 @@ export default function NewsPage() {
 
   useEffect(() => { setLoading(true); loadNews(activeCategory); }, [activeCategory, loadNews]);
 
-  // Auto-refresh every 60s
   useEffect(() => {
     const id = setInterval(() => loadNews(activeCategory), 60_000);
     return () => clearInterval(id);
@@ -142,15 +149,34 @@ export default function NewsPage() {
   async function handleRefresh() {
     setRefreshing(true);
     await fetch(`${API}/api/v1/news/refresh`, { method: "POST" });
-    // Scraper fetches 16 feeds concurrently — retry at 6s, 12s, 20s, 30s
     [6000, 12000, 20000, 30000].forEach((delay) => {
       setTimeout(() => loadNews(activeCategory), delay);
     });
     setTimeout(() => setRefreshing(false), 32000);
   }
 
-  const crisisArticles  = articles.filter(a => a.category === "CRISIS");
-  const normalArticles  = articles.filter(a => a.category !== "CRISIS");
+  const crisisArticles = articles.filter(a => a.category === "CRISIS");
+  const normalArticles = articles.filter(a => a.category !== "CRISIS");
+
+  // Compute infographic data
+  const posCount = articles.filter(a => a.sentiment === "POSITIVE").length;
+  const negCount = articles.filter(a => a.sentiment === "NEGATIVE").length;
+  const neuCount = articles.filter(a => a.sentiment === "NEUTRAL").length;
+  const totalArticles = articles.length || 1;
+
+  // Trending tickers: count mentions across all articles
+  const tickerCounts: Record<string, number> = {};
+  articles.forEach(a => a.tickers.forEach(t => { tickerCounts[t] = (tickerCounts[t] || 0) + 1; }));
+  const trendingTickers = Object.entries(tickerCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+
+  // Sources breakdown
+  const sourceCounts: Record<string, number> = {};
+  articles.forEach(a => { sourceCounts[a.source] = (sourceCounts[a.source] || 0) + 1; });
+  const topSources = Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
 
   return (
     <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
@@ -198,7 +224,7 @@ export default function NewsPage() {
         </div>
       )}
 
-      {/* ── CRISIS BANNER (only when crisis articles exist) ─────────── */}
+      {/* ── CRISIS BANNER ─────────────────────────────────────────── */}
       {crisisArticles.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2 bg-bear/10 border-b border-bear/30 shrink-0">
           <AlertTriangle className="h-3.5 w-3.5 text-bear shrink-0" />
@@ -254,8 +280,9 @@ export default function NewsPage() {
       {/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Article feed */}
+        {/* LEFT — Infographics + Card Grid */}
         <div className="flex-1 overflow-y-auto">
+
           {loading && (
             <div className="flex items-center justify-center h-40">
               <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
@@ -266,7 +293,7 @@ export default function NewsPage() {
           )}
 
           {!loading && fetchError && (
-            <div className="mx-4 mt-4 px-3 py-2 text-xs font-mono text-bear bg-bear/10 border border-bear/20">
+            <div className="mx-4 mt-4 px-3 py-2 text-xs font-mono text-bear bg-bear/10 border border-bear/20 rounded">
               ERR — {fetchError}
             </div>
           )}
@@ -281,13 +308,129 @@ export default function NewsPage() {
             </div>
           )}
 
-          {!loading && normalArticles.map((article, i) => (
-            <ArticleRow key={article.id} article={article} index={i} />
-          ))}
+          {/* ── INFOGRAPHICS ROW ────────────────────────────────────── */}
+          {!loading && articles.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 p-4 border-b border-border bg-[hsl(0_0%_2%)]">
+
+              {/* Sentiment Donut */}
+              <div className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <PieChart className="h-3 w-3 text-primary" />
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">SENTIMENT</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <SentimentDonut positive={posCount} neutral={neuCount} negative={negCount} />
+                  <div className="space-y-1.5">
+                    {[
+                      { label: "Bullish", count: posCount, color: "bg-bull", textColor: "text-bull" },
+                      { label: "Neutral", count: neuCount, color: "bg-muted-foreground", textColor: "text-muted-foreground" },
+                      { label: "Bearish", count: negCount, color: "bg-bear", textColor: "text-bear" },
+                    ].map(({ label, count, color, textColor }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <div className={cn("h-2 w-2 rounded-full", color)} />
+                        <span className={cn("text-[9px] font-mono", textColor)}>{label}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground ml-auto">{Math.round(count / totalArticles * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Distribution */}
+              <div className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <BarChart3 className="h-3 w-3 text-primary" />
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">CATEGORIES</span>
+                </div>
+                <div className="space-y-2">
+                  {summary?.categories
+                    .filter(c => CATEGORY_META[c.category])
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5)
+                    .map(cat => {
+                      const meta = CATEGORY_META[cat.category];
+                      const maxCount = Math.max(...(summary?.categories.map(c => c.count) || [1]));
+                      return (
+                        <div key={cat.category}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className={cn("text-[8px] font-mono font-bold", meta.color.split(" ")[0])}>{meta.label}</span>
+                            <span className="text-[8px] font-mono text-muted-foreground">{cat.count}</span>
+                          </div>
+                          <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-500", meta.barColor)}
+                              style={{ width: `${(cat.count / maxCount) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Trending Tickers */}
+              <div className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Hash className="h-3 w-3 text-primary" />
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">TRENDING TICKERS</span>
+                </div>
+                {trendingTickers.length === 0 ? (
+                  <div className="text-[9px] font-mono text-muted-foreground/50">No ticker mentions yet</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {trendingTickers.map(([ticker, count], i) => (
+                      <div
+                        key={ticker}
+                        className={cn(
+                          "flex items-center gap-1 px-2 py-1 rounded border font-mono",
+                          i === 0
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : i < 3
+                              ? "border-primary/20 bg-primary/5 text-primary/80"
+                              : "border-border/50 bg-muted/20 text-muted-foreground"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold">{ticker}</span>
+                        <span className="text-[7px] opacity-60">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Sources Breakdown */}
+              <div className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Globe className="h-3 w-3 text-primary" />
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">TOP SOURCES</span>
+                </div>
+                <div className="space-y-1.5">
+                  {topSources.map(([source, count]) => {
+                    const srcColor = SOURCE_COLORS[source] || "text-muted-foreground";
+                    return (
+                      <div key={source} className="flex items-center justify-between">
+                        <span className={cn("text-[9px] font-mono font-bold truncate", srcColor)}>{source}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground ml-2 shrink-0">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── NEWS CARD GRID ──────────────────────────────────────── */}
+          {!loading && normalArticles.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
+              {normalArticles.map((article) => (
+                <ArticleCard key={article.id} article={article} />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT SIDEBAR — Agent Alerts + Scanner + Sources */}
-        <div className="w-56 shrink-0 border-l border-border overflow-y-auto">
+        {/* RIGHT SIDEBAR — Scanner + Alerts */}
+        <div className="hidden lg:block w-64 shrink-0 border-l border-border overflow-y-auto">
 
           {/* Agent Alerts feed */}
           <div className="terminal-header">
@@ -343,52 +486,21 @@ export default function NewsPage() {
             <Zap className="h-2.5 w-2.5 text-primary" />
             <span className="terminal-label ml-1">SCANNER CONFIG</span>
           </div>
-          <ScannerPanel onConfigChange={() => {
-            // Refresh alerts after config change
-            const token = localStorage.getItem("sb-access-token") || localStorage.getItem("token");
+          <ScannerPanel onConfigChange={async () => {
+            const token = await getAuthToken();
             if (!token) return;
             fetch(`${API}/api/v1/alerts?limit=10`, { headers: { Authorization: `Bearer ${token}` } })
               .then(r => r.json()).then(setScanAlerts).catch(() => {});
           }} />
-
-          {/* Sources header */}
-          <div className="terminal-header mt-1">
-            <span className="terminal-label">SOURCES</span>
-          </div>
-
-          {summary?.categories.map(cat => {
-            const meta = CATEGORY_META[cat.category];
-            if (!meta) return null;
-            const Icon = meta.icon;
-            return (
-              <button
-                key={cat.category}
-                onClick={() => setActive(cat.category)}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2.5 border-b border-border/50 hover:bg-white/[0.02] transition-colors",
-                  activeCategory === cat.category && "bg-primary/5"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className={cn("h-3 w-3", meta.color.split(" ")[0])} />
-                  <span className="text-[10px] font-mono font-bold text-foreground">{meta.label}</span>
-                </div>
-                <span className="text-[10px] font-mono text-muted-foreground">{cat.count}</span>
-              </button>
-            );
-          })}
-
-          <div className="terminal-header mt-2">
-            <span className="terminal-label">SENTIMENT MIX</span>
-          </div>
-          <SentimentBar articles={articles} />
         </div>
       </div>
     </div>
   );
 }
 
-function ArticleRow({ article, index }: { article: Article; index: number }) {
+/* ── Article Card Component ────────────────────────────────────────────────── */
+
+function ArticleCard({ article }: { article: Article }) {
   const catMeta  = CATEGORY_META[article.category];
   const sentMeta = SENTIMENT_META[article.sentiment as keyof typeof SENTIMENT_META] || SENTIMENT_META.NEUTRAL;
   const srcColor = SOURCE_COLORS[article.source] || "text-muted-foreground";
@@ -399,94 +511,89 @@ function ArticleRow({ article, index }: { article: Article; index: number }) {
       href={article.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(
-        "block border-b border-border/50 px-4 py-3 hover:bg-white/[0.025] transition-colors group",
-        index === 0 && "bg-white/[0.015]"
-      )}
+      className="group block rounded-lg border border-border/60 bg-background hover:border-primary/30 hover:bg-white/[0.02] transition-all duration-200"
     >
-      <div className="flex items-start gap-3">
-        {/* Sentiment indicator */}
-        <div className={cn("mt-0.5 shrink-0", sentMeta.color)}>
-          <SentIcon className="h-3.5 w-3.5" />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          {/* Category + Source + Time */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {catMeta && (
-              <span className={cn(
-                "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border",
-                catMeta.color
-              )}>
-                {catMeta.label.toUpperCase()}
-              </span>
-            )}
-            <span className={cn("text-[9px] font-mono font-bold", srcColor)}>
-              {article.source.toUpperCase()}
+      <div className="p-4">
+        {/* Top row: category + sentiment + source + time */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {catMeta && (
+            <span className={cn(
+              "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border",
+              catMeta.color
+            )}>
+              {catMeta.label.toUpperCase()}
             </span>
-            {article.published_at && (
-              <span className="text-[9px] font-mono text-muted-foreground">
-                {timeAgo(article.published_at)}
-              </span>
-            )}
-            {article.tickers.length > 0 && article.tickers.slice(0, 3).map(t => (
-              <span key={t} className="text-[8px] font-mono text-primary border border-primary/20 px-1 rounded bg-primary/5">
-                {t}
-              </span>
-            ))}
+          )}
+          <div className={cn("flex items-center gap-0.5", sentMeta.color)}>
+            <SentIcon className="h-2.5 w-2.5" />
           </div>
-
-          {/* Headline */}
-          <div className={cn(
-            "text-sm font-medium leading-snug group-hover:text-primary transition-colors",
-            index === 0 ? "text-foreground" : "text-foreground/90"
-          )}>
-            {article.headline}
-          </div>
-
-          {/* Summary */}
-          {article.summary && (
-            <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed line-clamp-2">
-              {article.summary}
-            </div>
+          <span className={cn("text-[9px] font-mono font-bold", srcColor)}>
+            {article.source.toUpperCase()}
+          </span>
+          {article.published_at && (
+            <span className="text-[9px] font-mono text-muted-foreground ml-auto">
+              {timeAgo(article.published_at)}
+            </span>
           )}
         </div>
 
-        <ExternalLink className="h-3 w-3 text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 mt-0.5 transition-colors" />
+        {/* Headline */}
+        <div className="text-[13px] font-medium leading-snug text-foreground/90 group-hover:text-primary transition-colors line-clamp-2 mb-2">
+          {article.headline}
+        </div>
+
+        {/* Summary */}
+        {article.summary && (
+          <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-3">
+            {article.summary}
+          </div>
+        )}
+
+        {/* Bottom row: tickers + external link */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {article.tickers.slice(0, 4).map(t => (
+            <span key={t} className="text-[8px] font-mono text-primary border border-primary/20 px-1.5 py-0.5 rounded bg-primary/5 font-bold">
+              {t}
+            </span>
+          ))}
+          <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/20 group-hover:text-muted-foreground ml-auto shrink-0 transition-colors" />
+        </div>
       </div>
     </a>
   );
 }
 
-function SentimentBar({ articles }: { articles: Article[] }) {
-  if (!articles.length) return null;
-  const pos = articles.filter(a => a.sentiment === "POSITIVE").length;
-  const neg = articles.filter(a => a.sentiment === "NEGATIVE").length;
-  const neu = articles.filter(a => a.sentiment === "NEUTRAL").length;
-  const total = articles.length;
+/* ── Sentiment Donut (pure CSS) ────────────────────────────────────────────── */
+
+function SentimentDonut({ positive, neutral, negative }: { positive: number; neutral: number; negative: number }) {
+  const total = positive + neutral + negative || 1;
+  const posAngle = (positive / total) * 360;
+  const neuAngle = (neutral / total) * 360;
+  const negAngle = (negative / total) * 360;
+
+  // CSS conic-gradient donut
+  const gradient = `conic-gradient(
+    hsl(var(--bull)) 0deg ${posAngle}deg,
+    hsl(var(--muted-foreground)) ${posAngle}deg ${posAngle + neuAngle}deg,
+    hsl(var(--bear)) ${posAngle + neuAngle}deg ${posAngle + neuAngle + negAngle}deg
+  )`;
+
+  const dominantPct = Math.round(Math.max(positive, neutral, negative) / total * 100);
+  const dominantLabel = positive >= neutral && positive >= negative ? "Bull" : negative >= neutral ? "Bear" : "Flat";
 
   return (
-    <div className="px-3 py-3 space-y-2">
-      {[
-        { label: "BULLISH", count: pos, color: "bg-bull", textColor: "text-bull" },
-        { label: "NEUTRAL", count: neu, color: "bg-muted-foreground", textColor: "text-muted-foreground" },
-        { label: "BEARISH", count: neg, color: "bg-bear", textColor: "text-bear" },
-      ].map(({ label, count, color, textColor }) => (
-        <div key={label}>
-          <div className="flex justify-between mb-1">
-            <span className={cn("text-[9px] font-mono font-bold", textColor)}>{label}</span>
-            <span className="text-[9px] font-mono text-muted-foreground">
-              {total > 0 ? Math.round(count / total * 100) : 0}%
-            </span>
-          </div>
-          <div className="h-1 bg-muted rounded overflow-hidden">
-            <div
-              className={cn("h-full rounded", color)}
-              style={{ width: total > 0 ? `${count / total * 100}%` : "0%" }}
-            />
-          </div>
+    <div className="relative h-16 w-16 shrink-0">
+      <div
+        className="h-full w-full rounded-full"
+        style={{ background: gradient }}
+      />
+      {/* Inner cutout */}
+      <div className="absolute inset-[5px] rounded-full bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-[11px] font-mono font-bold text-foreground">{dominantPct}%</div>
+          <div className="text-[7px] font-mono text-muted-foreground">{dominantLabel}</div>
         </div>
-      ))}
+      </div>
     </div>
   );
 }
