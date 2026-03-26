@@ -20,12 +20,17 @@ const AGENT_META: Record<string, {
   seq: number;
   role: string;
 }> = {
-  FundamentalAnalyst: { color: "#D4A240", model: "sonnet-4-6", seq: 1, role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
-  TechnicalAnalyst:   { color: "#f59e0b", model: "sonnet-4-6", seq: 2, role: "Price action. EMA crossovers, RSI divergence, volume-weighted momentum." },
-  SentimentAnalyst:   { color: "#7c3aed", model: "sonnet-4-6", seq: 3, role: "Market sentiment. News NLP, social positioning, fear/greed index." },
-  MacroAnalyst:       { color: "#06b6d4", model: "sonnet-4-6", seq: 4, role: "Macro regime. GDP, CPI, Fed policy, carry trades, cross-asset correlation." },
-  RiskManager:        { color: "#f97316", model: "sonnet-4-6", seq: 5, role: "Risk enforcement. Kelly sizing, drawdown limits, portfolio correlation." },
-  TraderAgent:        { color: "#22c55e", model: "opus-4-6",   seq: 6, role: "Final decision. Synthesizes all analysts, issues execution signal." },
+  FundamentalAnalyst:   { color: "#D4A240", model: "sonnet-4-6", seq: 1,  role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
+  TechnicalAnalyst:     { color: "#f59e0b", model: "sonnet-4-6", seq: 2,  role: "Price action. EMA crossovers, RSI divergence, volume-weighted momentum." },
+  SentimentAnalyst:     { color: "#7c3aed", model: "sonnet-4-6", seq: 3,  role: "Market sentiment. News NLP, social positioning, fear/greed index." },
+  MacroAnalyst:         { color: "#06b6d4", model: "sonnet-4-6", seq: 4,  role: "Macro regime. GDP, CPI, Fed policy, carry trades, cross-asset correlation." },
+  OrderFlowAnalyst:     { color: "#ec4899", model: "sonnet-4-6", seq: 5,  role: "Order flow analysis. VPIN, bid/ask imbalance, block trades, dark pool activity." },
+  RegimeChangeAnalyst:  { color: "#8b5cf6", model: "sonnet-4-6", seq: 6,  role: "Regime detection. VIX term structure, cross-asset correlation, credit spreads, sector rotation." },
+  CorrelationAnalyst:   { color: "#14b8a6", model: "sonnet-4-6", seq: 7,  role: "Portfolio correlation. Concentration risk, contagion detection, Kelly adjustments." },
+  QuantAnalyst:         { color: "#3b82f6", model: "sonnet-4-6", seq: 8,  role: "Quant validation. 5yr backtest, p-value testing, Sharpe ratio, statistical edge." },
+  RiskManager:          { color: "#f97316", model: "sonnet-4-6", seq: 9,  role: "Risk enforcement. Kelly sizing, drawdown limits, portfolio correlation." },
+  TraderAgent:          { color: "#22c55e", model: "opus-4-6",   seq: 10, role: "Final decision. Synthesizes all analysts, issues execution signal." },
+  RiskGate:             { color: "#ef4444", model: "none",       seq: 11, role: "15 hard veto rules (pure Python). Cannot be overridden by AI reasoning." },
 };
 
 /** Micro latency sparkline — pure SVG, no library */
@@ -67,9 +72,13 @@ function PipelineDiagram() {
     { id: "technical",   label: "TECHNICAL",    seq: "02" },
     { id: "sentiment",   label: "SENTIMENT",    seq: "03" },
     { id: "macro",       label: "MACRO",        seq: "04" },
-    { id: "debate",      label: "DEBATE",       seq: "05", accent: true },
-    { id: "risk",        label: "RISK",         seq: "06", warn: true },
-    { id: "trader",      label: "SIGNAL",       seq: "07", primary: true },
+    { id: "orderflow",   label: "ORDER FLOW",   seq: "05" },
+    { id: "regime",      label: "REGIME",        seq: "06" },
+    { id: "correlation", label: "CORR",          seq: "07" },
+    { id: "quant",       label: "QUANT",         seq: "08" },
+    { id: "debate",      label: "DEBATE",        seq: "09", accent: true },
+    { id: "risk",        label: "RISK",          seq: "10", warn: true },
+    { id: "trader",      label: "SIGNAL",        seq: "11", primary: true },
   ];
 
   return (

@@ -100,7 +100,7 @@ const FAQ = [
   },
   {
     q: "How are signals generated?",
-    a: "A 6-agent LangGraph pipeline runs: 4 analyst agents work in parallel, then a bull/bear debate, then TraderAgent (Claude Opus 4) makes the final decision, and RiskManager validates position sizing.",
+    a: "A 9-agent LangGraph pipeline runs: 8 analyst agents work in parallel (Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant), then a bull/bear debate, then TraderAgent (Claude Opus 4) synthesizes the final probability signal. RiskManager and 15 hard veto rules validate every output.",
   },
   {
     q: "What strategies are included?",

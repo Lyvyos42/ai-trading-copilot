@@ -18,7 +18,7 @@ const SECTIONS = [
     icon: IconSignal,
     title: "Signal Generation",
     href: "/signals",
-    description: "The core intelligence engine. Enter any ticker and timeframe to run a full 6-agent analysis pipeline. Each agent (Fundamental, Technical, Sentiment, Macro, Risk Manager, Trader) independently evaluates the asset and produces a probability-based assessment.",
+    description: "The core intelligence engine. Enter any ticker and timeframe to run a full 9-agent analysis pipeline. Each agent (Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant, Risk Manager) independently evaluates the asset before the Trader agent produces a probability-based consensus.",
     features: [
       "Probability score (0-100) instead of simple BUY/SELL",
       "Research target and invalidation level",
@@ -32,12 +32,12 @@ const SECTIONS = [
     icon: IconAgents,
     title: "AI Agents",
     href: "/agents",
-    description: "Meet the 6 specialized AI agents powering every signal. View each agent's role, methodology, and current status. Understand how the Fundamental, Technical, Sentiment, Macro, Risk Manager, and Trader agents collaborate.",
+    description: "Meet the 9 specialized AI agents + Risk Gate powering every signal. View each agent's role, methodology, latency, accuracy, and current status. Includes Order Flow, Regime Change, Correlation, and Quant analysts alongside the core four.",
     features: [
-      "Agent role descriptions and methodologies",
+      "9 analyst agents + Trader + Risk Gate (11 total components)",
       "Powered by Claude Opus 4 (Trader) and Claude Sonnet 4 (Analysts)",
-      "LangGraph multi-agent DAG architecture",
-      "Independent analysis before consensus — no groupthink",
+      "LangGraph multi-agent DAG architecture with parallel execution",
+      "Each agent has unique 3D geometry, latency trace, and strategy tags",
     ],
   },
   {

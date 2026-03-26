@@ -403,16 +403,115 @@ export function GeoTorus({ size = 32, color = "currentColor", strokeWidth = 1.2,
   );
 }
 
+/** OrderFlow — Prism (triangular cross-section, suggests flow direction) */
+export function GeoPrism({ size = 32, color = "currentColor", strokeWidth = 1.2, active = false }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="geo-svg">
+      {/* Front triangular face */}
+      <polygon points="16,4 26,26 6,26" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.9" />
+      {/* Rear face offset — 3D depth */}
+      <polygon points="19,6 29,24 9,24" stroke={color} strokeWidth={strokeWidth * 0.5} strokeDasharray="2 1.5" fill="none" opacity="0.3" />
+      {/* Connecting edges — depth lines */}
+      <line x1="16" y1="4" x2="19" y2="6" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.5" />
+      <line x1="26" y1="26" x2="29" y2="24" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.4" />
+      <line x1="6" y1="26" x2="9" y2="24" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.4" />
+      {/* Flow arrow inside */}
+      <line x1="16" y1="12" x2="16" y2="22" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.4" />
+      <polyline points="13,19 16,22 19,19" stroke={color} strokeWidth={strokeWidth * 0.5} fill="none" opacity="0.4" />
+      {active && <circle cx="16" cy="4" r="1.5" fill={color} opacity="0.8" />}
+    </svg>
+  );
+}
+
+/** RegimeChange — Dodecahedron projection (pentagon-based, suggests regime states) */
+export function GeoDodecahedron({ size = 32, color = "currentColor", strokeWidth = 1.2, active = false }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="geo-svg">
+      {/* Outer pentagon */}
+      <polygon points="16,2 28,10 24,25 8,25 4,10" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.85" />
+      {/* Inner pentagon (rotated — classic dodecahedron projection) */}
+      <polygon points="16,8 23,13 20,22 12,22 9,13" stroke={color} strokeWidth={strokeWidth * 0.8} fill="none" opacity="0.6" />
+      {/* Connection lines between pentagons */}
+      <line x1="16" y1="2" x2="16" y2="8" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.4" />
+      <line x1="28" y1="10" x2="23" y2="13" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.4" />
+      <line x1="24" y1="25" x2="20" y2="22" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.35" />
+      <line x1="8" y1="25" x2="12" y2="22" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.35" />
+      <line x1="4" y1="10" x2="9" y2="13" stroke={color} strokeWidth={strokeWidth * 0.5} opacity="0.4" />
+      {active && <polygon points="16,8 23,13 20,22 12,22 9,13" stroke={color} strokeWidth={strokeWidth * 1.5} fill="none" opacity="0.3" />}
+    </svg>
+  );
+}
+
+/** Correlation — Tetrahedron (simplest platonic solid, shows interconnection) */
+export function GeoTetrahedron({ size = 32, color = "currentColor", strokeWidth = 1.2, active = false }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="geo-svg">
+      {/* Front face — equilateral triangle */}
+      <polygon points="16,3 27,27 5,27" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.9" />
+      {/* Apex to rear vertex (3D depth) */}
+      <line x1="16" y1="3" x2="22" y2="17" stroke={color} strokeWidth={strokeWidth * 0.7} opacity="0.5" />
+      {/* Base edges to rear vertex */}
+      <line x1="5" y1="27" x2="22" y2="17" stroke={color} strokeWidth={strokeWidth * 0.5} strokeDasharray="2 1.5" opacity="0.3" />
+      <line x1="27" y1="27" x2="22" y2="17" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.45" />
+      {/* Center of mass */}
+      <circle cx="16" cy="18" r="1" fill={color} opacity="0.5" />
+      {active && <circle cx="16" cy="18" r="4" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.3" />}
+    </svg>
+  );
+}
+
+/** Quant — Wireframe Diamond (double pyramid, suggests mathematical precision) */
+export function GeoDiamond({ size = 32, color = "currentColor", strokeWidth = 1.2, active = false }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="geo-svg">
+      {/* Top pyramid */}
+      <polygon points="16,2 27,16 5,16" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.9" />
+      {/* Bottom pyramid (inverted) */}
+      <polygon points="16,30 27,16 5,16" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.7" />
+      {/* Equatorial cross */}
+      <line x1="5" y1="16" x2="27" y2="16" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.5" />
+      {/* Hidden rear edges */}
+      <line x1="16" y1="2" x2="16" y2="30" stroke={color} strokeWidth={strokeWidth * 0.4} strokeDasharray="2 2" opacity="0.25" />
+      {/* Facet accents */}
+      <line x1="16" y1="2" x2="5" y2="16" stroke={color} strokeWidth={strokeWidth} opacity="0.9" />
+      <line x1="16" y1="2" x2="27" y2="16" stroke={color} strokeWidth={strokeWidth} opacity="0.9" />
+      <line x1="16" y1="30" x2="5" y2="16" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.5" />
+      <line x1="16" y1="30" x2="27" y2="16" stroke={color} strokeWidth={strokeWidth * 0.6} opacity="0.5" />
+      {active && <circle cx="16" cy="16" r="2" fill={color} opacity="0.6" />}
+    </svg>
+  );
+}
+
+/** RiskGate — Hexagonal Shield (hard gate, deterministic) */
+export function GeoHexShield({ size = 32, color = "currentColor", strokeWidth = 1.2, active = false }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="geo-svg">
+      {/* Hexagonal shield outline */}
+      <polygon points="16,2 27,8 27,20 16,28 5,20 5,8" stroke={color} strokeWidth={strokeWidth} fill="none" opacity="0.9" />
+      {/* Inner hexagon */}
+      <polygon points="16,7 23,11 23,19 16,24 9,19 9,11" stroke={color} strokeWidth={strokeWidth * 0.6} fill="none" opacity="0.4" />
+      {/* Stop bar */}
+      <line x1="11" y1="15" x2="21" y2="15" stroke={color} strokeWidth={strokeWidth * 1.2} opacity="0.7" />
+      {active && <polygon points="16,2 27,8 27,20 16,28 5,20 5,8" stroke={color} strokeWidth={strokeWidth * 1.5} fill="none" opacity="0.3" />}
+    </svg>
+  );
+}
+
 // Map role names to geometry components
 export const ROLE_GEOMETRY: Record<string, {
   Component: React.ComponentType<IconProps & { active?: boolean }>;
   animationClass: string;
   label: string;
 }> = {
-  FundamentalAnalyst: { Component: GeoOctahedron,   animationClass: "shape-researcher",   label: "Octahedron" },
-  TechnicalAnalyst:   { Component: GeoCylinder,      animationClass: "shape-analyst",      label: "Cylinder" },
-  SentimentAnalyst:   { Component: GeoSphere,        animationClass: "shape-evaluator",    label: "Sphere" },
-  MacroAnalyst:       { Component: GeoIcosahedron,   animationClass: "shape-orchestrator", label: "Icosahedron" },
-  RiskManager:        { Component: GeoTorus,         animationClass: "shape-executor",     label: "Torus" },
-  TraderAgent:        { Component: GeoCube,          animationClass: "shape-generator",    label: "Cube" },
+  FundamentalAnalyst:   { Component: GeoOctahedron,   animationClass: "shape-researcher",   label: "Octahedron" },
+  TechnicalAnalyst:     { Component: GeoCylinder,      animationClass: "shape-analyst",      label: "Cylinder" },
+  SentimentAnalyst:     { Component: GeoSphere,        animationClass: "shape-evaluator",    label: "Sphere" },
+  MacroAnalyst:         { Component: GeoIcosahedron,   animationClass: "shape-orchestrator", label: "Icosahedron" },
+  OrderFlowAnalyst:     { Component: GeoPrism,         animationClass: "shape-researcher",   label: "Prism" },
+  RegimeChangeAnalyst:  { Component: GeoDodecahedron,  animationClass: "shape-evaluator",    label: "Dodecahedron" },
+  CorrelationAnalyst:   { Component: GeoTetrahedron,   animationClass: "shape-analyst",      label: "Tetrahedron" },
+  QuantAnalyst:         { Component: GeoDiamond,       animationClass: "shape-orchestrator", label: "Diamond" },
+  RiskManager:          { Component: GeoTorus,         animationClass: "shape-executor",     label: "Torus" },
+  TraderAgent:          { Component: GeoCube,          animationClass: "shape-generator",    label: "Cube" },
+  RiskGate:             { Component: GeoHexShield,     animationClass: "shape-executor",     label: "HexShield" },
 };

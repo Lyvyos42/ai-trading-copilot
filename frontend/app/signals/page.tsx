@@ -295,7 +295,7 @@ export default function SignalsPage() {
           <IconSignal size={12} color="hsl(var(--primary))" />
           <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
           <span className="text-[9px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
-            — 6-Agent LangGraph Pipeline
+            — 9-Agent LangGraph Pipeline
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             <span className="live-dot" />

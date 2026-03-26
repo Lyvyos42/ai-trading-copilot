@@ -1,22 +1,26 @@
 import Link from "next/link";
-import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal, GeoOctahedron, GeoCylinder, GeoCube, GeoSphere, GeoIcosahedron, GeoTorus } from "@/components/icons/GeoIcons";
+import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal, GeoOctahedron, GeoCylinder, GeoCube, GeoSphere, GeoIcosahedron, GeoTorus, GeoPrism, GeoDodecahedron, GeoTetrahedron, GeoDiamond } from "@/components/icons/GeoIcons";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const AGENTS = [
-  { name: "Fundamental",  geo: GeoOctahedron,   color: "#D4A240", model: "sonnet-4-6" },
-  { name: "Technical",    geo: GeoCylinder,      color: "#f59e0b", model: "sonnet-4-6" },
-  { name: "Sentiment",    geo: GeoSphere,        color: "#7c3aed", model: "sonnet-4-6" },
-  { name: "Macro",        geo: GeoIcosahedron,   color: "#06b6d4", model: "sonnet-4-6" },
-  { name: "Risk",         geo: GeoTorus,         color: "#f97316", model: "sonnet-4-6" },
-  { name: "Trader",       geo: GeoCube,          color: "#22c55e", model: "opus-4-6" },
+  { name: "Fundamental",    geo: GeoOctahedron,    color: "#D4A240", model: "sonnet-4-6" },
+  { name: "Technical",      geo: GeoCylinder,       color: "#f59e0b", model: "sonnet-4-6" },
+  { name: "Sentiment",      geo: GeoSphere,         color: "#7c3aed", model: "sonnet-4-6" },
+  { name: "Macro",          geo: GeoIcosahedron,    color: "#06b6d4", model: "sonnet-4-6" },
+  { name: "Order Flow",     geo: GeoPrism,          color: "#ec4899", model: "sonnet-4-6" },
+  { name: "Regime",         geo: GeoDodecahedron,   color: "#8b5cf6", model: "sonnet-4-6" },
+  { name: "Correlation",    geo: GeoTetrahedron,    color: "#14b8a6", model: "sonnet-4-6" },
+  { name: "Quant",          geo: GeoDiamond,        color: "#3b82f6", model: "sonnet-4-6" },
+  { name: "Risk",           geo: GeoTorus,          color: "#f97316", model: "sonnet-4-6" },
+  { name: "Trader",         geo: GeoCube,           color: "#22c55e", model: "opus-4-6" },
 ];
 
 const FEATURES = [
   {
     icon: IconAgents,
-    title: "6 Specialized AI Agents",
-    description: "Fundamental, Technical, Sentiment, Macro analysts debate every signal. Final decision by TraderAgent powered by Claude Opus.",
+    title: "9 Specialized AI Agents",
+    description: "Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant analysts debate every signal. Final decision by TraderAgent powered by Claude Opus.",
   },
   {
     icon: IconBacktest,
@@ -86,7 +90,7 @@ const TIERS = [
 
 const STATS = [
   { value: "80+",   label: "Strategies" },
-  { value: "6",     label: "AI Agents" },
+  { value: "9",     label: "AI Agents" },
   { value: "<30s",  label: "Per Signal" },
   { value: "8",     label: "Asset Classes" },
 ];
@@ -137,7 +141,7 @@ export default function HomePage() {
                 color: "hsl(var(--primary))",
               }}
             >
-              6 AI AGENTS LIVE — LANGGRAPH + CLAUDE OPUS 4
+              9 AI AGENTS LIVE — LANGGRAPH + CLAUDE OPUS 4
             </span>
           </div>
         </div>
@@ -161,7 +165,7 @@ export default function HomePage() {
             className="text-base leading-relaxed max-w-xl mx-auto"
             style={{ color: "hsl(var(--muted-foreground))" }}
           >
-            80+ peer-reviewed quantitative strategies. 6 specialized AI agents that debate every trade.
+            80+ peer-reviewed quantitative strategies. 9 specialized AI agents that debate every trade.
             Full reasoning chain. No black boxes.
           </p>
         </div>
@@ -296,7 +300,7 @@ export default function HomePage() {
             className="font-bold max-w-lg"
             style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
           >
-            The only platform combining peer-reviewed quant strategies with multi-agent explainable AI.
+            9-agent pipeline combining peer-reviewed quant strategies with explainable AI consensus.
           </h2>
         </div>
 
