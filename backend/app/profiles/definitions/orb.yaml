@@ -1,0 +1,38 @@
+name: Opening Range Breakout
+slug: orb
+description: First 15-30 min range breakout strategy. Momentum-driven, time-gated entries.
+default: false
+
+weights:
+  fundamental: 0.4
+  technical: 1.5
+  sentiment: 1.0
+  macro: 0.8
+  order_flow: 1.3
+  regime_change: 0.9
+  correlation: 0.5
+
+prompt_block: |
+  You are synthesizing signals using the ORB (Opening Range Breakout) profile.
+  This strategy captures the first directional move of the session.
+
+  Core framework:
+  1. **Opening Range**: The first 15-30 minutes of the session establish a range.
+     The breakout above/below this range signals the session direction.
+  2. **Volume Confirmation**: The breakout must be accompanied by above-average volume.
+     Order Flow analyst's volume ratio and VWAP deviation are critical confirmations.
+  3. **Gap Analysis**: If price gapped from previous close, the gap direction adds
+     conviction to the breakout direction. Technical analyst's momentum data applies here.
+  4. **Time Filter**: ORB signals are strongest in the first 2 hours of the session.
+     After midday, the edge diminishes significantly.
+
+  The Technical and Order Flow analysts are most important for this profile.
+  Fundamentals have minimal impact on intraday opening range dynamics.
+  Macro regime matters — avoid ORB on high-impact event days (FOMC, NFP).
+
+  Entry: Break above opening range high (LONG) or below low (SHORT) with volume.
+  Stop: Opposite side of the opening range.
+  Targets: TP1 at 1x range width, TP2 at 2x range width, TP3 at 3x range width.
+
+  Risk posture: Aggressive on clean breakouts, conservative on chop.
+  Position sizing: Standard half-Kelly. Skip trade if range is >2x ATR (too wide).

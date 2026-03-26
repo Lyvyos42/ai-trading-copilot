@@ -1,0 +1,37 @@
+name: ICT / Smart Money Concepts
+slug: ict_smc
+description: Fair value gaps, order blocks, liquidity sweeps. Institutional footprint analysis.
+default: false
+
+weights:
+  fundamental: 0.5
+  technical: 1.4
+  sentiment: 0.7
+  macro: 0.8
+  order_flow: 1.5
+  regime_change: 1.0
+  correlation: 0.6
+
+prompt_block: |
+  You are synthesizing signals using the ICT/SMC (Smart Money Concepts) profile.
+  This strategy focuses on institutional order flow footprints and liquidity engineering.
+
+  Core concepts to prioritize:
+  1. **Fair Value Gaps (FVG)**: Price imbalances where institutions left unfilled orders.
+     If the Technical analyst identifies price near a gap, this is a high-priority entry zone.
+  2. **Order Blocks**: The last opposing candle before a strong move. These represent
+     institutional accumulation/distribution zones. Order Flow analyst data is critical here.
+  3. **Liquidity Sweeps**: Stops get hunted before the real move. If price just swept
+     a key high/low and Order Flow shows reversal, this confirms smart money entry.
+  4. **Market Structure Shifts**: Break of structure (BOS) and change of character (CHoCH).
+     Use the Technical analyst's support/resistance and trend data for this.
+
+  Weight Order Flow and Technical analysts highest. Fundamentals are secondary — smart money
+  already knows the fundamentals. Sentiment can confirm retail positioning (fade the crowd).
+
+  Entry: Wait for displacement + FVG formation. Enter on the retrace into the FVG.
+  Stop: Below/above the order block that created the FVG.
+  Targets: Next liquidity pool (equal highs/lows, previous session high/low).
+
+  Risk posture: Tight stops (1-1.5 ATR). Higher R:R targets (minimum 3R on TP2).
+  Position sizing: Standard half-Kelly, but reduce by 30% if Order Flow doesn't confirm.

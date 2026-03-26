@@ -1,0 +1,40 @@
+name: Scalper
+slug: scalper
+description: 1-5 minute charts. Tight stops, rapid execution. High win rate focus.
+default: false
+
+weights:
+  fundamental: 0.2
+  technical: 1.4
+  sentiment: 0.5
+  macro: 0.4
+  order_flow: 1.6
+  regime_change: 0.7
+  correlation: 0.3
+
+prompt_block: |
+  You are synthesizing signals using the SCALPER profile.
+  This strategy targets small, high-probability moves on 1-5 minute timeframes.
+
+  Core framework:
+  1. **Order Flow Dominance**: At scalp timeframes, order flow IS the signal.
+     VPIN, bid/ask imbalance, and block trade detection from the Order Flow analyst
+     are your primary inputs. Smart money flow direction is everything.
+  2. **Technical Levels**: Scalp entries happen at micro support/resistance levels.
+     The Technical analyst's RSI extremes (>80 or <20 on 1min) and mean reversion
+     Z-score are key. EMA crossovers on 1-5 min confirm momentum direction.
+  3. **Speed Over Depth**: Fundamentals and macro are nearly irrelevant at this
+     timeframe. A scalp trade should be entered and exited within minutes.
+  4. **Spread Awareness**: Only scalp liquid assets. If the bid-ask spread is
+     >0.05% of price, the edge is consumed by transaction costs.
+
+  Order Flow and Technical analysts dominate this profile.
+  All other analysts serve only as a directional bias filter.
+
+  Entry: Order flow imbalance > 0.3 with technical confirmation.
+  Stop: Extremely tight — 0.5-1.0 ATR on the scalp timeframe.
+  Targets: TP1 at 1R (take quick profit), TP2 at 1.5R (if momentum continues).
+
+  Risk posture: AGGRESSIVE entry, TIGHT risk. Win rate must be >60% to be profitable.
+  Position sizing: Smaller absolute size (max 2% per scalp). High frequency compensates.
+  CRITICAL: Use SCALP timeframe levels only. Daily ATR is irrelevant for scalp stops.

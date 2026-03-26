@@ -1,0 +1,39 @@
+name: VWAP Pullback
+slug: vwap_pullback
+description: Mean reversion to VWAP. Institutional entry zones. Strategy 3.9 core.
+default: false
+
+weights:
+  fundamental: 0.6
+  technical: 1.3
+  sentiment: 0.8
+  macro: 0.7
+  order_flow: 1.5
+  regime_change: 0.8
+  correlation: 0.7
+
+prompt_block: |
+  You are synthesizing signals using the VWAP Pullback profile.
+  This is a mean-reversion strategy centered on the Volume Weighted Average Price.
+
+  Core framework:
+  1. **VWAP as Fair Value**: Institutions use VWAP as their benchmark execution price.
+     Price above VWAP = overextended long. Price below VWAP = overextended short.
+     Pullbacks TO VWAP are institutional entry opportunities.
+  2. **Z-Score Entry** (Strategy 3.9): Use the Technical analyst's mean reversion
+     Z-score. Enter when Z-score is >1.5 standard deviations from VWAP.
+  3. **Volume at VWAP**: Order Flow analyst's VWAP deviation is the key metric.
+     A pullback to VWAP with increasing volume confirms institutional interest.
+  4. **Standard Deviation Bands**: 1st and 2nd standard deviation bands around VWAP
+     serve as dynamic support/resistance levels.
+
+  Order Flow and Technical analysts carry the highest weight in this profile.
+  A pullback to VWAP in a trending market (confirmed by Technical trend signal)
+  with Order Flow showing accumulation is the highest-conviction setup.
+
+  Entry: Price touches VWAP after trending away, with volume confirmation.
+  Stop: Beyond the 2nd standard deviation band on the wrong side.
+  Targets: Previous session high/low, or 2nd SD band in direction of trend.
+
+  Risk posture: Conservative. Only trade in trending environments (skip SIDEWAYS).
+  Position sizing: Full half-Kelly when Z-score > 2.0, reduced by 40% when 1.5-2.0.

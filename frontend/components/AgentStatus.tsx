@@ -1,25 +1,35 @@
 "use client";
 
-import { Activity, Brain, BarChart2, Newspaper, Globe, Shield } from "lucide-react";
+import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Waves, RefreshCw, GitBranch, FlaskConical, ShieldCheck } from "lucide-react";
 import { type AgentStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const AGENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  FundamentalAnalyst: BarChart2,
-  TechnicalAnalyst:   Activity,
-  SentimentAnalyst:   Newspaper,
-  MacroAnalyst:       Globe,
-  RiskManager:        Shield,
-  TraderAgent:        Brain,
+  FundamentalAnalyst:  BarChart2,
+  TechnicalAnalyst:    Activity,
+  SentimentAnalyst:    Newspaper,
+  MacroAnalyst:        Globe,
+  OrderFlowAnalyst:    Waves,
+  RegimeChangeAnalyst: RefreshCw,
+  CorrelationAnalyst:  GitBranch,
+  QuantAnalyst:        FlaskConical,
+  RiskManager:         Shield,
+  RiskGate:            ShieldCheck,
+  TraderAgent:         Brain,
 };
 
 const AGENT_SHORT: Record<string, string> = {
-  FundamentalAnalyst: "FUNDAMENTAL",
-  TechnicalAnalyst:   "TECHNICAL",
-  SentimentAnalyst:   "SENTIMENT",
-  MacroAnalyst:       "MACRO",
-  RiskManager:        "RISK MGR",
-  TraderAgent:        "TRADER",
+  FundamentalAnalyst:  "FUNDAMENTAL",
+  TechnicalAnalyst:    "TECHNICAL",
+  SentimentAnalyst:    "SENTIMENT",
+  MacroAnalyst:        "MACRO",
+  OrderFlowAnalyst:    "ORDER FLOW",
+  RegimeChangeAnalyst: "REGIME",
+  CorrelationAnalyst:  "CORRELATION",
+  QuantAnalyst:        "QUANT",
+  RiskManager:         "RISK MGR",
+  RiskGate:            "RISK GATE",
+  TraderAgent:         "TRADER",
 };
 
 interface AgentStatusPanelProps {

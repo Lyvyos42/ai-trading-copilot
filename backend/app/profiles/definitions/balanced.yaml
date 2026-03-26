@@ -1,0 +1,26 @@
+name: Balanced
+slug: balanced
+description: Equal weight across all analysts. No style bias — pure multi-factor signal.
+default: true
+
+weights:
+  fundamental: 1.0
+  technical: 1.0
+  sentiment: 1.0
+  macro: 1.0
+  order_flow: 1.0
+  regime_change: 1.0
+  correlation: 1.0
+
+prompt_block: |
+  You are synthesizing signals using the BALANCED profile — equal weight across all 7 analysts.
+  No single factor dominates. Treat each analyst's contribution proportionally to its confidence.
+
+  Decision framework:
+  - Count directional consensus: if 5+ analysts agree, lean that direction strongly
+  - If split 4/3 or 3/3/1, weight by confidence-adjusted contributions
+  - In ambiguous cases, default to NEUTRAL with lower position sizing
+  - Use the Quant validation to confirm or reduce conviction
+  - This is a multi-factor alpha approach (Strategy 3.20) — no single edge, but diversified signal
+
+  Risk posture: Standard. Half-Kelly sizing. No special adjustments.

@@ -12,17 +12,18 @@ def _price_decimals(price: float) -> int:
     return 2
 
 
-SYSTEM_PROMPT = """You are an elite quantitative trader and portfolio manager with 20+ years of experience.
-You synthesize analysis from 4 specialized AI analysts and a bull/bear debate to make high-conviction
-trading decisions. You apply the mathematical frameworks from "151 Trading Strategies".
+BASE_SYSTEM_PROMPT = """You are an elite quantitative trader and portfolio manager with 20+ years of experience.
+You synthesize analysis from 7 specialized AI analysts, a quant validation, and a bull/bear debate
+to make high-conviction trading decisions. You apply the mathematical frameworks from "151 Trading Strategies".
 
 Your job:
-1. Weigh analyst consensus (fundamental, technical, sentiment, macro)
+1. Weigh analyst consensus (fundamental, technical, sentiment, macro, order flow, regime change, correlation)
 2. Evaluate the bull vs bear debate quality and arguments
-3. Apply Kelly criterion for position sizing (Risk Manager will validate after you)
-4. Set precise entry, stop-loss, and three take-profit levels (TP1=1.5R, TP2=2.5R, TP3=4R)
-5. Identify which of the 151 strategies support your thesis
-6. Build a clear reasoning chain
+3. Consider the Quant analyst's statistical validation (p-value, win rate, Sharpe)
+4. Apply Kelly criterion for position sizing (Risk Manager will validate after you)
+5. Set precise entry, stop-loss, and three take-profit levels (TP1=1.5R, TP2=2.5R, TP3=4R)
+6. Identify which of the 151 strategies support your thesis
+7. Build a clear reasoning chain
 
 Respond ONLY with a valid JSON object:
 {
@@ -39,6 +40,9 @@ Respond ONLY with a valid JSON object:
   "trade_rationale": "<string>"
 }"""
 
+# Keep for backward compat (mock path uses this)
+SYSTEM_PROMPT = BASE_SYSTEM_PROMPT
+
 
 class TraderAgent(BaseAgent):
     def __init__(self):
@@ -51,6 +55,10 @@ class TraderAgent(BaseAgent):
         tech = state.get("technical_analysis", {})
         sent = state.get("sentiment_analysis", {})
         macro = state.get("macro_analysis", {})
+        oflow = state.get("order_flow_analysis", {})
+        regime = state.get("regime_change_analysis", {})
+        corr = state.get("correlation_analysis", {})
+        quant = state.get("quant_validation", {})
         risk = state.get("risk_assessment", {})
         bull = state.get("bull_case", "")
         bear = state.get("bear_case", "")
@@ -60,9 +68,10 @@ class TraderAgent(BaseAgent):
         _dec = _price_decimals(current_price)
         _pfmt = f".{_dec}f"
 
-        # Vote aggregation
+        # Vote aggregation from all 7 analysts
+        all_analyses = [fund, tech, sent, macro, oflow, regime, corr]
         votes = []
-        for analysis in [fund, tech, sent, macro]:
+        for analysis in all_analyses:
             d = analysis.get("direction", "NEUTRAL")
             c = analysis.get("confidence", 50)
             votes.append((d, c))
@@ -71,16 +80,29 @@ class TraderAgent(BaseAgent):
         short_score = sum(c for d, c in votes if d == "SHORT")
         direction = "LONG" if long_score >= short_score else "SHORT"
 
+        # Build system prompt with profile injection
+        profile_slug = state.get("strategy_profile", "balanced")
+        system_prompt = self._build_system_prompt(profile_slug)
+
         user_msg = f"""Make a final trading decision for {ticker}.
 
 CURRENT PRICE: {current_price:{_pfmt}}
-⚠ Your entry_price MUST be within 1% of {current_price:{_pfmt}}. Base ALL price levels on this exact current price.
+Your entry_price MUST be within 1% of {current_price:{_pfmt}}. Base ALL price levels on this exact current price.
 
-ANALYST CONSENSUS:
+ANALYST CONSENSUS (7 agents):
 - Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}
 - Technical: {tech.get('direction')} ({tech.get('confidence', 0):.0f}%) — {tech.get('reasoning', '')[:200]}
 - Sentiment: {sent.get('direction')} ({sent.get('confidence', 0):.0f}%) — {sent.get('reasoning', '')[:200]}
 - Macro: {macro.get('direction')} ({macro.get('confidence', 0):.0f}%) — {macro.get('reasoning', '')[:200]}
+- OrderFlow: {oflow.get('direction')} ({oflow.get('confidence', 0):.0f}%) — {oflow.get('reasoning', '')[:200]}
+- RegimeChange: {regime.get('direction')} ({regime.get('confidence', 0):.0f}%) — {regime.get('reasoning', '')[:200]}
+- Correlation: {corr.get('direction')} ({corr.get('confidence', 0):.0f}%) — {corr.get('reasoning', '')[:200]}
+
+QUANT VALIDATION:
+- Statistical edge: {quant.get('statistical_edge', 'N/A')}
+- p-value: {quant.get('p_value', 'N/A')}
+- Win rate: {quant.get('backtest_win_rate', 'N/A')}
+- Sharpe: {quant.get('sharpe_estimate', 'N/A')}
 
 DEBATE:
 Bull case: {bull[:300]}
@@ -92,10 +114,11 @@ RISK PARAMETERS:
 - Support: {tech.get('support', current_price * 0.95):{_pfmt}}
 - Resistance: {tech.get('resistance', current_price * 1.06):{_pfmt}}
 
+STRATEGY PROFILE: {profile_slug.upper()}
 Set TP1 at 1.5R, TP2 at 2.5R, TP3 at 4R from entry.
 Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, max_tokens=3000)
+        raw = await self._call_claude(system_prompt, user_msg, max_tokens=3000)
         if raw:
             try:
                 result = json.loads(raw)
@@ -119,6 +142,14 @@ Output JSON only."""
                 pass
 
         return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+
+    def _build_system_prompt(self, profile_slug: str) -> str:
+        """Build system prompt with strategy profile injection."""
+        from app.profiles.manager import profile_manager
+        profile = profile_manager.get_profile(profile_slug)
+        if profile.prompt_block:
+            return f"{BASE_SYSTEM_PROMPT}\n\n=== STRATEGY PROFILE: {profile.name.upper()} ===\n{profile.prompt_block}"
+        return BASE_SYSTEM_PROMPT
 
     def _pin_entry_and_recompute(self, result: dict, price: float, direction: str, atr: float, atr_15m: float, dec: int) -> dict:
         """Pin entry to exact current price and recompute SL/TP from ATR."""

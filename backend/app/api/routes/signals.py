@@ -132,6 +132,7 @@ class GenerateRequest(BaseModel):
     ticker: str
     asset_class: str = "stocks"
     timeframe: str = "1D"
+    profile: str = "balanced"
 
 
 @router.post("/generate")
@@ -146,6 +147,7 @@ async def generate_signal(
     _check_ip_rate_limit(client_ip)
 
     # ── Authenticated user guards ────────────────────────────────────────────────
+    db_user = None
     if user:
         user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
         # Fetch real tier from DB — Supabase JWTs don't carry a tier claim
@@ -193,7 +195,14 @@ async def generate_signal(
         raise HTTPException(status_code=400, detail="Invalid ticker format. Use standard exchange symbols (e.g. AAPL, BTC-USD, EURUSD=X).")
 
     # Run multi-agent pipeline
-    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe)
+    # Resolve profile: request param takes priority, then user's DB setting, then default
+    profile_slug = body.profile
+    if profile_slug == "balanced" and user:
+        # Check if user has a non-default profile stored
+        if db_user and hasattr(db_user, "active_profile") and db_user.active_profile:
+            profile_slug = db_user.active_profile
+
+    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug)
 
     final = state.get("final_signal", {})
     if not final:

@@ -7,6 +7,7 @@ import { TradingViewChart } from "@/components/TradingViewChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
 import { ScannerPanel } from "@/components/ScannerPanel";
+import { ProfileSelector } from "@/components/ProfileSelector";
 import { formatPrice } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,9 @@ export default function DashboardPage() {
     (typeof window !== "undefined" && localStorage.getItem("dashboard_ticker")) || "AAPL"
   );
 const [upgradeOpen, setUpgradeOpen]       = useState(false);
+  const [activeProfile, setActiveProfile]   = useState(() =>
+    (typeof window !== "undefined" && localStorage.getItem("dashboard_profile")) || "balanced"
+  );
 
   const { isLoggedIn } = useAuth();
 
@@ -38,6 +42,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   useEffect(() => {
     localStorage.setItem("dashboard_ticker", activeTicker);
   }, [activeTicker]);
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_profile", activeProfile);
+  }, [activeProfile]);
 
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
@@ -61,7 +69,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setAnalysisError(null);
     setActiveTicker(t);
     try {
-      const signal = await generateSignal(t);
+      const signal = await generateSignal(t, undefined, "1D", activeProfile);
       // Deduplicate: replace existing signal for same ticker, keep latest
       setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)]);
       setSelectedSignal(signal);
@@ -111,7 +119,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           {
             label: "AGENTS ONLINE",
             value: `${healthyAgents}`,
-            suffix: "/6",
+            suffix: `/${agents.length || 11}`,
             icon: Activity,
             color: "text-bull",
           },
@@ -151,6 +159,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           {/* Control bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0 flex-wrap">
             <SymbolSearch value={activeTicker} onChange={setActiveTicker} />
+            <ProfileSelector value={activeProfile} onChange={setActiveProfile} compact />
 
             <div className="flex items-center gap-1 flex-wrap">
               {WATCHLIST.map((ticker) => {
@@ -268,7 +277,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         <div className="hidden xl:flex flex-col w-64 shrink-0">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">AGENT NETWORK</span>
-            <span className="ml-auto font-mono text-[9px] text-bull">{healthyAgents}/6 HEALTHY</span>
+            <span className="ml-auto font-mono text-[9px] text-bull">{healthyAgents}/{agents.length || 11} HEALTHY</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -278,11 +287,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             <div className="border-t border-border mt-2 pt-2 px-3 pb-3">
               <div className="terminal-label mb-2">PIPELINE STAGES</div>
               {[
-                { n: "1", name: "Parallel Analysis",  detail: "4 agents concurrent" },
-                { n: "2", name: "Bull/Bear Debate",   detail: "Researcher debate" },
-                { n: "3", name: "Trade Decision",     detail: "TraderAgent (Opus 4)" },
-                { n: "4", name: "Risk Check",         detail: "Kelly + exposure" },
-                { n: "5", name: "Fund Manager",       detail: "Final approval" },
+                { n: "1", name: "Parallel Analysis",  detail: "7 agents concurrent" },
+                { n: "2", name: "Quant Validation",   detail: "Statistical edge check" },
+                { n: "3", name: "Bull/Bear Debate",   detail: "Researcher debate" },
+                { n: "4", name: "Trade Decision",     detail: "TraderAgent (Opus 4)" },
+                { n: "5", name: "Risk Gate",          detail: "15 hard veto rules" },
+                { n: "6", name: "Risk Check",         detail: "Kelly + exposure" },
+                { n: "7", name: "Fund Manager",       detail: "Final approval" },
               ].map(({ n, name, detail }) => (
                 <div key={n} className="flex items-start gap-2 mb-2">
                   <div className="h-4 w-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -316,10 +327,15 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 }
 
 const PLACEHOLDER_AGENTS: AgentStatus[] = [
-  { name: "FundamentalAnalyst", role: "P/E, P/B, earnings momentum",  model: "claude-sonnet-4-6", strategies: ["3.2", "3.3"],           status: "HEALTHY", avg_latency_ms: 1200, signals_today: 42, accuracy_7d: 61.5, last_active: new Date().toISOString() },
-  { name: "TechnicalAnalyst",   role: "EMA, RSI, momentum, Z-score",  model: "claude-sonnet-4-6", strategies: ["3.1", "3.9", "3.11"],    status: "HEALTHY", avg_latency_ms:  950, signals_today: 67, accuracy_7d: 64.2, last_active: new Date().toISOString() },
-  { name: "SentimentAnalyst",   role: "News NLP, social media",       model: "claude-sonnet-4-6", strategies: ["18.3"],                  status: "HEALTHY", avg_latency_ms: 1800, signals_today: 38, accuracy_7d: 58.9, last_active: new Date().toISOString() },
-  { name: "MacroAnalyst",       role: "GDP, CPI, Fed, carry",         model: "claude-sonnet-4-6", strategies: ["19.2", "8.2"],           status: "HEALTHY", avg_latency_ms: 2100, signals_today: 25, accuracy_7d: 56.3, last_active: new Date().toISOString() },
-  { name: "RiskManager",        role: "Kelly, drawdown, correlation",  model: "claude-sonnet-4-6", strategies: ["3.18", "6.5"],          status: "HEALTHY", avg_latency_ms:  800, signals_today: 88, accuracy_7d: 72.1, last_active: new Date().toISOString() },
-  { name: "TraderAgent",        role: "Final decision & sizing",       model: "claude-opus-4-6",   strategies: ["3.20"],                  status: "HEALTHY", avg_latency_ms: 3800, signals_today: 55, accuracy_7d: 66.8, last_active: new Date().toISOString() },
+  { name: "FundamentalAnalyst",  role: "P/E, P/B, earnings momentum",    model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.2", "3.3"],            status: "HEALTHY", avg_latency_ms: 1200, signals_today: 42, accuracy_7d: 61.5, last_active: new Date().toISOString() },
+  { name: "TechnicalAnalyst",    role: "EMA, RSI, momentum, Z-score",    model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.1", "3.9", "3.11"],     status: "HEALTHY", avg_latency_ms:  950, signals_today: 67, accuracy_7d: 64.2, last_active: new Date().toISOString() },
+  { name: "SentimentAnalyst",    role: "News NLP, social media",         model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["18.3"],                   status: "HEALTHY", avg_latency_ms: 1800, signals_today: 38, accuracy_7d: 58.9, last_active: new Date().toISOString() },
+  { name: "MacroAnalyst",        role: "GDP, CPI, Fed, carry",           model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["19.2", "8.2"],            status: "HEALTHY", avg_latency_ms: 2100, signals_today: 25, accuracy_7d: 56.3, last_active: new Date().toISOString() },
+  { name: "OrderFlowAnalyst",    role: "VPIN, bid/ask, dark pool",       model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.14", "3.15"],           status: "HEALTHY", avg_latency_ms: 1400, signals_today: 35, accuracy_7d: 59.7, last_active: new Date().toISOString() },
+  { name: "RegimeChangeAnalyst", role: "VIX, credit spreads, rotation",  model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["19.5"],                   status: "HEALTHY", avg_latency_ms: 1600, signals_today: 30, accuracy_7d: 57.8, last_active: new Date().toISOString() },
+  { name: "CorrelationAnalyst",  role: "Cross-asset, contagion, Kelly",  model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["6.3", "6.5"],             status: "HEALTHY", avg_latency_ms: 1100, signals_today: 40, accuracy_7d: 62.4, last_active: new Date().toISOString() },
+  { name: "QuantAnalyst",        role: "Statistical edge validation",    model: "claude-sonnet-4-6", tier: "standard", stage: "quant",    strategies: ["3.17"],                   status: "HEALTHY", avg_latency_ms: 1300, signals_today: 45, accuracy_7d: 68.3, last_active: new Date().toISOString() },
+  { name: "RiskManager",         role: "Kelly, drawdown, correlation",   model: "claude-sonnet-4-6", tier: "standard", stage: "risk",     strategies: ["3.18", "6.5"],            status: "HEALTHY", avg_latency_ms:  800, signals_today: 88, accuracy_7d: 72.1, last_active: new Date().toISOString() },
+  { name: "RiskGate",            role: "15 hard veto rules (no AI)",     model: "none",              tier: "system",   stage: "risk",     strategies: [],                          status: "HEALTHY", avg_latency_ms:   50, signals_today: 88, accuracy_7d: 100,  last_active: new Date().toISOString() },
+  { name: "TraderAgent",         role: "Final decision & sizing",        model: "claude-opus-4-6",   tier: "premium",  stage: "decision", strategies: ["3.20"],                   status: "HEALTHY", avg_latency_ms: 3800, signals_today: 55, accuracy_7d: 66.8, last_active: new Date().toISOString() },
 ];

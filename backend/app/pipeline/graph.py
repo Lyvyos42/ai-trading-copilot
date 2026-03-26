@@ -240,8 +240,9 @@ async def run_fund_manager(state: TradingState) -> TradingState:
         signal["position_size_pct"] = 0.0
         signal["status"] = "RISK_REJECTED"
 
-    # Set default status
+    # Set default status and attach profile
     signal.setdefault("status", "APPROVED")
+    signal["strategy_profile"] = state.get("strategy_profile", "balanced")
 
     # Attach attribution data from all agents
     signal["agent_attribution"] = _build_attribution(state)
@@ -342,13 +343,14 @@ def _build_graph() -> StateGraph:
 
 # ─── Public API ───────────────────────────────────────────────────────────
 
-async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None) -> TradingState:
+async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced") -> TradingState:
     """
     Run the full 9-agent pipeline for a given ticker.
     Returns the completed TradingState with final_signal populated.
     """
     from app.data.market_data import fetch_market_data
     from app.services.news_context import get_news_context
+    from app.profiles.manager import profile_manager
 
     # Fetch market data and live news context in parallel
     if market_data is None:
@@ -385,12 +387,13 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         )
 
     initial_state: TradingState = {
-        "ticker":        ticker,
-        "timeframe":     timeframe,
-        "asset_class":   asset_class,
-        "market_data":   market_data,
-        "news_context":  news_ctx,
-        "reasoning_chain": reasoning_prefix,
+        "ticker":           ticker,
+        "timeframe":        timeframe,
+        "asset_class":      asset_class,
+        "market_data":      market_data,
+        "news_context":     news_ctx,
+        "strategy_profile": profile,
+        "reasoning_chain":  reasoning_prefix,
         "errors": [],
     }
 
@@ -419,6 +422,18 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "regime_change_analysis":  _wrap("regime_change", regime_change_result, ["vix", "credit_spreads"]),
         "correlation_analysis":    _wrap("correlation", correlation_result, ["portfolio_corr"]),
     }
+
+    # ── Apply strategy profile weight multipliers ───────────────────────────
+    if profile != "balanced":
+        analyst_keys = {
+            "fundamental_analysis", "technical_analysis", "sentiment_analysis",
+            "macro_analysis", "order_flow_analysis", "regime_change_analysis",
+            "correlation_analysis",
+        }
+        analyst_data = {k: state_after_analysts[k] for k in analyst_keys if k in state_after_analysts}
+        weighted = profile_manager.apply_weights(profile, analyst_data)
+        state_after_analysts = {**state_after_analysts, **weighted}
+        reasoning_prefix.append(f"Strategy profile: {profile.upper()} — analyst weights applied")
 
     # ── Stage 2: Quant validation ───────────────────────────────────────────
     quant_result = await _quant.analyze(state_after_analysts)

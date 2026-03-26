@@ -29,3 +29,4 @@ class TradingState(TypedDict, total=False):
     errors: list[str]
     # Metadata
     daily_analysis_count: int                # for Risk Gate rule 8
+    strategy_profile: str                    # active profile slug (e.g. "balanced")

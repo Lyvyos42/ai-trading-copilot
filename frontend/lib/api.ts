@@ -113,10 +113,10 @@ function inferAssetClass(ticker: string): string {
   return "stocks";
 }
 
-export async function generateSignal(ticker: string, assetClass?: string, timeframe = "1D"): Promise<Signal> {
+export async function generateSignal(ticker: string, assetClass?: string, timeframe = "1D", profile = "balanced"): Promise<Signal> {
   return apiFetch<Signal>("/api/v1/signals/generate", {
     method: "POST",
-    body: JSON.stringify({ ticker, asset_class: assetClass ?? inferAssetClass(ticker), timeframe }),
+    body: JSON.stringify({ ticker, asset_class: assetClass ?? inferAssetClass(ticker), timeframe, profile }),
   });
 }
 
@@ -197,6 +197,34 @@ export interface AgentStatus {
 
 export async function getAgentStatus(): Promise<{ agents: AgentStatus[]; all_healthy: boolean }> {
   return apiFetch("/api/v1/agents/status");
+}
+
+// ─── Profiles ────────────────────────────────────────────────────────────────
+
+export interface StrategyProfile {
+  name: string;
+  slug: string;
+  description: string;
+  weights: Record<string, number>;
+  is_default: boolean;
+}
+
+export async function listProfiles(): Promise<StrategyProfile[]> {
+  const res = await apiFetch<{ profiles: StrategyProfile[] }>("/api/v1/profiles");
+  return res.profiles;
+}
+
+export async function getActiveProfile(): Promise<StrategyProfile> {
+  const res = await apiFetch<{ profile: StrategyProfile }>("/api/v1/profiles/active");
+  return res.profile;
+}
+
+export async function setActiveProfile(profile: string): Promise<StrategyProfile> {
+  const res = await apiFetch<{ profile: StrategyProfile }>("/api/v1/profiles/active", {
+    method: "PUT",
+    body: JSON.stringify({ profile }),
+  });
+  return res.profile;
 }
 
 // ─── Backtest ─────────────────────────────────────────────────────────────────

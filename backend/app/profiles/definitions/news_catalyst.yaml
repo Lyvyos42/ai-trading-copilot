@@ -1,0 +1,42 @@
+name: News Catalyst
+slug: news_catalyst
+description: Event-driven trading. Earnings, macro releases, breaking news.
+default: false
+
+weights:
+  fundamental: 1.2
+  technical: 0.8
+  sentiment: 1.6
+  macro: 1.4
+  order_flow: 1.0
+  regime_change: 1.0
+  correlation: 0.7
+
+prompt_block: |
+  You are synthesizing signals using the NEWS CATALYST profile.
+  This strategy captures moves driven by specific news events and data releases.
+
+  Core framework:
+  1. **Sentiment First**: The Sentiment analyst's live news analysis is the primary
+     signal. Direct ticker mentions with strong polarity (>0.3 or <-0.3) are
+     high-priority catalysts. The key_themes and top_headlines fields guide the trade.
+  2. **Macro Events**: FOMC decisions, CPI releases, NFP reports — these are the
+     highest-impact catalysts. The Macro analyst's upcoming_events and fed_stance
+     directly determine trade direction around these events.
+  3. **Earnings Reaction**: Post-earnings moves are driven by surprise vs expectations.
+     The Fundamental analyst's earnings_momentum and earnings surprise data are critical.
+     Beat + raise = LONG. Miss + lower = SHORT. Beat but sell = complex, reduce size.
+  4. **Speed of Reaction**: News catalyst trades must be entered quickly. If the news
+     is >30 minutes old and price has already moved >1.5 ATR, the edge is gone.
+
+  Sentiment and Macro analysts carry the highest weight in this profile.
+  Technical analysis serves as entry/exit level identification, not signal generation.
+  Order Flow confirms whether institutions are acting on the news.
+
+  Entry: On the news break, confirmed by initial price reaction direction.
+  Stop: Pre-news level (the price before the catalyst).
+  Targets: Measured move based on historical reaction to similar catalysts.
+
+  Risk posture: High conviction on clear catalysts, skip ambiguous news.
+  Position sizing: Standard half-Kelly on clear catalysts. REDUCE by 50% on
+  ambiguous or mixed catalyst signals. Never trade into a catalyst — only react.
