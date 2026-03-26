@@ -170,7 +170,7 @@ export default function JournalPage() {
                 <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
                   <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">DATE</th>
                   <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">TICKER</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">DIR</th>
+                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">PROB</th>
                   <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">ENTRY</th>
                   <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">CONF</th>
                   <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-center">OUTCOME</th>
@@ -189,9 +189,15 @@ export default function JournalPage() {
                     </td>
                     <td className="text-[11px] font-mono font-bold text-[hsl(var(--foreground))] py-2 px-3">{signal.ticker}</td>
                     <td className="py-2 px-3">
-                      <span className={cn("text-[10px] font-mono font-bold", signal.direction === "LONG" ? "text-bull" : "text-bear")}>
-                        {signal.direction}
-                      </span>
+                      {(() => {
+                        const p = signal.probability_score ?? signal.confidence_score ?? 50;
+                        const bull = p >= 50;
+                        return (
+                          <span className={cn("text-[10px] font-mono font-bold", bull ? "text-bull" : "text-bear")}>
+                            {Math.round(p)}% {bull ? "BULL" : "BEAR"}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="text-[10px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.entry_price.toFixed(2)}</td>
                     <td className="text-[10px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.confidence_score}</td>

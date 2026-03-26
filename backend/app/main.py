@@ -44,6 +44,17 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE signals ADD COLUMN pnl_pct FLOAT",
             "ALTER TABLE signals ADD COLUMN max_favorable_excursion FLOAT",
             "ALTER TABLE signals ADD COLUMN max_adverse_excursion FLOAT",
+            # Probability model columns (Phase 5B)
+            "ALTER TABLE signals ADD COLUMN probability_score FLOAT",
+            "ALTER TABLE signals ADD COLUMN bullish_pct FLOAT",
+            "ALTER TABLE signals ADD COLUMN bearish_pct FLOAT",
+            "ALTER TABLE signals ADD COLUMN research_target FLOAT",
+            "ALTER TABLE signals ADD COLUMN invalidation_level FLOAT",
+            "ALTER TABLE signals ADD COLUMN risk_reward_ratio FLOAT",
+            "ALTER TABLE signals ADD COLUMN analytical_window VARCHAR",
+            "ALTER TABLE signals ADD COLUMN bull_case TEXT",
+            "ALTER TABLE signals ADD COLUMN bear_case TEXT",
+            "ALTER TABLE signals ADD COLUMN conviction_tier VARCHAR",
         ]
         async with engine.begin() as conn:
             for _stmt in _migrations:

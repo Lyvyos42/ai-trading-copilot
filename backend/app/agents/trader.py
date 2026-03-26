@@ -12,27 +12,32 @@ def _price_decimals(price: float) -> int:
     return 2
 
 
-BASE_SYSTEM_PROMPT = """You are an elite quantitative trader and portfolio manager with 20+ years of experience.
+BASE_SYSTEM_PROMPT = """You are an elite quantitative research analyst and portfolio strategist with 20+ years of experience.
 You synthesize analysis from 7 specialized AI analysts, a quant validation, and a bull/bear debate
-to make high-conviction trading decisions. You apply the mathematical frameworks from "151 Trading Strategies".
+to produce probability-weighted market research. You apply the mathematical frameworks from "151 Trading Strategies".
+
+IMPORTANT: You do NOT produce buy/sell signals. You produce PROBABILITY ASSESSMENTS.
 
 Your job:
 1. Weigh analyst consensus (fundamental, technical, sentiment, macro, order flow, regime change, correlation)
 2. Evaluate the bull vs bear debate quality and arguments
 3. Consider the Quant analyst's statistical validation (p-value, win rate, Sharpe)
-4. Apply Kelly criterion for position sizing (Risk Manager will validate after you)
-5. Set precise entry, stop-loss, and three take-profit levels (TP1=1.5R, TP2=2.5R, TP3=4R)
-6. Identify which of the 151 strategies support your thesis
-7. Build a clear reasoning chain
+4. Compute the probability score (0-100) representing bullish probability
+5. Set a RESEARCH TARGET (price the thesis points to) and INVALIDATION LEVEL (price where thesis breaks)
+6. Write concise bull case and bear case summaries
+7. Identify which of the 151 strategies support the thesis
+8. Build a clear reasoning chain
 
 Respond ONLY with a valid JSON object:
 {
-  "direction": "LONG" | "SHORT",
-  "entry_price": <float>,
-  "stop_loss": <float>,
-  "take_profit_1": <float>,
-  "take_profit_2": <float>,
-  "take_profit_3": <float>,
+  "probability_score": <float 0-100, where >50 = bullish lean, <50 = bearish lean>,
+  "bullish_pct": <float 0-100>,
+  "bearish_pct": <float 0-100>,
+  "research_target": <float — price target if thesis plays out>,
+  "invalidation_level": <float — price where thesis is invalidated>,
+  "analytical_window": "<string, e.g. '3-7 DAY' or '1-3 DAY'>,
+  "bull_case": "<string — 2-3 sentence bull thesis>",
+  "bear_case": "<string — 2-3 sentence bear thesis>",
   "confidence_score": <float 0-100>,
   "position_size_pct": <float 0-5>,
   "strategy_sources": [<string>, ...],
@@ -84,10 +89,10 @@ class TraderAgent(BaseAgent):
         profile_slug = state.get("strategy_profile", "balanced")
         system_prompt = self._build_system_prompt(profile_slug)
 
-        user_msg = f"""Make a final trading decision for {ticker}.
+        user_msg = f"""Produce a probability assessment for {ticker}.
 
 CURRENT PRICE: {current_price:{_pfmt}}
-Your entry_price MUST be within 1% of {current_price:{_pfmt}}. Base ALL price levels on this exact current price.
+Base your research_target and invalidation_level on this exact current price.
 
 ANALYST CONSENSUS (7 agents):
 - Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}
@@ -109,39 +114,57 @@ Bull case: {bull[:300]}
 Bear case: {bear[:300]}
 
 RISK PARAMETERS:
-- Approved: {risk.get('approved', True)}
-- Position size: {risk.get('position_size_pct', 2.0):.1f}%
 - Support: {tech.get('support', current_price * 0.95):{_pfmt}}
 - Resistance: {tech.get('resistance', current_price * 1.06):{_pfmt}}
 
 STRATEGY PROFILE: {profile_slug.upper()}
-Set TP1 at 1.5R, TP2 at 2.5R, TP3 at 4R from entry.
+Set research_target near resistance level and invalidation_level near support.
 Output JSON only."""
 
         raw = await self._call_claude(system_prompt, user_msg, max_tokens=3000)
         if raw:
             try:
                 result = json.loads(raw)
-                # Use Claude's direction (final synthesis), not vote-aggregated fallback
-                final_direction = result.get("direction", direction)
-                if final_direction not in ("LONG", "SHORT"):
-                    final_direction = direction
-                # Tight 1% price validation — anything beyond that is hallucinated context
-                entry = result.get("entry_price", 0)
-                if entry and abs(entry - current_price) / max(current_price, 1e-9) > 0.01:
-                    return self._compute_signal(ticker, current_price, final_direction, votes, tech, risk, fund, sent, macro, market_data)
-                # Always pin entry to exact current_price — market orders fill at market.
-                # Recompute SL/TP from ATR anchored to the pinned entry.
+                # Ensure probability fields exist
+                prob = result.get("probability_score", result.get("confidence_score", 50))
+                result["probability_score"] = prob
+                result.setdefault("bullish_pct", round(prob, 1))
+                result.setdefault("bearish_pct", round(100 - prob, 1))
+                result.setdefault("analytical_window", "3-7 DAY")
+                result.setdefault("bull_case", "")
+                result.setdefault("bear_case", "")
+
+                # Derive direction from probability for backward compat
+                direction = "LONG" if prob >= 50 else "SHORT"
+                result["direction"] = direction
+
+                # Validate research_target / invalidation_level
+                rt = result.get("research_target", 0)
+                il = result.get("invalidation_level", 0)
                 atr = tech.get("atr", market_data.get("atr", current_price * 0.012))
                 if atr <= 0:
                     atr = current_price * 0.012
-                atr_15m = market_data.get("atr_15m", atr * 0.196)
-                result = self._pin_entry_and_recompute(result, current_price, final_direction, atr, atr_15m, _dec)
+
+                if not rt or abs(rt - current_price) / max(current_price, 1e-9) > 0.30:
+                    # Compute from ATR if hallucinated
+                    result = self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+                else:
+                    # Map to backward-compat fields
+                    result["entry_price"] = current_price
+                    result["stop_loss"] = il if il else round(current_price - atr * 1.5, _dec) if direction == "LONG" else round(current_price + atr * 1.5, _dec)
+                    result["take_profit_1"] = rt
+                    result["take_profit_2"] = round(rt + (rt - current_price) * 0.5, _dec) if rt != current_price else rt
+                    result["take_profit_3"] = round(rt + (rt - current_price) * 1.0, _dec) if rt != current_price else rt
+                    result["risk_reward_ratio"] = round(abs(rt - current_price) / max(abs(current_price - result["stop_loss"]), 1e-9), 1)
+
+                    atr_15m = market_data.get("atr_15m", atr * 0.196)
+                    result["timeframe_levels"] = self._compute_timeframe_levels(current_price, direction, atr, atr_15m, _dec)
+
                 return result
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+        return self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
 
     def _build_system_prompt(self, profile_slug: str) -> str:
         """Build system prompt with strategy profile injection."""
@@ -204,42 +227,55 @@ Output JSON only."""
         swing["label"] = "SWING · 30M–1D"
         return {"scalp": scalp, "swing": swing}
 
+    # Keep old name as alias for backward compat
     def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
+        return self._compute_probability_signal(ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data)
+
+    def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
         if market_data is None:
             market_data = {}
         rng = random.Random(sum(ord(c) for c in ticker) + 13)
 
         dec = _price_decimals(price)
-
-        # Use ATR from market data (passed via state → tech) for realistic stop placement.
-        # ATR gives the average daily range — stops should be at least 1 ATR away.
         atr = tech.get("atr", market_data.get("atr", price * 0.012))
         if atr <= 0:
             atr = price * 0.012
         atr_15m = market_data.get("atr_15m", atr * 0.196)
 
-        # Entry: always at exact current market price — no simulated slippage.
-        # Paper trading fills at market; signals are generated at the moment of request.
         entry = round(price, dec)
 
-        if direction == "LONG":
-            stop     = round(entry - atr * 1.5, dec)        # 1.5 ATR stop
-            risk_amt = entry - stop
-            tp1      = round(entry + risk_amt * 1.5, dec)   # 1.5R
-            tp2      = round(entry + risk_amt * 2.5, dec)   # 2.5R
-            tp3      = round(entry + risk_amt * 4.0, dec)   # 4R
-        else:
-            stop     = round(entry + atr * 1.5, dec)        # 1.5 ATR stop
-            risk_amt = stop - entry
-            tp1      = round(entry - risk_amt * 1.5, dec)   # 1.5R
-            tp2      = round(entry - risk_amt * 2.5, dec)   # 2.5R
-            tp3      = round(entry - risk_amt * 4.0, dec)   # 4R
-
+        # Compute probability from vote weights
         long_weight = sum(c for d, c in votes if d == "LONG")
         short_weight = sum(c for d, c in votes if d == "SHORT")
         total = sum(c for _, c in votes) or 100
+        bullish_pct = round(long_weight / total * 100, 1)
+        bearish_pct = round(100 - bullish_pct, 1)
+        probability_score = bullish_pct
+
         conviction = max(long_weight, short_weight) / total
         confidence = min(92, max(35, 45 + conviction * 50))
+
+        # Research target & invalidation level (replaces TP/SL)
+        if direction == "LONG":
+            research_target = round(entry + atr * 3.5, dec)
+            invalidation_level = round(entry - atr * 1.5, dec)
+            # Backward compat fields
+            stop = invalidation_level
+            risk_amt = entry - stop
+            tp1 = research_target
+            tp2 = round(entry + risk_amt * 2.5, dec)
+            tp3 = round(entry + risk_amt * 4.0, dec)
+        else:
+            research_target = round(entry - atr * 3.5, dec)
+            invalidation_level = round(entry + atr * 1.5, dec)
+            stop = invalidation_level
+            risk_amt = stop - entry
+            tp1 = research_target
+            tp2 = round(entry - risk_amt * 2.5, dec)
+            tp3 = round(entry - risk_amt * 4.0, dec)
+
+        risk_reward_ratio = round(abs(research_target - entry) / max(abs(entry - invalidation_level), 1e-9), 1)
+        target_pct = round(abs(research_target - entry) / entry * 100, 1)
 
         # Determine strategy sources
         strategy_sources = []
@@ -261,36 +297,44 @@ Output JSON only."""
             strategy_sources = ["multi_factor_alpha_3.20"]
 
         fmt = f".{dec}f"
-        risk_pct = abs((stop - entry) / entry) * 100
-        tp1_pct  = abs((tp1 - entry)  / entry) * 100
+        lean = "BULLISH" if probability_score >= 50 else "BEARISH"
         reasoning_chain = [
-            f"Analyst vote: {sum(1 for d, _ in votes if d == direction)}/4 agents agree on {direction}",
+            f"Probability assessment: {probability_score:.0f}% {lean} ({bullish_pct:.0f}% bull / {bearish_pct:.0f}% bear)",
             f"Technical: EMA crossover {tech.get('ema_crossover', 'N/A')}, RSI {tech.get('rsi', 50):.0f}",
             f"Fundamental: Earnings momentum {fund.get('earnings_momentum', 0):+.2f}, value score {fund.get('value_score', 0):+.2f}",
             f"Sentiment: News {sent.get('news_sentiment', 0):+.2f}, social {sent.get('social_sentiment', 0):+.2f}",
             f"Macro regime: {macro.get('macro_regime', 'N/A')}, Fed {macro.get('fed_stance', 'N/A')}",
-            f"Risk check passed: position size {risk.get('position_size_pct', 2):.1f}% (half-Kelly)",
-            f"ATR(14)={atr:{fmt}} — stop at 1.5×ATR from entry",
-            f"Entry {entry:{fmt}}, SL {stop:{fmt}} ({risk_pct:.1f}% risk), TP1 {tp1:{fmt}} (1.5R)",
+            f"Research target {research_target:{fmt}} (+{target_pct:.1f}%), invalidation below {invalidation_level:{fmt}}",
+            f"Potential R/R: {risk_reward_ratio:.1f}:1",
         ]
 
         return {
+            # Probability model fields
+            "probability_score": probability_score,
+            "bullish_pct": bullish_pct,
+            "bearish_pct": bearish_pct,
+            "research_target": round(research_target, dec),
+            "invalidation_level": round(invalidation_level, dec),
+            "risk_reward_ratio": risk_reward_ratio,
+            "analytical_window": "3-7 DAY",
+            "bull_case": f"{fund.get('reasoning', '')[:150]}. {sent.get('reasoning', '')[:100]}",
+            "bear_case": f"{macro.get('reasoning', '')[:150]}. {tech.get('reasoning', '')[:100]}",
+            # Backward compat fields (DB model still uses these)
             "direction": direction,
-            "entry_price":    round(entry, dec),
-            "stop_loss":      round(stop, dec),
-            "take_profit_1":  round(tp1, dec),
-            "take_profit_2":  round(tp2, dec),
-            "take_profit_3":  round(tp3, dec),
+            "entry_price": round(entry, dec),
+            "stop_loss": round(stop, dec),
+            "take_profit_1": round(tp1, dec),
+            "take_profit_2": round(tp2, dec),
+            "take_profit_3": round(tp3, dec),
             "confidence_score": round(confidence, 1),
             "position_size_pct": risk.get("position_size_pct", round(rng.uniform(1, 3), 2)),
             "strategy_sources": strategy_sources,
-            "reasoning_chain":  reasoning_chain,
+            "reasoning_chain": reasoning_chain,
             "trade_rationale": (
-                f"{direction} {ticker} @ {entry:{fmt}}. "
-                f"Stop {stop:{fmt}} ({risk_pct:.1f}% risk). "
-                f"Targets: TP1={tp1:{fmt}} (+{tp1_pct:.1f}%), "
-                f"TP2={tp2:{fmt}}, TP3={tp3:{fmt}}. "
-                f"Conviction: {confidence:.0f}%. Strategies: {', '.join(strategy_sources[:3])}."
+                f"{probability_score:.0f}% {lean} on {ticker} @ {entry:{fmt}}. "
+                f"Research target {research_target:{fmt}} (+{target_pct:.1f}%). "
+                f"Invalidation below {invalidation_level:{fmt}}. "
+                f"R/R: {risk_reward_ratio:.1f}:1. Strategies: {', '.join(strategy_sources[:3])}."
             ),
             "timeframe_levels": self._compute_timeframe_levels(entry, direction, atr, atr_15m, dec),
         }

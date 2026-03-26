@@ -253,6 +253,17 @@ async def generate_signal(
         timeframe_levels=final.get("timeframe_levels", {}),
         status="ACTIVE",
         expiry_time=datetime.utcnow() + timedelta(hours=24),
+        # Probability model fields
+        probability_score=final.get("probability_score"),
+        bullish_pct=final.get("bullish_pct"),
+        bearish_pct=final.get("bearish_pct"),
+        research_target=final.get("research_target"),
+        invalidation_level=final.get("invalidation_level"),
+        risk_reward_ratio=final.get("risk_reward_ratio"),
+        analytical_window=final.get("analytical_window"),
+        bull_case=final.get("bull_case"),
+        bear_case=final.get("bear_case"),
+        conviction_tier=final.get("conviction_tier"),
     )
 
     # Save to DB — non-blocking: return signal even if DB write fails
@@ -286,6 +297,17 @@ async def generate_signal(
         "expiry_time": (datetime.utcnow() + timedelta(hours=24)).isoformat() + "Z",
         "pipeline_latency_ms": state.get("pipeline_latency_ms"),
         "agent_detail": _build_agent_detail(state),
+        # Probability model fields
+        "probability_score": final.get("probability_score"),
+        "bullish_pct": final.get("bullish_pct"),
+        "bearish_pct": final.get("bearish_pct"),
+        "research_target": final.get("research_target"),
+        "invalidation_level": final.get("invalidation_level"),
+        "risk_reward_ratio": final.get("risk_reward_ratio"),
+        "analytical_window": final.get("analytical_window"),
+        "bull_case": final.get("bull_case"),
+        "bear_case": final.get("bear_case"),
+        "conviction_tier": final.get("conviction_tier"),
     }
 
     # Store in cache so repeat requests for the same ticker are instant
@@ -421,6 +443,17 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
         "exit_price": getattr(signal, "exit_price", None),
         "resolved_at": (signal.resolved_at.isoformat() + "Z") if getattr(signal, "resolved_at", None) else None,
         "pnl_pct": getattr(signal, "pnl_pct", None),
+        # Probability model fields
+        "probability_score": getattr(signal, "probability_score", None),
+        "bullish_pct": getattr(signal, "bullish_pct", None),
+        "bearish_pct": getattr(signal, "bearish_pct", None),
+        "research_target": getattr(signal, "research_target", None),
+        "invalidation_level": getattr(signal, "invalidation_level", None),
+        "risk_reward_ratio": getattr(signal, "risk_reward_ratio", None),
+        "analytical_window": getattr(signal, "analytical_window", None),
+        "bull_case": getattr(signal, "bull_case", None),
+        "bear_case": getattr(signal, "bear_case", None),
+        "conviction_tier": getattr(signal, "conviction_tier", None),
         "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
         "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,
     }

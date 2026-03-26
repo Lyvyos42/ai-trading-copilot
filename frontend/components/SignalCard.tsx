@@ -1,10 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { TrendingUp, TrendingDown, Clock, Target, Shield, Zap, ChevronDown, ChevronUp } from "lucide-react";
-import { type Signal, type TimeframeLevels, executePosition, resolveSignal } from "@/lib/api";
-import { formatPrice, timeAgo, directionBg } from "@/lib/utils";
+import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { type Signal, executePosition, resolveSignal } from "@/lib/api";
+import { formatPrice, timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+const AGENT_LABELS: Record<string, string> = {
+  fundamental:   "Fundamental",
+  technical:     "Technical",
+  sentiment:     "Sentiment",
+  macro:         "Macro",
+  order_flow:    "Order Flow",
+  regime_change: "Regime",
+  correlation:   "Correlation",
+};
 
 const AGENT_SHORT: Record<string, string> = {
   fundamental:   "FUND",
@@ -20,13 +30,11 @@ interface SignalCardProps {
   signal: Signal;
   onExecute?: (id: string) => void;
   onResolve?: (id: string, outcome: "WIN" | "LOSS") => void;
-  /** Compact mode for dashboard feed panel */
   compact?: boolean;
 }
 
 export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
-  const [tfTab, setTfTab]         = useState<"scalp" | "swing">("scalp");
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executed, setExecuted]   = useState(false);
@@ -35,10 +43,20 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
     signal.status === "WIN" || signal.status === "LOSS" ? (signal.status as "WIN" | "LOSS") : null
   );
 
-  const isLong    = signal.direction === "LONG";
-  const riskPct   = Math.abs((signal.stop_loss - signal.entry_price) / signal.entry_price * 100);
-  const rewardPct = Math.abs((signal.take_profit_1 - signal.entry_price) / signal.entry_price * 100);
-  const rrRatio   = (rewardPct / riskPct).toFixed(1);
+  // Probability model fields (with backward compat)
+  const prob = signal.probability_score ?? signal.confidence_score ?? 50;
+  const bullPct = signal.bullish_pct ?? prob;
+  const bearPct = signal.bearish_pct ?? (100 - bullPct);
+  const isBullish = prob >= 50;
+  const lean = isBullish ? "BULLISH" : "BEARISH";
+  const leanColor = isBullish ? "text-bull" : "text-bear";
+  const leanBg = isBullish ? "bg-bull/10 border-bull/30" : "bg-bear/10 border-bear/30";
+  const convictionTier = signal.conviction_tier || "MODERATE";
+  const rrRatio = signal.risk_reward_ratio ?? (
+    signal.entry_price && signal.stop_loss && signal.take_profit_1
+      ? Math.abs((signal.take_profit_1 - signal.entry_price) / Math.max(Math.abs(signal.stop_loss - signal.entry_price), 0.0001))
+      : 0
+  );
 
   const handleExecute = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,155 +87,129 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
     }
   };
 
-  /* ── COMPACT MODE — terminal feed row ─────────────────────────── */
+  /* ── COMPACT MODE — probability feed row ─────────────────────── */
   if (compact) {
     return (
       <div className="px-3 py-2.5">
-        {/* Row 1: Ticker + Direction + Confidence */}
+        {/* Row 1: Ticker + Probability + Conviction */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={cn(
               "text-[9px] font-mono font-bold px-1 rounded",
-              isLong ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+              isBullish ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
             )}>
-              {isLong ? "▲" : "▼"}
+              {isBullish ? "▲" : "▼"}
             </span>
             <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
             <span className={cn(
               "text-[9px] font-mono font-semibold px-1.5 rounded border",
-              isLong ? "border-bull/30 text-bull" : "border-bear/30 text-bear"
+              leanBg, leanColor
             )}>
-              {signal.direction}
+              {Math.round(prob)}% {lean}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <ConfBar score={signal.confidence_score} />
-            <span className={cn(
-              "text-[10px] font-mono font-bold",
-              signal.confidence_score >= 70 ? "text-bull" : signal.confidence_score >= 50 ? "text-warn" : "text-bear"
-            )}>
-              {Math.round(signal.confidence_score)}%
-            </span>
+            <ConvictionBadge tier={convictionTier} size="sm" />
           </div>
         </div>
 
-        {/* Row 2: Prices — prefer scalp levels if available (tighter, more actionable) */}
-        {(() => {
-          const lv = signal.timeframe_levels?.scalp ?? signal.timeframe_levels?.swing;
-          const entry = lv?.entry ?? signal.entry_price;
-          const tp1   = lv?.take_profit_1 ?? signal.take_profit_1;
-          const sl    = lv?.stop_loss ?? signal.stop_loss;
-          return (
-            <div className="flex items-center gap-3 mt-1.5">
-              <span className="text-[9px] font-mono text-muted-foreground">
-                ENTRY <span className="text-foreground font-semibold">{formatPrice(entry)}</span>
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground">
-                TP1 <span className="text-bull font-semibold">{formatPrice(tp1)}</span>
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground">
-                SL <span className="text-bear font-semibold">{formatPrice(sl)}</span>
-              </span>
-            </div>
-          );
-        })()}
+        {/* Row 2: Research Target + Invalidation + R:R */}
+        <div className="flex items-center gap-3 mt-1.5">
+          {signal.research_target && (
+            <span className="text-[9px] font-mono text-muted-foreground">
+              TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target)}</span>
+            </span>
+          )}
+          {signal.invalidation_level && (
+            <span className="text-[9px] font-mono text-muted-foreground">
+              INVAL <span className="text-bear font-semibold">{formatPrice(signal.invalidation_level)}</span>
+            </span>
+          )}
+          {rrRatio > 0 && (
+            <span className="text-[9px] font-mono text-muted-foreground">
+              R:R <span className="text-foreground font-semibold">{typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1</span>
+            </span>
+          )}
+        </div>
 
-        {/* Row 3: Meta */}
+        {/* Row 3: Bull/Bear bar + Meta */}
         <div className="flex items-center justify-between mt-1.5">
-          <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground">
+          <div className="flex items-center gap-2 flex-1 mr-3">
+            <ProbabilityBar bullPct={bullPct} bearPct={bearPct} />
+          </div>
+          <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground shrink-0">
             <Clock className="h-2.5 w-2.5" />
             {timeAgo(signal.timestamp)}
-            {signal.pipeline_latency_ms && (
-              <span className="flex items-center gap-0.5 ml-1 text-warn">
-                <Zap className="h-2.5 w-2.5" />{signal.pipeline_latency_ms}ms
-              </span>
+            {signal.analytical_window && (
+              <span className="ml-1 text-primary/70">{signal.analytical_window}</span>
             )}
           </div>
-          <span className="text-[9px] font-mono text-muted-foreground">R:R {rrRatio}x</span>
         </div>
 
-        {/* Agent votes row */}
+        {/* Agent contribution chips */}
         <div className="flex gap-1 mt-2 flex-wrap">
           {Object.entries(signal.agent_votes).map(([agent, vote]) => {
             if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
-            const v = vote as { direction?: string };
+            const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number };
+            const contrib = (v.bullish_contribution ?? 0) - (v.bearish_contribution ?? 0);
+            const isPos = contrib >= 0;
             return (
               <span key={agent} className={cn(
                 "text-[8px] font-mono px-1 py-0.5 rounded border",
-                directionBg(v.direction || "NEUTRAL")
+                isPos ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"
               )}>
-                {AGENT_SHORT[agent] || agent}:{v.direction?.[0] || "?"}
+                {AGENT_SHORT[agent] || agent}: {isPos ? "+" : ""}{contrib.toFixed(0)}pp
               </span>
             );
           })}
-          {signal.agent_votes.quant_validated !== undefined && (
-            <span className={cn(
-              "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
-              signal.agent_votes.quant_validated ? "bg-bull/10 text-bull border-bull/20" : "bg-warn/10 text-warn border-warn/20"
-            )}>
-              {signal.agent_votes.quant_validated ? "QNT✓" : "QNT?"}
-            </span>
-          )}
           {signal.agent_votes.risk_approved !== undefined && (
             <span className={cn(
               "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
               signal.agent_votes.risk_approved ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"
             )}>
               <Shield className="h-2 w-2" />
-              {signal.agent_votes.risk_approved ? "RISK✓" : "RISK✗"}
+              {signal.agent_votes.risk_approved ? "RISK OK" : "RISK NO"}
             </span>
           )}
         </div>
 
-        {/* Action row: paper trade + outcome buttons */}
+        {/* Action row */}
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/30">
           {resolved ? (
             <span className={cn(
               "text-[8px] font-mono px-2 py-0.5 rounded border font-bold",
               resolved === "WIN" ? "bg-bull/10 border-bull/30 text-bull" : "bg-bear/10 border-bear/30 text-bear"
             )}>
-              {resolved === "WIN" ? "✓ WIN" : "✗ LOSS"}
+              {resolved === "WIN" ? "WIN" : "LOSS"}
             </span>
           ) : (
             <>
-              <button
-                onClick={(e) => handleResolve(e, "WIN")}
-                disabled={resolving}
-                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bull/10 border-bull/30 text-bull hover:bg-bull/20 disabled:opacity-50"
-              >
+              <button onClick={(e) => handleResolve(e, "WIN")} disabled={resolving}
+                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bull/10 border-bull/30 text-bull hover:bg-bull/20 disabled:opacity-50">
                 WIN
               </button>
-              <button
-                onClick={(e) => handleResolve(e, "LOSS")}
-                disabled={resolving}
-                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bear/10 border-bear/30 text-bear hover:bg-bear/20 disabled:opacity-50"
-              >
+              <button onClick={(e) => handleResolve(e, "LOSS")} disabled={resolving}
+                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bear/10 border-bear/30 text-bear hover:bg-bear/20 disabled:opacity-50">
                 LOSS
               </button>
             </>
           )}
           <div className="ml-auto flex items-center gap-1.5">
-            {executeError && (
-              <span className="text-[8px] font-mono text-bear truncate">✗ {executeError}</span>
-            )}
+            {executeError && <span className="text-[8px] font-mono text-bear truncate">Error</span>}
             {executed ? (
               <span className="text-[8px] font-mono text-bull">
-                ✓ <a href="/portfolio" className="underline">Portfolio</a>
+                <a href="/portfolio" className="underline">Portfolio</a>
               </span>
             ) : (
               !resolved && (
-                <button
-                  onClick={handleExecute}
-                  disabled={loading || executed}
+                <button onClick={handleExecute} disabled={loading || executed}
                   className={cn(
                     "text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors",
                     (loading || executed) ? "opacity-50 cursor-not-allowed border-border/30 text-muted-foreground" :
-                    isLong
-                      ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
-                      : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
-                  )}
-                >
-                  {loading ? "…" : "PAPER TRADE"}
+                    isBullish ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
+                             : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
+                  )}>
+                  {loading ? "..." : "PAPER TRADE"}
                 </button>
               )
             )}
@@ -227,107 +219,151 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
     );
   }
 
-  /* ── FULL MODE — signal detail card ───────────────────────────── */
+  /* ── FULL MODE — probability signal card ─────────────────────── */
   return (
     <div className="terminal-panel animate-fade-in">
       <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className={cn("p-1.5 rounded border", isLong ? "bg-bull/10 border-bull/20" : "bg-bear/10 border-bear/20")}>
-              {isLong
-                ? <TrendingUp className="h-4 w-4 text-bull" />
-                : <TrendingDown className="h-4 w-4 text-bear" />}
+        {/* Header: Ticker + Probability Score */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-foreground text-lg font-mono">{signal.ticker}</span>
+              <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 rounded">
+                {signal.asset_class}
+              </span>
+              <ConvictionBadge tier={convictionTier} />
+              {signal.analytical_window && (
+                <span className="text-[9px] font-mono text-primary/70 border border-primary/20 px-1.5 py-0.5 rounded">
+                  {signal.analytical_window}
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-foreground text-lg font-mono">{signal.ticker}</span>
-                <span className={cn(
-                  "text-xs font-mono font-bold px-1.5 py-0.5 rounded border",
-                  isLong ? "bg-bull/10 text-bull border-bull/30" : "bg-bear/10 text-bear border-bear/30"
-                )}>
-                  {signal.direction}
+            <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground font-mono">
+              <Clock className="h-3 w-3" />
+              {timeAgo(signal.timestamp)}
+              {signal.pipeline_latency_ms && (
+                <span className="flex items-center gap-0.5 ml-1 text-warn">
+                  <Zap className="h-3 w-3" />{signal.pipeline_latency_ms}ms
                 </span>
-                <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 rounded">
-                  {signal.asset_class}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground font-mono">
-                <Clock className="h-3 w-3" />
-                {timeAgo(signal.timestamp)}
-                {signal.pipeline_latency_ms && (
-                  <span className="flex items-center gap-0.5 ml-1 text-warn">
-                    <Zap className="h-3 w-3" />{signal.pipeline_latency_ms}ms
-                  </span>
-                )}
-              </div>
+              )}
             </div>
           </div>
-          <ConfidenceRing score={signal.confidence_score} />
+          <ProbabilityDonut score={prob} />
         </div>
 
-        {/* Timeframe tab switcher */}
-        {signal.timeframe_levels?.scalp && signal.timeframe_levels?.swing ? (
-          <div className="mb-3">
-            {/* Tab buttons */}
-            <div className="flex gap-1 mb-2">
-              {(["scalp", "swing"] as const).map((tab) => {
-                const lv = signal.timeframe_levels![tab]!;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setTfTab(tab)}
-                    className={cn(
-                      "flex-1 text-[9px] font-mono font-bold px-2 py-1 rounded border transition-colors",
-                      tfTab === tab
-                        ? "bg-primary/10 border-primary/50 text-primary"
-                        : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                    )}
-                  >
-                    {lv.label}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Active timeframe levels */}
-            <TimeframePriceGrid levels={signal.timeframe_levels[tfTab]!} />
+        {/* Probability bar */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
+            <span className="text-[10px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
           </div>
-        ) : (
-          /* Fallback: original flat price boxes */
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            <PriceBox label="ENTRY" value={signal.entry_price} colorClass="text-primary" borderClass="border-primary/30" />
-            <PriceBox label="SL" value={signal.stop_loss} colorClass="text-bear" borderClass="border-bear/30" />
-            <PriceBox label="TP1" value={signal.take_profit_1} colorClass="text-bull" borderClass="border-bull/30" />
-            <PriceBox label="TP2" value={signal.take_profit_2} colorClass="text-bull/70" borderClass="border-bull/20" />
+          <ProbabilityBar bullPct={bullPct} bearPct={bearPct} tall />
+        </div>
+
+        {/* Research Target + Invalidation Level + R:R */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
+            <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
+              <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
+            </div>
+            <div className="text-xs font-mono font-bold text-bull">
+              {signal.research_target ? formatPrice(signal.research_target) : formatPrice(signal.take_profit_1)}
+            </div>
+            {signal.research_target && signal.entry_price > 0 && (
+              <div className="text-[9px] font-mono text-bull/70 mt-0.5">
+                +{((Math.abs(signal.research_target - signal.entry_price) / signal.entry_price) * 100).toFixed(1)}%
+              </div>
+            )}
+          </div>
+          <div className="text-center p-2.5 rounded border bg-background/40 border-bear/30">
+            <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
+              <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
+            </div>
+            <div className="text-xs font-mono font-bold text-bear">
+              {signal.invalidation_level ? formatPrice(signal.invalidation_level) : formatPrice(signal.stop_loss)}
+            </div>
+            {signal.invalidation_level && signal.entry_price > 0 && (
+              <div className="text-[9px] font-mono text-bear/70 mt-0.5">
+                -{((Math.abs(signal.entry_price - signal.invalidation_level) / signal.entry_price) * 100).toFixed(1)}%
+              </div>
+            )}
+          </div>
+          <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30">
+            <div className="terminal-label mb-0.5">POTENTIAL R:R</div>
+            <div className="text-xs font-mono font-bold text-primary">
+              {typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1
+            </div>
+            <div className="text-[9px] font-mono text-muted-foreground mt-0.5">
+              risk/reward
+            </div>
+          </div>
+        </div>
+
+        {/* Per-agent contribution bars */}
+        <div className="mb-4">
+          <div className="terminal-label mb-2">AGENT CONTRIBUTIONS</div>
+          <div className="space-y-1.5">
+            {Object.entries(signal.agent_votes).map(([agent, vote]) => {
+              if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
+              const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number };
+              const bullContrib = v.bullish_contribution ?? (v.direction === "LONG" ? (v.confidence ?? 50) / 7 : 0);
+              const bearContrib = v.bearish_contribution ?? (v.direction === "SHORT" ? (v.confidence ?? 50) / 7 : 0);
+              const net = bullContrib - bearContrib;
+              const isPos = net >= 0;
+              return (
+                <div key={agent} className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-muted-foreground w-20 shrink-0 uppercase">
+                    {AGENT_LABELS[agent] || agent}
+                  </span>
+                  <div className="flex-1 flex items-center gap-1">
+                    <div className="flex-1 h-2 bg-muted/50 rounded overflow-hidden relative">
+                      {/* Center line */}
+                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border/50" />
+                      {isPos ? (
+                        <div className="absolute top-0 bottom-0 bg-bull/60 rounded-r"
+                          style={{ left: '50%', width: `${Math.min(Math.abs(net) * 2, 50)}%` }} />
+                      ) : (
+                        <div className="absolute top-0 bottom-0 bg-bear/60 rounded-l"
+                          style={{ right: '50%', width: `${Math.min(Math.abs(net) * 2, 50)}%` }} />
+                      )}
+                    </div>
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-mono font-bold w-10 text-right",
+                    isPos ? "text-bull" : "text-bear"
+                  )}>
+                    {isPos ? "+" : ""}{net.toFixed(0)}pp
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Bull Case / Bear Case */}
+        {(signal.bull_case || signal.bear_case) && (
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {signal.bull_case && (
+              <div className="p-2.5 rounded border border-bull/20 bg-bull/5">
+                <div className="text-[9px] font-mono font-bold text-bull mb-1 flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" /> BULL CASE
+                </div>
+                <p className="text-[10px] font-mono text-foreground/80 leading-relaxed">{signal.bull_case}</p>
+              </div>
+            )}
+            {signal.bear_case && (
+              <div className="p-2.5 rounded border border-bear/20 bg-bear/5">
+                <div className="text-[9px] font-mono font-bold text-bear mb-1 flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" /> BEAR CASE
+                </div>
+                <p className="text-[10px] font-mono text-foreground/80 leading-relaxed">{signal.bear_case}</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Risk/reward bar */}
-        <div className="flex items-center gap-2 mb-3 text-xs font-mono">
-          <span className="text-muted-foreground w-12">RISK/RWD</span>
-          <div className="flex-1 flex gap-0.5 h-1.5 rounded overflow-hidden">
-            <div className="bg-bear/60" style={{ width: `${Math.min(riskPct * 5, 40)}%` }} />
-            <div className="bg-bull/60 flex-1" style={{ width: `${Math.min(rewardPct * 5, 60)}%` }} />
-          </div>
-          <span className="text-bear w-10 text-right">{riskPct.toFixed(1)}%</span>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-bull w-10">{rewardPct.toFixed(1)}%</span>
-          <span className="text-muted-foreground ml-2">{rrRatio}x</span>
-        </div>
-
-        {/* Agent votes */}
+        {/* Risk + Quant badges */}
         <div className="flex gap-1.5 mb-3 flex-wrap">
-          {Object.entries(signal.agent_votes).map(([agent, vote]) => {
-            if (["risk_approved", "quant_validated"].includes(agent)) return null;
-            if (typeof vote !== "object" || !vote) return null;
-            const v = vote as { direction?: string; confidence?: number };
-            return (
-              <div key={agent} className={cn("text-xs font-mono px-2 py-0.5 rounded border", directionBg(v.direction || "NEUTRAL"))}>
-                {AGENT_SHORT[agent] || agent}: {v.direction || "N/A"}
-                {v.confidence ? <span className="text-muted-foreground ml-1">{Math.round(v.confidence)}%</span> : null}
-              </div>
-            );
-          })}
           {signal.agent_votes.quant_validated !== undefined && (
             <div className={cn(
               "text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1",
@@ -345,33 +381,17 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               RISK {signal.agent_votes.risk_approved ? "APPROVED" : "REJECTED"}
             </div>
           )}
-          {signal.conviction_tier && (
-            <div className={cn(
-              "text-xs font-mono px-2 py-0.5 rounded border font-bold",
-              signal.conviction_tier === "HIGH" ? "bg-bull/10 text-bull border-bull/20" :
-              signal.conviction_tier === "MODERATE" ? "bg-warn/10 text-warn border-warn/20" :
-              "bg-muted text-muted-foreground border-border/30"
-            )}>
-              {signal.conviction_tier}
-            </div>
+          {signal.strategy_sources?.length > 0 && signal.strategy_sources.slice(0, 3).map((s) => (
+            <span key={s} className="text-[9px] font-mono bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded border border-border/50">
+              {s.replace(/_/g, " ")}
+            </span>
+          ))}
+          {(signal.strategy_sources?.length ?? 0) > 3 && (
+            <span className="text-[9px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
           )}
         </div>
 
-        {/* Strategy tags */}
-        {signal.strategy_sources?.length > 0 && (
-          <div className="flex gap-1 flex-wrap mb-3">
-            {signal.strategy_sources.slice(0, 3).map((s) => (
-              <span key={s} className="text-[9px] font-mono bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded border border-border/50">
-                {s.replace(/_/g, " ")}
-              </span>
-            ))}
-            {signal.strategy_sources.length > 3 && (
-              <span className="text-[9px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
-            )}
-          </div>
-        )}
-
-        {/* Reasoning chain */}
+        {/* Reasoning chain (expandable) */}
         {expanded && signal.reasoning_chain?.length > 0 && (
           <div className="mb-3 space-y-1 border border-border/50 rounded p-2 bg-muted/30">
             <div className="terminal-label mb-1">REASONING CHAIN</div>
@@ -388,12 +408,12 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         <div className="flex flex-col gap-1.5 pt-2 border-t border-border/50">
           {executeError && (
             <div className="text-[10px] font-mono text-bear bg-bear/10 border border-bear/30 rounded px-2 py-1">
-              ✗ {executeError}
+              {executeError}
             </div>
           )}
           {executed && (
             <div className="text-[10px] font-mono text-bull bg-bull/10 border border-bull/30 rounded px-2 py-1">
-              ✓ Paper trade opened — check Portfolio
+              Paper trade opened — check Portfolio
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -414,12 +434,12 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
                 className={cn(
                   "text-[10px] font-mono px-3 py-1 rounded border font-bold transition-colors",
                   (loading || executed) ? "opacity-50 cursor-not-allowed" : "",
-                  isLong
+                  isBullish
                     ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
                     : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
                 )}
               >
-                {loading ? "…" : executed ? "EXECUTED" : "PAPER TRADE"}
+                {loading ? "..." : executed ? "EXECUTED" : "PAPER TRADE"}
               </button>
             </div>
           </div>
@@ -429,66 +449,58 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   );
 }
 
-function PriceBox({ label, value, colorClass, borderClass }: {
-  label: string; value: number; colorClass: string; borderClass: string;
-}) {
-  return (
-    <div className={cn("text-center p-2 rounded border bg-background/40", borderClass)}>
-      <div className="terminal-label mb-0.5">{label}</div>
-      <div className={cn("text-xs font-mono font-bold", colorClass)}>{formatPrice(value)}</div>
-    </div>
-  );
-}
+/* ── Sub-components ────────────────────────────────────────────── */
 
-function ConfBar({ score }: { score: number }) {
-  const color = score >= 70 ? "bg-bull" : score >= 50 ? "bg-warn" : "bg-bear";
-  return (
-    <div className="h-1.5 w-12 bg-muted rounded overflow-hidden">
-      <div className={cn("h-full rounded", color)} style={{ width: `${score}%` }} />
-    </div>
-  );
-}
-
-function TimeframePriceGrid({ levels }: { levels: TimeframeLevels }) {
-  const hasTP3 = levels.take_profit_3 !== undefined;
-  return (
-    <div className="space-y-1.5">
-      <div className={cn("grid gap-2", hasTP3 ? "grid-cols-5" : "grid-cols-4")}>
-        <PriceBox label="ENTRY" value={levels.entry} colorClass="text-primary" borderClass="border-primary/30" />
-        <PriceBox label="SL" value={levels.stop_loss} colorClass="text-bear" borderClass="border-bear/30" />
-        <PriceBox label="TP1" value={levels.take_profit_1} colorClass="text-bull" borderClass="border-bull/30" />
-        <PriceBox label="TP2" value={levels.take_profit_2} colorClass="text-bull/70" borderClass="border-bull/20" />
-        {hasTP3 && (
-          <PriceBox label="TP3" value={levels.take_profit_3!} colorClass="text-bull/50" borderClass="border-bull/15" />
-        )}
-      </div>
-      <div className="flex items-center gap-3 text-[8px] font-mono text-muted-foreground px-0.5">
-        <span>ATR <span className="text-foreground">{formatPrice(levels.atr)}</span></span>
-        <span>SL <span className="text-bear">{levels.risk_pct.toFixed(2)}%</span></span>
-        <span>R:R <span className="text-bull">{(Math.abs(levels.take_profit_1 - levels.entry) / Math.abs(levels.stop_loss - levels.entry)).toFixed(1)}x</span></span>
-      </div>
-    </div>
-  );
-}
-
-function ConfidenceRing({ score }: { score: number }) {
-  const color = score >= 70 ? "#00c55a" : score >= 50 ? "#f59e0b" : "#e63946";
-  const radius = 16;
+function ProbabilityDonut({ score }: { score: number }) {
+  const isBull = score >= 50;
+  const color = isBull ? "#00c55a" : "#e63946";
+  const bgColor = isBull ? "#e6394620" : "#00c55a20";
+  const radius = 18;
   const circ = 2 * Math.PI * radius;
   const dash = (score / 100) * circ;
   return (
     <div className="relative inline-flex items-center justify-center">
-      <svg width="44" height="44" viewBox="0 0 44 44">
-        <circle cx="22" cy="22" r={radius} fill="none" stroke="hsl(var(--border))" strokeWidth="3" />
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <circle cx="26" cy="26" r={radius} fill="none" stroke={bgColor} strokeWidth="4" />
         <circle
-          cx="22" cy="22" r={radius}
-          fill="none" stroke={color} strokeWidth="3"
+          cx="26" cy="26" r={radius}
+          fill="none" stroke={color} strokeWidth="4"
           strokeDasharray={`${dash} ${circ}`}
           strokeLinecap="round"
-          transform="rotate(-90 22 22)"
+          transform="rotate(-90 26 26)"
         />
       </svg>
-      <span className="absolute text-[10px] font-mono font-bold" style={{ color }}>{Math.round(score)}</span>
+      <div className="absolute flex flex-col items-center">
+        <span className="text-[11px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}%</span>
+        <span className="text-[7px] font-mono text-muted-foreground leading-none mt-0.5">
+          {isBull ? "BULL" : "BEAR"}
+        </span>
+      </div>
     </div>
+  );
+}
+
+function ProbabilityBar({ bullPct, bearPct, tall }: { bullPct: number; bearPct: number; tall?: boolean }) {
+  return (
+    <div className={cn("w-full flex rounded overflow-hidden", tall ? "h-2.5" : "h-1.5")}>
+      <div className="bg-bull/70 transition-all" style={{ width: `${bullPct}%` }} />
+      <div className="bg-bear/70 transition-all" style={{ width: `${bearPct}%` }} />
+    </div>
+  );
+}
+
+function ConvictionBadge({ tier, size }: { tier: string; size?: "sm" }) {
+  const isSm = size === "sm";
+  return (
+    <span className={cn(
+      "font-mono font-bold rounded border",
+      isSm ? "text-[8px] px-1 py-0.5" : "text-[9px] px-1.5 py-0.5",
+      tier === "HIGH"     ? "bg-bull/10 text-bull border-bull/20" :
+      tier === "MODERATE" ? "bg-warn/10 text-warn border-warn/20" :
+      tier === "LOW"      ? "bg-muted text-muted-foreground border-border/30" :
+                            "bg-muted text-muted-foreground border-border/30"
+    )}>
+      {tier}
+    </span>
   );
 }

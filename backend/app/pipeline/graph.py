@@ -258,21 +258,31 @@ async def run_fund_manager(state: TradingState) -> TradingState:
         "triggered_rules": gate.get("triggered_rules", []),
     }
 
-    # Conviction tier
+    # Conviction tier (based on probability score, not raw confidence)
+    prob = signal.get("probability_score", signal.get("confidence_score", signal.get("confidence", 50)))
     conf = signal.get("confidence_score", signal.get("confidence", 50))
-    if conf >= 75:
+    # Use the stronger of probability_score or confidence for conviction
+    conviction_input = max(prob, conf) if prob and conf else (prob or conf or 50)
+    if conviction_input >= 75:
         signal["conviction_tier"] = "HIGH"
-    elif conf >= 60:
+    elif conviction_input >= 60:
         signal["conviction_tier"] = "MODERATE"
-    elif conf >= 50:
+    elif conviction_input >= 50:
         signal["conviction_tier"] = "LOW"
     else:
         signal["conviction_tier"] = "NEUTRAL"
 
+    # Ensure probability fields are preserved from trader output
+    for key in ("probability_score", "bullish_pct", "bearish_pct",
+                "research_target", "invalidation_level", "risk_reward_ratio",
+                "analytical_window", "bull_case", "bear_case"):
+        signal.setdefault(key, None)
+
     reasoning = state.get("reasoning_chain", [])
+    lean = "BULLISH" if (prob or 50) >= 50 else "BEARISH"
     reasoning.append(
-        f"Fund Manager: Signal {signal['status']} "
-        f"— position size {signal.get('position_size_pct', 0):.1f}% of equity. "
+        f"Fund Manager: {signal['status']} "
+        f"— {prob:.0f}% {lean}, position size {signal.get('position_size_pct', 0):.1f}% of equity. "
         f"Conviction: {signal.get('conviction_tier', 'N/A')}."
     )
 

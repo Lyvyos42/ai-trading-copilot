@@ -97,10 +97,20 @@ export interface Signal {
   exit_price?: number | null;
   resolved_at?: string | null;
   pnl_pct?: number | null;
+  // Probability model fields
+  probability_score?: number | null;
+  bullish_pct?: number | null;
+  bearish_pct?: number | null;
+  research_target?: number | null;
+  invalidation_level?: number | null;
+  risk_reward_ratio?: number | null;
+  analytical_window?: string | null;
+  bull_case?: string | null;
+  bear_case?: string | null;
+  conviction_tier?: string | null;
   timestamp: string;
   expiry_time: string;
   pipeline_latency_ms?: number;
-  conviction_tier?: string;
   agent_detail?: Record<string, unknown>;
 }
 
