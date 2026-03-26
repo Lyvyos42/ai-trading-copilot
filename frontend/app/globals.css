@@ -25,6 +25,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Scrollbar utility ────────────────────────────────────────────────────── */
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* ── Design Tokens ─────────────────────────────────────────────────────────── */
 @layer base {
   :root {
@@ -473,7 +477,7 @@
   animation: signal-appear 250ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-/* ── Bloomberg Data Cell ─────────────────────────────────────────────────────── */
+/* ── Data Cell ──────────────────────────────────────────────────────────────── */
 .data-cell { display: flex; flex-direction: column; gap: 1px; }
 .data-cell-label {
   font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;

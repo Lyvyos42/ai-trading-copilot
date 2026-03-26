@@ -97,7 +97,7 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold mb-1 font-mono">PORTFOLIO</h1>
+          <h1 className="text-lg sm:text-2xl font-bold mb-1 font-mono">PORTFOLIO</h1>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
             <AlertCircle className="h-3 w-3" />
             Paper trading — no real funds. Open positions via AI signals on the Terminal.

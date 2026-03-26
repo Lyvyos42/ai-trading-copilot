@@ -159,21 +159,6 @@ export default function PricingPage() {
         ))}
       </div>
 
-      {/* Revenue projections */}
-      <div className="grid md:grid-cols-3 gap-4 mb-16">
-        {[
-          { label: "Year 1 Target ARR", value: "$576K", sub: "5,000 free → 8% conversion @ $120 avg" },
-          { label: "Year 2 Target ARR", value: "$1.4M", sub: "20,000 free → 12% conversion" },
-          { label: "Additional Revenue", value: "+30%", sub: "Strategy marketplace commission" },
-        ].map(({ label, value, sub }) => (
-          <div key={label} className="p-4 rounded-xl border border-border/50 bg-card text-center">
-            <div className="text-2xl font-bold text-primary font-mono">{value}</div>
-            <div className="text-sm font-medium mt-1">{label}</div>
-            <div className="text-xs text-muted-foreground mt-1">{sub}</div>
-          </div>
-        ))}
-      </div>
-
       {/* FAQ */}
       <div className="max-w-2xl mx-auto">
         <h2 className="text-xl font-bold mb-6 text-center">Frequently Asked Questions</h2>

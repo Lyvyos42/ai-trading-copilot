@@ -117,12 +117,16 @@ export default function CorrelationPage() {
                 <span className="text-[9px] font-mono text-muted-foreground">({data.data_points} data points)</span>
               )}
             </div>
+            <div className="overflow-x-auto -mx-4 px-4" style={{ minWidth: 0 }}>
+            <div className="min-w-[380px]">
             <CorrelationHeatmap
               tickers={data.tickers}
               matrix={data.matrix}
               onCellClick={(t1, t2) => setSelectedPair(t1 === t2 ? null : { t1, t2 })}
               selectedPair={selectedPair}
             />
+            </div>
+            </div>
           </div>
 
           {/* Pair detail panel */}

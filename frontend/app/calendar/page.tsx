@@ -72,10 +72,10 @@ export default function CalendarPage() {
       </div>
 
       {/* Impact legend */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-[9px] font-mono text-muted-foreground">IMPACT:</span>
+      <div className="flex items-center gap-3 mb-4 overflow-x-auto">
+        <span className="text-[9px] font-mono text-muted-foreground shrink-0">IMPACT:</span>
         {(["HIGH", "MEDIUM", "LOW"] as const).map((level) => (
-          <span key={level} className={cn("text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border", IMPACT_STYLE[level])}>
+          <span key={level} className={cn("text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0", IMPACT_STYLE[level])}>
             {level}
           </span>
         ))}
@@ -124,14 +124,15 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Events table */}
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px]">
                   <thead>
                     <tr className="border-b border-border/20">
-                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-4 text-left w-14">TIME</th>
+                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-3 sm:px-4 text-left w-14">TIME</th>
                       <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-left">EVENT</th>
                       <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-center w-16">IMPACT</th>
-                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-right w-16">PREV</th>
-                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-right w-16">FCST</th>
+                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-right w-16 hidden sm:table-cell">PREV</th>
+                      <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-right w-16 hidden sm:table-cell">FCST</th>
                       <th className="text-[8px] font-mono text-muted-foreground py-1 px-2 text-right w-16">ACT</th>
                     </tr>
                   </thead>
@@ -142,7 +143,7 @@ export default function CalendarPage() {
                         isPast ? "opacity-50" : "",
                         evt.impact === "HIGH" && !isPast ? "bg-bear/3" : ""
                       )}>
-                        <td className="text-[10px] font-mono text-muted-foreground py-1.5 px-4">{evt.time}</td>
+                        <td className="text-[10px] font-mono text-muted-foreground py-1.5 px-3 sm:px-4">{evt.time}</td>
                         <td className="py-1.5 px-2">
                           <div className="flex items-center gap-2">
                             <span className="text-[8px] font-mono font-bold text-primary/60 bg-primary/5 px-1 rounded">
@@ -156,8 +157,8 @@ export default function CalendarPage() {
                             {evt.impact}
                           </span>
                         </td>
-                        <td className="text-[10px] font-mono text-muted-foreground text-right py-1.5 px-2">{evt.previous || "—"}</td>
-                        <td className="text-[10px] font-mono text-foreground text-right py-1.5 px-2 font-bold">{evt.forecast || "—"}</td>
+                        <td className="text-[10px] font-mono text-muted-foreground text-right py-1.5 px-2 hidden sm:table-cell">{evt.previous || "—"}</td>
+                        <td className="text-[10px] font-mono text-foreground text-right py-1.5 px-2 font-bold hidden sm:table-cell">{evt.forecast || "—"}</td>
                         <td className={cn(
                           "text-[10px] font-mono text-right py-1.5 px-2 font-bold",
                           evt.actual ? "text-primary" : "text-muted-foreground"
@@ -168,6 +169,7 @@ export default function CalendarPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             );
           })}

@@ -161,7 +161,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             <SymbolSearch value={activeTicker} onChange={setActiveTicker} />
             <ProfileSelector value={activeProfile} onChange={setActiveProfile} compact />
 
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap overflow-x-auto">
               {WATCHLIST.map((ticker) => {
                 const label = ticker.replace("=X","").replace("-USD","").replace("=F","").replace("^","");
                 return (
@@ -218,7 +218,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         </div>
 
         {/* CENTER — Signal Feed */}
-        <div className="flex flex-col lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-r border-border max-h-64 lg:max-h-none overflow-hidden">
+        <div className="flex flex-col lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-r border-border max-h-48 sm:max-h-64 lg:max-h-none overflow-hidden">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">SIGNAL FEED</span>
             {loading && (

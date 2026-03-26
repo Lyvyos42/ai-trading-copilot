@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { href: "/backtest",     label: "BACKTEST",     Icon: IconBacktest },
   { href: "/calendar",     label: "CALENDAR",     Icon: IconCalendar },
   { href: "/correlation",  label: "CORR MAP",     Icon: IconGrid },
+  { href: "/guide",        label: "GUIDE",        Icon: IconShield },
 ];
 
 const TIER_LABEL: Record<UserTier, string> = {
@@ -198,7 +199,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center h-full">
+        <nav className="hidden md:flex items-center h-full overflow-x-auto scrollbar-none">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
             const active  = pathname === href || pathname.startsWith(href + "/");
             const isIntel = href === "/news";
@@ -207,8 +208,8 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 key={href}
                 href={href}
                 className={cn(
-                  "relative flex items-center gap-1.5 px-3 h-10 transition-colors",
-                  "text-[9px] font-bold tracking-[0.12em] uppercase",
+                  "relative flex items-center gap-1 px-2 lg:px-3 h-10 transition-colors shrink-0",
+                  "text-[9px] font-bold tracking-[0.08em] lg:tracking-[0.12em] uppercase",
                   "border-b-[1.5px]",
                 )}
                 style={{

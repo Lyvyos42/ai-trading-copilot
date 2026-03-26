@@ -544,7 +544,7 @@ export default function SignalsPage() {
             </div>
 
             {/* Stage progress — text indicators */}
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
               {PIPELINE_STAGES.map((s, i) => {
                 const done   = i < pipelineStage;
                 const active = i === pipelineStage;
