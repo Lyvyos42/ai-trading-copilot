@@ -3,10 +3,15 @@ Session Mode API — start/stop sessions, run session analysis, get session stat
 """
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.signals import get_current_user, get_market_data
+from app.auth.jwt import get_current_user
+from app.db.database import get_db
+from app.models.user import User
+from app.data.market_data import fetch_market_data
 from app.services.news_context import get_news_context
 from app.pipeline.session_graph import run_session_pipeline
 
@@ -26,17 +31,25 @@ class SessionAnalyzeRequest(BaseModel):
     ticker: str | None = None  # defaults to session ticker
 
 
+async def _get_user_tier(user: dict, db: AsyncSession) -> str:
+    """Resolve tier from DB since Supabase JWTs don't carry tier claims."""
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
+    result = await db.execute(select(User).where(User.id == user_id))
+    db_user = result.scalar_one_or_none()
+    return (db_user.tier if db_user else None) or user.get("tier", "free") or "free"
+
+
 # ── POST /start — Start a new session ─────────────────────────────────────
 @router.post("/start")
-async def start_session(req: StartSessionRequest, request: Request):
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    user_id = str(user.id)
+async def start_session(
+    req: StartSessionRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
 
     # Check tier — Session Mode requires Pro or higher
-    tier = getattr(user, "tier", "free")
+    tier = await _get_user_tier(user, db)
     if tier not in ("pro", "enterprise", "admin"):
         raise HTTPException(status_code=403, detail="Session Mode requires Pro plan or higher")
 
@@ -75,12 +88,11 @@ async def start_session(req: StartSessionRequest, request: Request):
 
 # ── POST /analyze — Run session analysis ──────────────────────────────────
 @router.post("/analyze")
-async def session_analyze(req: SessionAnalyzeRequest, request: Request):
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    user_id = str(user.id)
+async def session_analyze(
+    req: SessionAnalyzeRequest,
+    user: dict = Depends(get_current_user),
+):
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
     session = _active_sessions.get(user_id)
     if not session:
         raise HTTPException(status_code=400, detail="No active session. Call POST /start first.")
@@ -88,7 +100,7 @@ async def session_analyze(req: SessionAnalyzeRequest, request: Request):
     ticker = (req.ticker or session["ticker"]).upper()
 
     # Get market data
-    market_data = await get_market_data(ticker)
+    market_data = await fetch_market_data(ticker)
 
     # Get news context
     news_context = await get_news_context(ticker)
@@ -116,12 +128,8 @@ async def session_analyze(req: SessionAnalyzeRequest, request: Request):
 
 # ── GET /status — Get current session status ──────────────────────────────
 @router.get("/status")
-async def session_status(request: Request):
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    user_id = str(user.id)
+async def session_status(user: dict = Depends(get_current_user)):
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
     session = _active_sessions.get(user_id)
     if not session:
         return {"active": False}
@@ -141,12 +149,8 @@ async def session_status(request: Request):
 
 # ── POST /stop — End the current session ──────────────────────────────────
 @router.post("/stop")
-async def stop_session(request: Request):
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    user_id = str(user.id)
+async def stop_session(user: dict = Depends(get_current_user)):
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
     session = _active_sessions.pop(user_id, None)
     if not session:
         return {"status": "NO_SESSION"}
