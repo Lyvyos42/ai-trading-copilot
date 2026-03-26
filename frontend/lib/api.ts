@@ -504,3 +504,47 @@ export async function getJournalSignals(params: {
   if (params.max_confidence) searchParams.set("max_confidence", String(params.max_confidence));
   return apiFetch(`/api/v1/signals/journal?${searchParams.toString()}`);
 }
+
+// ─── Economic Calendar ────────────────────────────────────────────────────────
+
+export interface CalendarEvent {
+  date: string;
+  time: string;
+  name: string;
+  country: string;
+  impact: "HIGH" | "MEDIUM" | "LOW";
+  category: string;
+  previous: string | null;
+  forecast: string | null;
+  actual: string | null;
+}
+
+export async function getCalendarEvents(weeks = 2): Promise<{ events: CalendarEvent[]; start: string; end: string }> {
+  return publicFetch(`/api/v1/calendar/events?weeks=${weeks}`);
+}
+
+// ─── Correlation Map ──────────────────────────────────────────────────────────
+
+export interface CorrelationMatrix {
+  tickers: string[];
+  matrix: number[][];
+  period_days: number;
+  data_points: number;
+}
+
+export interface CorrelationPair {
+  t1: string;
+  t2: string;
+  series: { date: string; v1: number; v2: number }[];
+  correlation: number;
+}
+
+export async function getCorrelationMatrix(tickers?: string[], period = 90): Promise<CorrelationMatrix> {
+  const params = new URLSearchParams({ period: String(period) });
+  if (tickers?.length) params.set("tickers", tickers.join(","));
+  return publicFetch(`/api/v1/correlations/matrix?${params.toString()}`);
+}
+
+export async function getCorrelationPair(t1: string, t2: string, period = 90): Promise<CorrelationPair> {
+  return publicFetch(`/api/v1/correlations/pair?t1=${t1}&t2=${t2}&period=${period}`);
+}

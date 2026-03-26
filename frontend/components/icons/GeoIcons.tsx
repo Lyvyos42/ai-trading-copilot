@@ -264,6 +264,35 @@ export function IconBell({ size = 16, color = "currentColor", strokeWidth = 1.5,
   );
 }
 
+/** Calendar — page with grid lines */
+export function IconCalendar({ size = 16, color = "currentColor", strokeWidth = 1.5, className, style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+      <rect x="2" y="3" width="12" height="11" rx="1.5" />
+      <line x1="2" y1="6.5" x2="14" y2="6.5" />
+      <line x1="5.5" y1="3" x2="5.5" y2="1.5" />
+      <line x1="10.5" y1="3" x2="10.5" y2="1.5" />
+      <line x1="5.5" y1="6.5" x2="5.5" y2="14" strokeWidth="0.75" opacity="0.4" />
+      <line x1="10.5" y1="6.5" x2="10.5" y2="14" strokeWidth="0.75" opacity="0.4" />
+      <line x1="2" y1="10" x2="14" y2="10" strokeWidth="0.75" opacity="0.4" />
+    </svg>
+  );
+}
+
+/** Correlation Grid — 2x2 cells with connection lines */
+export function IconGrid({ size = 16, color = "currentColor", strokeWidth = 1.5, className, style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+      <rect x="2" y="2" width="5" height="5" rx="0.5" />
+      <rect x="9" y="2" width="5" height="5" rx="0.5" />
+      <rect x="2" y="9" width="5" height="5" rx="0.5" />
+      <rect x="9" y="9" width="5" height="5" rx="0.5" />
+      <line x1="7" y1="4.5" x2="9" y2="4.5" strokeDasharray="1 1" strokeWidth="1" opacity="0.5" />
+      <line x1="4.5" y1="7" x2="4.5" y2="9" strokeDasharray="1 1" strokeWidth="1" opacity="0.5" />
+    </svg>
+  );
+}
+
 // ─── Agent Role Geometry Icons ────────────────────────────────────────────────
 // These are 2D projections of 3D geometric forms — suggest depth through line construction
 

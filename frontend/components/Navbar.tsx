@@ -20,6 +20,8 @@ import {
   IconMenu,
   IconX,
   IconShield,
+  IconCalendar,
+  IconGrid,
 } from "@/components/icons/GeoIcons";
 
 const NAV_ITEMS = [
@@ -31,6 +33,8 @@ const NAV_ITEMS = [
   { href: "/portfolio",    label: "PORTFOLIO",    Icon: IconPortfolio },
   { href: "/agents",       label: "AGENTS",       Icon: IconAgents },
   { href: "/backtest",     label: "BACKTEST",     Icon: IconBacktest },
+  { href: "/calendar",     label: "CALENDAR",     Icon: IconCalendar },
+  { href: "/correlation",  label: "CORR MAP",     Icon: IconGrid },
 ];
 
 const TIER_LABEL: Record<UserTier, string> = {
