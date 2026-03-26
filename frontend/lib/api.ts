@@ -300,3 +300,80 @@ export async function logout(): Promise<void> {
 export async function getMe() {
   return apiFetch<{ id: string; email: string; tier: string }>("/api/v1/auth/me");
 }
+
+// ─── Session Mode ─────────────────────────────────────────────────────────────
+
+export interface SessionSignal {
+  direction: string;
+  confidence: number;
+  entry: number;
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  position_size_pct: number;
+  trade_type: string;
+  urgency: string;
+  agent_agreement: number;
+  reasoning: string;
+  risk_reward_ratio: number;
+  ticker: string;
+  mode: string;
+  strategy_profile: string;
+  kill_zone: string;
+  kill_zone_active: boolean;
+  kill_zone_minutes_remaining: number;
+  market_phase: string;
+  risk_gate_passed: boolean;
+  risk_gate_mode: string;
+  risk_gate_rules: { rule: number; name: string; reason: string }[];
+  coach: {
+    tilt_detected: boolean;
+    tilt_type: string;
+    tilt_severity: number;
+    message: string;
+    recommendation: string;
+    positive_note: string | null;
+  };
+  session_risk: {
+    risk_level: string;
+    recommended_action: string;
+  };
+  agent_votes: { agent: string; direction: string; confidence: number }[];
+  reasoning_chain: string[];
+  pipeline_latency_ms: number;
+  timestamp: string;
+}
+
+export interface SessionStatus {
+  active: boolean;
+  session_id?: string;
+  ticker?: string;
+  profile?: string;
+  started_at?: string;
+  analysis_count?: number;
+  trade_count?: number;
+  pnl?: number;
+  pnl_pct?: number;
+}
+
+export async function startSession(ticker: string, profile: string = "balanced") {
+  return apiFetch("/api/v1/session/start", {
+    method: "POST",
+    body: JSON.stringify({ ticker, profile }),
+  });
+}
+
+export async function runSessionAnalysis(ticker?: string) {
+  return apiFetch("/api/v1/session/analyze", {
+    method: "POST",
+    body: JSON.stringify({ ticker }),
+  }) as Promise<SessionSignal>;
+}
+
+export async function getSessionStatus(): Promise<SessionStatus> {
+  return apiFetch("/api/v1/session/status");
+}
+
+export async function stopSession() {
+  return apiFetch("/api/v1/session/stop", { method: "POST" });
+}

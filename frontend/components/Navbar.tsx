@@ -162,6 +162,35 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           </span>
         </Link>
 
+        {/* Mode toggle — RESEARCH | SESSION */}
+        <div className="hidden md:flex items-center gap-0.5 mx-1 p-0.5 rounded border border-[hsl(var(--border-strong))] bg-[hsl(var(--surface-2)/0.3)]">
+          <Link
+            href="/dashboard"
+            className={cn(
+              "px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] rounded transition-colors",
+              !pathname?.startsWith("/session")
+                ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
+                : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+            )}
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace" }}
+          >
+            RESEARCH
+          </Link>
+          <Link
+            href="/session"
+            className={cn(
+              "px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] rounded transition-colors flex items-center gap-1",
+              pathname?.startsWith("/session")
+                ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
+                : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+            )}
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace" }}
+          >
+            SESSION
+            <span className="text-[6px] text-amber-400 border border-amber-400/30 rounded px-0.5 leading-tight">PRO</span>
+          </Link>
+        </div>
+
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center h-full">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
