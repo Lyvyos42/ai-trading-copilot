@@ -44,5 +44,11 @@ class Signal(Base):
     strategy_sources: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
     timeframe_levels: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=True, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default="ACTIVE")
+    outcome: Mapped[str | None] = mapped_column(String, nullable=True)  # WIN, LOSS, EXPIRED
+    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pnl_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_favorable_excursion: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_adverse_excursion: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expiry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)

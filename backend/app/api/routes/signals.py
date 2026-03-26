@@ -295,6 +295,43 @@ async def generate_signal(
     return result
 
 
+@router.get("/journal")
+async def journal_signals(
+    limit: int = 50,
+    offset: int = 0,
+    ticker: str | None = None,
+    outcome: str | None = None,
+    asset_class: str | None = None,
+    min_confidence: float | None = None,
+    max_confidence: float | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
+):
+    """Full signal history with filters — for authenticated journal page."""
+    query = select(Signal).order_by(desc(Signal.created_at))
+
+    if user:
+        uid = user.get("sub") or user.get("id") or user.get("user_id")
+        if uid:
+            query = query.where(Signal.user_id == uid)
+
+    if ticker:
+        query = query.where(Signal.ticker == ticker.upper().strip())
+    if outcome:
+        query = query.where(Signal.outcome == outcome.upper())
+    if asset_class:
+        query = query.where(Signal.asset_class == asset_class)
+    if min_confidence is not None:
+        query = query.where(Signal.confidence_score >= min_confidence)
+    if max_confidence is not None:
+        query = query.where(Signal.confidence_score <= max_confidence)
+
+    query = query.offset(offset).limit(min(limit, 200))
+    result = await db.execute(query)
+    signals = result.scalars().all()
+    return [_signal_to_dict(s) for s in signals]
+
+
 @router.get("/{signal_id}")
 async def get_signal(
     signal_id: str,
@@ -325,7 +362,9 @@ async def list_signals(
 
 
 class OutcomeRequest(BaseModel):
-    outcome: str  # "WIN" or "LOSS"
+    outcome: str  # "WIN", "LOSS", or "EXPIRED"
+    exit_price: float | None = None
+    pnl_pct: float | None = None
 
 
 @router.patch("/{signal_id}/outcome")
@@ -335,8 +374,8 @@ async def set_signal_outcome(
     db: AsyncSession = Depends(get_db),
     user: dict | None = Depends(get_optional_user),
 ):
-    if body.outcome not in ("WIN", "LOSS"):
-        raise HTTPException(status_code=400, detail="outcome must be WIN or LOSS")
+    if body.outcome not in ("WIN", "LOSS", "EXPIRED"):
+        raise HTTPException(status_code=400, detail="outcome must be WIN, LOSS, or EXPIRED")
 
     result = await db.execute(select(Signal).where(Signal.id == signal_id))
     signal = result.scalar_one_or_none()
@@ -349,6 +388,12 @@ async def set_signal_outcome(
         raise HTTPException(status_code=403, detail="Not your signal")
 
     signal.status = body.outcome
+    signal.outcome = body.outcome
+    if body.exit_price is not None:
+        signal.exit_price = body.exit_price
+    if body.pnl_pct is not None:
+        signal.pnl_pct = body.pnl_pct
+    signal.resolved_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(signal)
     return _signal_to_dict(signal)
@@ -372,6 +417,10 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
         "strategy_sources": signal.strategy_sources,
         "timeframe_levels": signal.timeframe_levels or {},
         "status": signal.status,
+        "outcome": getattr(signal, "outcome", None),
+        "exit_price": getattr(signal, "exit_price", None),
+        "resolved_at": (signal.resolved_at.isoformat() + "Z") if getattr(signal, "resolved_at", None) else None,
+        "pnl_pct": getattr(signal, "pnl_pct", None),
         "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
         "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,
     }

@@ -118,6 +118,20 @@ async def close_position(
     position.closed_at = datetime.now(timezone.utc)
     position.close_price = close_price
     position.realized_pnl = round(realized, 2)
+
+    # Sync outcome to linked signal
+    if position.signal_id:
+        sig_result = await db.execute(select(Signal).where(Signal.id == position.signal_id))
+        linked_signal = sig_result.scalar_one_or_none()
+        if linked_signal and linked_signal.status in ("ACTIVE", "EXECUTED"):
+            linked_signal.outcome = "WIN" if realized > 0 else "LOSS"
+            linked_signal.status = linked_signal.outcome
+            linked_signal.exit_price = close_price
+            linked_signal.pnl_pct = round(
+                realized / (position.entry_price * position.quantity) * 100, 4
+            ) if position.entry_price and position.quantity else 0
+            linked_signal.resolved_at = datetime.now(timezone.utc)
+
     await db.commit()
 
     return {

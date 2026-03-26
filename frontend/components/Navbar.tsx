@@ -23,12 +23,14 @@ import {
 } from "@/components/icons/GeoIcons";
 
 const NAV_ITEMS = [
-  { href: "/dashboard",  label: "TERMINAL",  Icon: IconTerminal },
-  { href: "/signals",    label: "SIGNALS",   Icon: IconSignal },
-  { href: "/news",       label: "INTEL",     Icon: IconIntel },
-  { href: "/portfolio",  label: "PORTFOLIO", Icon: IconPortfolio },
-  { href: "/agents",     label: "AGENTS",    Icon: IconAgents },
-  { href: "/backtest",   label: "BACKTEST",  Icon: IconBacktest },
+  { href: "/dashboard",    label: "TERMINAL",     Icon: IconTerminal },
+  { href: "/signals",      label: "SIGNALS",      Icon: IconSignal },
+  { href: "/performance",  label: "PERFORMANCE",  Icon: IconSignal },
+  { href: "/journal",      label: "JOURNAL",      Icon: IconPortfolio },
+  { href: "/news",         label: "INTEL",        Icon: IconIntel },
+  { href: "/portfolio",    label: "PORTFOLIO",    Icon: IconPortfolio },
+  { href: "/agents",       label: "AGENTS",       Icon: IconAgents },
+  { href: "/backtest",     label: "BACKTEST",     Icon: IconBacktest },
 ];
 
 const TIER_LABEL: Record<UserTier, string> = {

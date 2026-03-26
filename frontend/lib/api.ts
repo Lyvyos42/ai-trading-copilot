@@ -93,7 +93,10 @@ export interface Signal {
   strategy_sources: string[];
   timeframe_levels?: { scalp?: TimeframeLevels; swing?: TimeframeLevels };
   status: string;
-  outcome?: string;
+  outcome?: string | null;
+  exit_price?: number | null;
+  resolved_at?: string | null;
+  pnl_pct?: number | null;
   timestamp: string;
   expiry_time: string;
   pipeline_latency_ms?: number;
@@ -376,4 +379,118 @@ export async function getSessionStatus(): Promise<SessionStatus> {
 
 export async function stopSession() {
   return apiFetch("/api/v1/session/stop", { method: "POST" });
+}
+
+// ─── Performance (Public) ─────────────────────────────────────────────────────
+
+export interface PerformanceSummary {
+  total_signals: number;
+  resolved_signals: number;
+  active_signals: number;
+  wins: number;
+  losses: number;
+  win_rate_pct: number;
+  avg_confidence: number;
+  avg_pnl_pct: number;
+}
+
+export interface EquityCurvePoint {
+  date: string;
+  pnl_pct: number;
+  cumulative_pnl_pct: number;
+}
+
+export interface AssetClassPerformance {
+  asset_class: string;
+  total: number;
+  wins: number;
+  win_rate_pct: number;
+  avg_pnl_pct: number;
+  avg_confidence: number;
+}
+
+export interface AgentPerformance {
+  agent: string;
+  total_signals: number;
+  correct_calls: number;
+  accuracy_pct: number;
+  avg_confidence: number;
+}
+
+export interface CalibrationBucket {
+  confidence_range: string;
+  confidence_midpoint: number;
+  total: number;
+  wins: number;
+  actual_win_rate_pct: number;
+}
+
+export interface MonthlyReturn {
+  month: string;
+  total_pnl_pct: number;
+  signal_count: number;
+  wins: number;
+  losses: number;
+  win_rate_pct: number;
+}
+
+async function publicFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getPerformanceSummary(): Promise<PerformanceSummary> {
+  return publicFetch("/api/v1/performance/summary");
+}
+
+export async function getEquityCurve(): Promise<{ curve: EquityCurvePoint[] }> {
+  return publicFetch("/api/v1/performance/equity-curve");
+}
+
+export async function getByAssetClass(): Promise<{ asset_classes: AssetClassPerformance[] }> {
+  return publicFetch("/api/v1/performance/by-asset-class");
+}
+
+export async function getByAgent(): Promise<{ agents: AgentPerformance[] }> {
+  return publicFetch("/api/v1/performance/by-agent");
+}
+
+export async function getCalibration(): Promise<{ calibration: CalibrationBucket[] }> {
+  return publicFetch("/api/v1/performance/calibration");
+}
+
+export async function getMonthlyReturns(): Promise<{ months: MonthlyReturn[] }> {
+  return publicFetch("/api/v1/performance/monthly");
+}
+
+// ─── Evaluation ───────────────────────────────────────────────────────────────
+
+export async function evaluateSignals() {
+  return apiFetch("/api/v1/signals/evaluate", { method: "POST" });
+}
+
+// ─── Journal ──────────────────────────────────────────────────────────────────
+
+export async function getJournalSignals(params: {
+  limit?: number;
+  offset?: number;
+  ticker?: string;
+  outcome?: string;
+  asset_class?: string;
+  min_confidence?: number;
+  max_confidence?: number;
+}): Promise<Signal[]> {
+  const searchParams = new URLSearchParams();
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if (params.offset) searchParams.set("offset", String(params.offset));
+  if (params.ticker) searchParams.set("ticker", params.ticker);
+  if (params.outcome) searchParams.set("outcome", params.outcome);
+  if (params.asset_class) searchParams.set("asset_class", params.asset_class);
+  if (params.min_confidence) searchParams.set("min_confidence", String(params.min_confidence));
+  if (params.max_confidence) searchParams.set("max_confidence", String(params.max_confidence));
+  return apiFetch(`/api/v1/signals/journal?${searchParams.toString()}`);
 }
