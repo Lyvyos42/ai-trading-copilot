@@ -58,12 +58,12 @@ async def lifespan(app: FastAPI):
             # User model — active_profile column (Phase 3)
             "ALTER TABLE users ADD COLUMN active_profile VARCHAR DEFAULT 'balanced'",
         ]
-        async with engine.begin() as conn:
-            for _stmt in _migrations:
-                try:
+        for _stmt in _migrations:
+            try:
+                async with engine.begin() as conn:
                     await conn.execute(_text(_stmt))
-                except Exception:
-                    pass  # column already exists — safe to ignore
+            except Exception:
+                pass  # column already exists — safe to ignore
 
         # Seed demo user
         from app.db.database import AsyncSessionLocal
