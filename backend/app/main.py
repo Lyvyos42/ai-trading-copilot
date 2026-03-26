@@ -55,6 +55,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE signals ADD COLUMN bull_case TEXT",
             "ALTER TABLE signals ADD COLUMN bear_case TEXT",
             "ALTER TABLE signals ADD COLUMN conviction_tier VARCHAR",
+            # User model — active_profile column (Phase 3)
+            "ALTER TABLE users ADD COLUMN active_profile VARCHAR DEFAULT 'balanced'",
         ]
         async with engine.begin() as conn:
             for _stmt in _migrations:
