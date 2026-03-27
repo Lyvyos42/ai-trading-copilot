@@ -223,8 +223,8 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 key={href}
                 href={href}
                 className={cn(
-                  "relative flex items-center gap-1 px-2 lg:px-3 h-10 transition-colors shrink-0",
-                  "text-[13px] font-bold tracking-[0.08em] lg:tracking-[0.12em] uppercase",
+                  "relative flex items-center gap-0.5 px-1.5 lg:px-2 h-10 transition-colors shrink-0",
+                  "text-[10px] font-bold tracking-[0.06em] lg:tracking-[0.1em] uppercase",
                   "border-b-[1.5px]",
                 )}
                 style={{
