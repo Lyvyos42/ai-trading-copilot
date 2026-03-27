@@ -102,9 +102,17 @@ async def close_position(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    result = await db.execute(
-        select(Position).where(Position.id == position_id, Position.user_id == user_id)
-    )
+    # Check if admin — admins can close any position
+    from app.models.user import User
+    _u = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    is_admin = (_u.tier if _u else "free") == "admin"
+
+    if is_admin:
+        result = await db.execute(select(Position).where(Position.id == position_id))
+    else:
+        result = await db.execute(
+            select(Position).where(Position.id == position_id, Position.user_id == user_id)
+        )
     position = result.scalar_one_or_none()
     if not position:
         raise HTTPException(status_code=404, detail="Position not found")

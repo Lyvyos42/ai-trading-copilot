@@ -35,13 +35,18 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       const res = await fetch(`${API_URL}${path}`, reqOptions);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Request failed" }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
+        const msg = err.detail || `HTTP ${res.status}`;
+        // Tag HTTP errors so we can distinguish from network failures
+        const httpErr = new Error(msg);
+        (httpErr as any)._httpStatus = res.status;
+        throw httpErr;
       }
       return await res.json();
     } catch (err) {
       lastError = err;
-      // Don't retry on HTTP errors (4xx/5xx) — only on network-level failures.
-      if (err instanceof Error && !err.message.startsWith("HTTP ") && attempt < DELAYS.length) {
+      // Only retry on network-level failures (no _httpStatus), not on HTTP 4xx/5xx
+      const isHttpError = (err as any)?._httpStatus != null;
+      if (!isHttpError && err instanceof Error && attempt < DELAYS.length) {
         await new Promise(r => setTimeout(r, DELAYS[attempt]));
         continue;
       }

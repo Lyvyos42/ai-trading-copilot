@@ -434,9 +434,14 @@ async def set_signal_outcome(
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
 
-    # Only the owner can resolve their signal
+    # Only the owner (or admin) can resolve a signal
     owner_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
-    if user and signal.user_id and signal.user_id != owner_id:
+    is_admin = False
+    if owner_id:
+        from app.models.user import User
+        _u = (await db.execute(select(User).where(User.id == owner_id))).scalar_one_or_none()
+        is_admin = (_u.tier if _u else user.get("tier", "free")) == "admin"
+    if user and signal.user_id and signal.user_id != owner_id and not is_admin:
         raise HTTPException(status_code=403, detail="Not your signal")
 
     signal.status = body.outcome
