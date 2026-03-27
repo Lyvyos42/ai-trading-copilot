@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { BarChart2, Play, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, X } from "lucide-react";
 import { runBacktest, listStrategies } from "@/lib/api";
 import { formatPct } from "@/lib/utils";
-import { PremiumGate } from "@/components/PremiumGate";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -75,9 +75,27 @@ function EquityCurve({ data, positive }: { data: number[]; positive: boolean }) 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function BacktestPage() {
   return (
-    <PremiumGate requiredTier="retail" feature="Backtesting Engine" reason="Run full backtests with equity curves and performance metrics. Available on Retail and above.">
-      <BacktestContent />
-    </PremiumGate>
+    <div className="relative min-h-screen">
+      {/* Under Development overlay */}
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="text-center p-8 rounded-xl border border-primary/20 bg-background/95 shadow-2xl max-w-md mx-4">
+          <div className="text-4xl mb-4 font-mono text-primary/40">⚙</div>
+          <h2 className="text-xl font-bold font-mono text-foreground mb-2">UNDER DEVELOPMENT</h2>
+          <p className="text-sm font-mono text-muted-foreground leading-relaxed mb-4">
+            The Backtesting Engine is currently being built. Full strategy backtesting with equity curves,
+            performance metrics, and historical analysis will be available soon.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs font-mono text-primary/60">
+            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            Coming soon
+          </div>
+        </div>
+      </div>
+      {/* Blurred content behind */}
+      <div className="pointer-events-none select-none opacity-30 blur-[2px]">
+        <BacktestContent />
+      </div>
+    </div>
   );
 }
 
