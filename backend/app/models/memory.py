@@ -3,7 +3,7 @@ Memory Layer models — structured data for user interactions, preferences,
 and agent corrections. (Vector memory lives in ChromaDB, not here.)
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, String, Float, Integer, Text, DateTime, ForeignKey
 from app.db.database import Base
 
@@ -21,7 +21,7 @@ class UserInteraction(Base):
     ticker = Column(String(20), nullable=True, index=True)
     signal_id = Column(String(36), nullable=True)
     payload = Column(Text, nullable=True)  # JSON: event-specific data
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), index=True)
 
 
 class UserPreference(Base):
@@ -39,8 +39,8 @@ class UserPreference(Base):
     win_rate = Column(Float, nullable=True)
     avg_confidence_pref = Column(Float, nullable=True)
     last_computed = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(),
+                        onupdate=lambda: datetime.utcnow())
 
 
 class AgentCorrection(Base):
@@ -55,4 +55,4 @@ class AgentCorrection(Base):
     lesson = Column(Text, nullable=False)  # natural language lesson
     ticker = Column(String(20), nullable=True)
     conditions_hash = Column(String(64), nullable=True)  # dedup key
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())

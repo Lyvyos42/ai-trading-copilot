@@ -60,7 +60,7 @@ _DAILY_QUOTA: dict[str, int] = {
 
 async def _check_daily_quota(user_id: str, tier: str, db: AsyncSession) -> None:
     quota = _DAILY_QUOTA.get(tier, 5)
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.utcnow()
     today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(func.count()).select_from(Signal)

@@ -84,7 +84,7 @@ async def recompute_user_preferences(user_id: str, db: AsyncSession) -> dict | N
             pass
 
         # ── Upsert into UserPreference ─────────────────────────────────────
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         result = await db.execute(
             select(UserPreference).where(UserPreference.user_id == user_id)
         )

@@ -151,7 +151,7 @@ async def scanner_job() -> None:
     """
     from app.api.websocket import broadcast_alert
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -167,7 +167,7 @@ async def scanner_job() -> None:
     for cfg in configs:
         # Check if enough time has elapsed since last scan
         if cfg.last_scan_at:
-            last = cfg.last_scan_at.replace(tzinfo=timezone.utc) if cfg.last_scan_at.tzinfo is None else cfg.last_scan_at
+            last = cfg.last_scan_at
             elapsed_min = (now - last).total_seconds() / 60
             if elapsed_min < cfg.interval_minutes:
                 continue  # Not due yet
