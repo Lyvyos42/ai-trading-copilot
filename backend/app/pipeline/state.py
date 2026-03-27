@@ -27,6 +27,9 @@ class TradingState(TypedDict, total=False):
     final_signal: dict[str, Any]
     reasoning_chain: list[str]
     errors: list[str]
+    # Memory Layer
+    memory_context: str                      # injected user + agent memory context
+    user_id: str                             # for memory retrieval + storage
     # Metadata
     daily_analysis_count: int                # for Risk Gate rule 8
     strategy_profile: str                    # active profile slug (e.g. "balanced")

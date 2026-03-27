@@ -202,7 +202,8 @@ async def generate_signal(
         if db_user and hasattr(db_user, "active_profile") and db_user.active_profile:
             profile_slug = db_user.active_profile
 
-    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug)
+    user_id_for_pipeline = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
+    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug, user_id=user_id_for_pipeline)
 
     final = state.get("final_signal", {})
     if not final:
@@ -314,6 +315,35 @@ async def generate_signal(
     if user:
         _cache_signal(user.get("sub", ""), ticker, result)
 
+    # ── Memory Layer: track interaction + extract memories (fire-and-forget) ──
+    if user and signal_id:
+        import asyncio
+        from app.services.interactions import track_event as _track
+        from app.services.memory import memory_manager as _mm
+
+        _uid = user.get("sub") or user.get("id") or user.get("user_id") or ""
+        asyncio.create_task(_track(
+            db=db, user_id=_uid, event_type="SIGNAL_GENERATE",
+            ticker=ticker, signal_id=signal_id,
+            payload={"probability_score": final.get("probability_score"),
+                     "direction": direction, "conviction_tier": final.get("conviction_tier"),
+                     "timeframe": body.timeframe, "profile": profile_slug},
+        ))
+        asyncio.create_task(_mm.extract_memories_from_session(
+            user_id=_uid,
+            session_data={
+                "instrument": ticker, "asset_class": body.asset_class,
+                "timeframe": body.timeframe, "direction": direction,
+                "probability_score": final.get("probability_score"),
+                "conviction_tier": final.get("conviction_tier"),
+                "strategy_sources": final.get("strategy_sources", []),
+                "bull_case": final.get("bull_case", "")[:200],
+                "bear_case": final.get("bear_case", "")[:200],
+                "session_timestamp": datetime.now(timezone.utc).isoformat(),
+                "profile": profile_slug,
+            },
+        ))
+
     return result
 
 
@@ -418,6 +448,61 @@ async def set_signal_outcome(
     signal.resolved_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(signal)
+
+    # ── Memory Layer: store outcome + generate agent corrections ──────────
+    import asyncio
+    from app.services.memory import memory_manager as _mm
+    from app.services.interactions import track_event as _track
+    from app.models.memory import AgentCorrection
+
+    _uid = owner_id or ""
+    if _uid:
+        asyncio.create_task(_track(
+            db=db, user_id=_uid, event_type="OUTCOME_MARK",
+            ticker=signal.ticker, signal_id=signal_id,
+            payload={"outcome": body.outcome, "pnl_pct": body.pnl_pct},
+        ))
+
+    # Store outcome as a memory for the user
+    pnl_str = f" ({body.pnl_pct:+.1f}%)" if body.pnl_pct else ""
+    memory_text = (
+        f"Signal on {signal.ticker} ({signal.direction}, {signal.timeframe}): "
+        f"{body.outcome}{pnl_str}. "
+        f"Probability was {signal.probability_score or signal.confidence_score or '?'}%. "
+        f"Conviction: {getattr(signal, 'conviction_tier', 'N/A')}."
+    )
+    importance = "HIGH" if body.outcome == "LOSS" else "MEDIUM"
+    _mm.store_memory(
+        user_id=_uid or "system",
+        memory=memory_text,
+        memory_type="PERFORMANCE",
+        importance=importance,
+    )
+
+    # Generate agent corrections (async — uses Haiku for lesson generation)
+    async def _store_corrections():
+        try:
+            signal_data = {
+                "signal_id": signal_id,
+                "ticker": signal.ticker,
+                "timeframe": signal.timeframe,
+                "direction": signal.direction,
+                "outcome": body.outcome,
+                "pnl_pct": body.pnl_pct,
+                "agent_votes": signal.agent_votes or {},
+            }
+            corrections = await _mm.generate_agent_corrections(signal_data)
+            if corrections:
+                from app.db.database import AsyncSessionLocal
+                async with AsyncSessionLocal() as sess:
+                    for c in corrections:
+                        sess.add(AgentCorrection(**c))
+                    await sess.commit()
+        except Exception:
+            pass  # memory is enhancement, not core
+
+    asyncio.create_task(_store_corrections())
+
     return _signal_to_dict(signal)
 
 

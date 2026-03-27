@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { href: "/backtest",     label: "BACKTEST",     Icon: IconBacktest },
   { href: "/calendar",     label: "CALENDAR",     Icon: IconCalendar },
   { href: "/correlation",  label: "CORR MAP",     Icon: IconGrid },
+  { href: "/memory",       label: "MEMORY",       Icon: IconShield },
   { href: "/guide",        label: "GUIDE",        Icon: IconShield },
 ];
 

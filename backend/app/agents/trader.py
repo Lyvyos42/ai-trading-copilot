@@ -89,7 +89,10 @@ class TraderAgent(BaseAgent):
         profile_slug = state.get("strategy_profile", "balanced")
         system_prompt = self._build_system_prompt(profile_slug)
 
-        user_msg = f"""Produce a probability assessment for {ticker}.
+        # ── Memory context injection ────────────────────────────────────
+        memory_block = state.get("memory_context", "")
+
+        user_msg = f"""{memory_block}Produce a probability assessment for {ticker}.
 
 CURRENT PRICE: {current_price:{_pfmt}}
 Base your research_target and invalidation_level on this exact current price.

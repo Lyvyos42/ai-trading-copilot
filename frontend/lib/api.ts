@@ -548,3 +548,79 @@ export async function getCorrelationMatrix(tickers?: string[], period = 90): Pro
 export async function getCorrelationPair(t1: string, t2: string, period = 90): Promise<CorrelationPair> {
   return publicFetch(`/api/v1/correlations/pair?t1=${t1}&t2=${t2}&period=${period}`);
 }
+
+// ─── Memory Layer ────────────────────────────────────────────────────────────
+
+export interface Memory {
+  memory: string;
+  type: string;
+  importance: string;
+  created_at: string;
+  relevance_score?: number;
+}
+
+export interface MemoryStats {
+  memory_count: number;
+  interaction_count: number;
+  correction_count: number;
+  status: string;
+}
+
+export interface AgentCorrectionItem {
+  id: string;
+  agent_name: string;
+  correction_type: string;
+  lesson: string;
+  ticker: string | null;
+  created_at: string | null;
+}
+
+export interface UserPreferences {
+  favorite_tickers: string[];
+  favorite_asset_classes: string[];
+  avg_risk_tolerance: number | null;
+  preferred_timeframe: string | null;
+  preferred_direction: string | null;
+  signal_count: number;
+  win_rate: number | null;
+  avg_confidence_pref: number | null;
+  last_computed: string | null;
+}
+
+export async function trackEvent(eventType: string, ticker?: string, signalId?: string, payload?: Record<string, unknown>): Promise<void> {
+  apiFetch("/api/v1/memory/track", {
+    method: "POST",
+    body: JSON.stringify({ event_type: eventType, ticker, signal_id: signalId, payload }),
+  }).catch(() => {}); // fire-and-forget
+}
+
+export async function sendSignalFeedback(signalId: string, feedback: "THUMBS_UP" | "THUMBS_DOWN", ticker?: string, note?: string): Promise<void> {
+  await apiFetch("/api/v1/memory/feedback", {
+    method: "POST",
+    body: JSON.stringify({ signal_id: signalId, feedback, ticker, note }),
+  });
+}
+
+export async function getMemories(): Promise<{ memories: Memory[]; total: number }> {
+  return apiFetch("/api/v1/memory/memories");
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  await apiFetch(`/api/v1/memory/${memoryId}`, { method: "DELETE" });
+}
+
+export async function getMemoryPreferences(): Promise<{ preferences: UserPreferences | null }> {
+  return apiFetch("/api/v1/memory/preferences");
+}
+
+export async function getAgentCorrections(limit = 50): Promise<{ corrections: AgentCorrectionItem[] }> {
+  return apiFetch(`/api/v1/memory/corrections?limit=${limit}`);
+}
+
+export async function getAgentCorrectionsByName(agentName: string): Promise<{ corrections: AgentCorrectionItem[] }> {
+  return apiFetch(`/api/v1/memory/corrections/${agentName}`);
+}
+
+export async function getMemoryStats(): Promise<MemoryStats> {
+  return apiFetch("/api/v1/memory/stats");
+}

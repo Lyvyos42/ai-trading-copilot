@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     provider_tier_standard: str = "anthropic:claude-sonnet-4-6"
     provider_tier_lightweight: str = "anthropic:claude-haiku-4-5-20251001"
 
+    # OpenAI (for embeddings only — Memory Layer)
+    openai_api_key: str = ""
+
+    # Memory Layer
+    memory_enabled: bool = True
+    memory_retrieval_k: int = 8
+    memory_relevance_threshold: float = 0.4
+
     # App
     environment: str = "development"
     log_level: str = "INFO"

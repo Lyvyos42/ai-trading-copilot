@@ -353,7 +353,7 @@ def _build_graph() -> StateGraph:
 
 # ─── Public API ───────────────────────────────────────────────────────────
 
-async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced") -> TradingState:
+async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced", user_id: str | None = None) -> TradingState:
     """
     Run the full 9-agent pipeline for a given ticker.
     Returns the completed TradingState with final_signal populated.
@@ -396,12 +396,31 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
             "News context: scraper warming up — agents using estimated data"
         )
 
+    # ── Memory Layer: retrieve user + agent memory ─────────────────────────
+    memory_context = ""
+    if user_id:
+        try:
+            from app.services.memory import memory_manager
+            from app.config import settings
+            if settings.memory_enabled:
+                context_str = f"User analysing {ticker} ({asset_class}) on {timeframe} with {profile} profile"
+                memory_context = memory_manager.build_memory_context(user_id, context_str)
+                if memory_context:
+                    reasoning_prefix.append(
+                        f"Memory Layer: {len(memory_context.splitlines())} context lines injected from user history"
+                    )
+        except Exception as exc:
+            import structlog
+            structlog.get_logger().error("memory_retrieval_failed", error=str(exc))
+
     initial_state: TradingState = {
         "ticker":           ticker,
         "timeframe":        timeframe,
         "asset_class":      asset_class,
         "market_data":      market_data,
         "news_context":     news_ctx,
+        "memory_context":   memory_context,
+        "user_id":          user_id or "",
         "strategy_profile": profile,
         "reasoning_chain":  reasoning_prefix,
         "errors": [],
