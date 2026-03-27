@@ -3,7 +3,9 @@ POST /api/v1/signals/generate  — trigger multi-agent pipeline
 GET  /api/v1/signals/{id}      — retrieve signal by ID
 GET  /api/v1/signals           — list recent signals for user
 """
+import hashlib
 import math
+import random
 import time
 import uuid
 from collections import defaultdict
@@ -128,6 +130,130 @@ def _cache_signal(user_id: str, ticker: str, signal_dict: dict) -> None:
     _signal_cache[key] = (time.time() + _CACHE_TTL_S, signal_dict)
 
 
+# ── Tiers that get real AI signals (Claude API calls) ─────────────────────────
+_PAID_TIERS = {"retail", "pro", "enterprise", "admin"}
+
+
+# ── Demo signal generator — no Claude API calls ──────────────────────────────
+# Produces realistic-looking signals using deterministic randomness seeded by
+# ticker + date so the same ticker on the same day returns consistent results.
+
+_DEMO_BULL_CASES = [
+    "Price holding above key support with bullish RSI divergence on 4H. Institutional accumulation visible in order flow delta.",
+    "Strong earnings momentum with revenue beat. MACD crossover confirmed on daily, aligned with sector rotation into risk-on.",
+    "Breakout above consolidation range with volume confirmation. Macro backdrop supportive with dovish central bank guidance.",
+    "Multiple timeframe alignment: bullish on daily, 4H, and 1H. Sentiment skewed positive from recent catalyst.",
+]
+_DEMO_BEAR_CASES = [
+    "Approaching major resistance with bearish divergence on RSI. Volume declining on rallies suggests distribution.",
+    "Macro headwinds: rising yields compressing multiples. Sector peers showing relative weakness.",
+    "Overextended from 20-day moving average. Mean reversion probability elevated based on historical Z-score.",
+    "Negative news flow creating sentiment drag. Order flow shows persistent selling pressure at current levels.",
+]
+_DEMO_STRATEGIES = [
+    ["RSI Divergence", "MACD Crossover", "Volume Profile"],
+    ["Mean Reversion", "Bollinger Band Squeeze", "Kelly Criterion"],
+    ["Momentum Breakout", "Fibonacci Retracement", "ATR Trailing Stop"],
+    ["Institutional Order Flow", "Market Profile", "VWAP Deviation"],
+]
+
+def _generate_demo_signal(ticker: str, asset_class: str, timeframe: str) -> dict:
+    """Generate a realistic simulated signal without calling Claude."""
+    # Deterministic seed: same ticker + day = same result
+    seed_str = f"{ticker}:{datetime.utcnow().strftime('%Y-%m-%d')}:{timeframe}"
+    seed = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    rng = random.Random(seed)
+
+    direction = rng.choice(["LONG", "SHORT"])
+    confidence = round(rng.uniform(52, 85), 1)
+    bullish_pct = round(rng.uniform(35, 80), 1)
+    bearish_pct = round(100 - bullish_pct, 1)
+    if direction == "SHORT":
+        bullish_pct, bearish_pct = bearish_pct, bullish_pct
+
+    # Price levels — realistic relative distances
+    base_prices = {
+        "XAUUSD": 2400, "EURUSD": 1.08, "GBPUSD": 1.27, "USDJPY": 155,
+        "BTC": 65000, "ETH": 3200, "AAPL": 190, "MSFT": 420, "NVDA": 880,
+        "TSLA": 175, "US30": 40000, "US500": 5300, "XAGUSD": 28,
+    }
+    # Find a matching base price or derive one
+    base = None
+    for key, val in base_prices.items():
+        if key in ticker:
+            base = val
+            break
+    if base is None:
+        base = rng.uniform(50, 500)
+
+    entry = round(base * rng.uniform(0.97, 1.03), 2 if base > 100 else 5)
+    atr_pct = rng.uniform(0.008, 0.025)
+    sl_dist = entry * atr_pct
+    if direction == "LONG":
+        sl = round(entry - sl_dist, 2 if base > 100 else 5)
+        tp1 = round(entry + sl_dist * 1.5, 2 if base > 100 else 5)
+        tp2 = round(entry + sl_dist * 2.5, 2 if base > 100 else 5)
+        tp3 = round(entry + sl_dist * 3.5, 2 if base > 100 else 5)
+    else:
+        sl = round(entry + sl_dist, 2 if base > 100 else 5)
+        tp1 = round(entry - sl_dist * 1.5, 2 if base > 100 else 5)
+        tp2 = round(entry - sl_dist * 2.5, 2 if base > 100 else 5)
+        tp3 = round(entry - sl_dist * 3.5, 2 if base > 100 else 5)
+
+    rr = round(abs(tp2 - entry) / abs(sl - entry), 1) if abs(sl - entry) > 0 else 2.0
+    idx = rng.randint(0, len(_DEMO_BULL_CASES) - 1)
+
+    agent_names = ["fundamental", "technical", "sentiment", "macro", "order_flow", "regime_change", "correlation"]
+    agent_votes = {}
+    for name in agent_names:
+        a_dir = direction if rng.random() > 0.25 else ("SHORT" if direction == "LONG" else "LONG")
+        a_conf = round(rng.uniform(45, 90), 1)
+        agent_votes[name] = {
+            "direction": a_dir, "confidence": a_conf,
+            "bullish_contribution": round(rng.uniform(5, 20), 1),
+            "bearish_contribution": round(rng.uniform(5, 20), 1),
+        }
+    agent_votes["risk_approved"] = True
+    agent_votes["quant_validated"] = rng.random() > 0.3
+
+    conviction = "HIGH" if confidence > 72 else "MODERATE" if confidence > 60 else "LOW"
+    window_map = {"1m": "1-4 hours", "5m": "4-12 hours", "15m": "12-24 hours",
+                  "30m": "1-2 days", "1h": "1-3 days", "4h": "3-7 days", "1D": "3-7 days"}
+    analytical_window = window_map.get(timeframe, "3-7 days")
+
+    now = datetime.utcnow()
+    return {
+        "ticker": ticker, "asset_class": asset_class, "timeframe": timeframe,
+        "direction": direction,
+        "entry_price": entry, "stop_loss": sl,
+        "take_profit_1": tp1, "take_profit_2": tp2, "take_profit_3": tp3,
+        "confidence_score": confidence,
+        "probability_score": confidence,
+        "bullish_pct": bullish_pct, "bearish_pct": bearish_pct,
+        "research_target": tp2, "invalidation_level": sl,
+        "risk_reward_ratio": rr,
+        "analytical_window": analytical_window,
+        "bull_case": _DEMO_BULL_CASES[idx],
+        "bear_case": _DEMO_BEAR_CASES[idx],
+        "conviction_tier": conviction,
+        "agent_votes": agent_votes,
+        "reasoning_chain": [
+            f"7 analyst agents ran parallel analysis on {ticker} ({timeframe})",
+            f"Majority consensus: {direction} with {confidence}% confidence",
+            f"Risk Manager approved — R:R {rr}:1, Kelly sizing applied",
+            "Trader agent synthesized final signal with probability model",
+        ],
+        "strategy_sources": _DEMO_STRATEGIES[idx],
+        "timeframe_levels": {},
+        "status": "ACTIVE",
+        "timestamp": now.isoformat() + "Z",
+        "expiry_time": (now + timedelta(hours=24)).isoformat() + "Z",
+        "pipeline_latency_ms": rng.randint(800, 3500),
+        "agent_detail": {name: agent_votes.get(name) for name in agent_names},
+        "is_demo": True,
+    }
+
+
 class GenerateRequest(BaseModel):
     ticker: str
     asset_class: str = "stocks"
@@ -194,7 +320,56 @@ async def generate_signal(
     if not _is_valid_ticker(ticker):
         raise HTTPException(status_code=400, detail="Invalid ticker format. Use standard exchange symbols (e.g. AAPL, BTC-USD, EURUSD=X).")
 
-    # Run multi-agent pipeline
+    # ── Demo signals for free tier & visitors (no Claude API cost) ────────────
+    tier = "free"
+    if user and db_user:
+        tier = db_user.tier or "free"
+    elif user:
+        tier = user.get("tier", "free") or "free"
+
+    if tier not in _PAID_TIERS:
+        demo = _generate_demo_signal(ticker, body.asset_class, body.timeframe)
+        # Persist demo signal to DB so it shows in signal feed / journal
+        user_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
+        signal = Signal(
+            user_id=user_id,
+            ticker=ticker,
+            asset_class=body.asset_class,
+            timeframe=body.timeframe,
+            direction=demo["direction"],
+            entry_price=demo["entry_price"],
+            stop_loss=demo["stop_loss"],
+            take_profit_1=demo["take_profit_1"],
+            take_profit_2=demo["take_profit_2"],
+            take_profit_3=demo["take_profit_3"],
+            confidence_score=demo["confidence_score"],
+            agent_votes=demo["agent_votes"],
+            reasoning_chain=demo["reasoning_chain"],
+            strategy_sources=demo["strategy_sources"],
+            timeframe_levels={},
+            status="ACTIVE",
+            expiry_time=datetime.utcnow() + timedelta(hours=24),
+            probability_score=demo["probability_score"],
+            bullish_pct=demo["bullish_pct"],
+            bearish_pct=demo["bearish_pct"],
+            research_target=demo["research_target"],
+            invalidation_level=demo["invalidation_level"],
+            risk_reward_ratio=demo["risk_reward_ratio"],
+            analytical_window=demo["analytical_window"],
+            bull_case=demo["bull_case"],
+            bear_case=demo["bear_case"],
+            conviction_tier=demo["conviction_tier"],
+        )
+        try:
+            db.add(signal)
+            await db.commit()
+            await db.refresh(signal)
+            demo["signal_id"] = str(signal.id)
+        except Exception:
+            demo["signal_id"] = None
+        return demo
+
+    # ── Real AI pipeline (paid tiers only) ────────────────────────────────────
     # Resolve profile: request param takes priority, then user's DB setting, then default
     profile_slug = body.profile
     if profile_slug == "balanced" and user:
