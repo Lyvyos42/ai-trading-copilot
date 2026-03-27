@@ -123,7 +123,7 @@ async def close_position(
     realized = _calc_pnl(position.direction, position.entry_price, close_price, position.quantity)
 
     position.status = "CLOSED"
-    position.closed_at = datetime.now(timezone.utc)
+    position.closed_at = datetime.utcnow()
     position.close_price = close_price
     position.realized_pnl = round(realized, 2)
 
@@ -138,7 +138,7 @@ async def close_position(
             linked_signal.pnl_pct = round(
                 realized / (position.entry_price * position.quantity) * 100, 4
             ) if position.entry_price and position.quantity else 0
-            linked_signal.resolved_at = datetime.now(timezone.utc)
+            linked_signal.resolved_at = datetime.utcnow()
 
     await db.commit()
 

@@ -61,7 +61,7 @@ async def evaluate_signals(
                 signal.outcome = outcome
                 signal.exit_price = current_price
                 signal.pnl_pct = round(pnl_pct, 4)
-                signal.resolved_at = datetime.now(timezone.utc)
+                signal.resolved_at = datetime.utcnow()
                 resolved.append({
                     "signal_id": str(signal.id),
                     "ticker": signal.ticker,
@@ -82,9 +82,9 @@ async def evaluate_signals(
             errors.append({"signal_id": str(signal.id), "ticker": signal.ticker, "error": str(exc)})
 
     # Check for expired signals (past expiry_time)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     for signal in active_signals:
-        if signal.expiry_time and signal.expiry_time.replace(tzinfo=timezone.utc) < now and signal.status == "ACTIVE":
+        if signal.expiry_time and signal.expiry_time < now and signal.status == "ACTIVE":
             signal.status = "EXPIRED"
             signal.outcome = "EXPIRED"
             signal.resolved_at = now

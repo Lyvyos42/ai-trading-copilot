@@ -450,7 +450,7 @@ async def set_signal_outcome(
         signal.exit_price = body.exit_price
     if body.pnl_pct is not None:
         signal.pnl_pct = body.pnl_pct
-    signal.resolved_at = datetime.now(timezone.utc)
+    signal.resolved_at = datetime.utcnow()
     await db.commit()
     await db.refresh(signal)
 
