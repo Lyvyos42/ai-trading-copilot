@@ -32,7 +32,7 @@ const SECTIONS = [
     icon: IconAgents,
     title: "AI Agents",
     href: "/agents",
-    description: "Meet the 9 specialized AI agents + Risk Gate powering every signal. View each agent's role, methodology, latency, accuracy, and current status. Includes Order Flow, Regime Change, Correlation, and Quant analysts alongside the core four.",
+    description: "Meet the 9 specialized AI agents + Risk Gate powering every signal. View each agent's role, methodology, latency, accuracy, and current status. All 9 agents — Fundamental, Technical, Sentiment, Macro, Order Flow, Regime Change, Correlation, Quant, and Trader — work together with the Risk Manager and Risk Gate.",
     features: [
       "9 analyst agents + Trader + Risk Gate (11 total components)",
       "Powered by Claude Opus 4 (Trader) and Claude Sonnet 4 (Analysts)",

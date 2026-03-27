@@ -9,8 +9,17 @@ import { EquityCurve } from "@/components/EquityCurve";
 import { MonthlyHeatmap } from "@/components/MonthlyHeatmap";
 import { CalibrationChart } from "@/components/CalibrationChart";
 import { AgentLeaderboard } from "@/components/AgentLeaderboard";
+import { PremiumGate } from "@/components/PremiumGate";
 
 export default function PerformancePage() {
+  return (
+    <PremiumGate requiredTier="retail" feature="Performance Analytics" reason="Equity curve, agent leaderboard, calibration charts, and monthly heatmap. Available on Retail and above.">
+      <PerformanceContent />
+    </PremiumGate>
+  );
+}
+
+function PerformanceContent() {
   const [summary, setSummary] = useState<PerformanceSummary | null>(null);
   const [curve, setCurve] = useState<EquityCurvePoint[]>([]);
   const [assetClasses, setAssetClasses] = useState<AssetClassPerformance[]>([]);

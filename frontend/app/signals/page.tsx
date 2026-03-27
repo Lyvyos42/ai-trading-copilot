@@ -224,7 +224,7 @@ export default function SignalsPage() {
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["5 AI signals / day", "Stocks & ETFs only", "Paper trading portfolio", "Market intel & news"] },
+                { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["2 AI signals / day", "Stocks & ETFs only", "Paper trading portfolio", "Market intel & news"] },
                 { label: "RETAIL — $49/mo", color: "hsl(var(--primary))", features: ["Unlimited signals", "All 8 asset classes", "All 80+ strategies", "Bull/Bear agent debate"] },
                 { label: "PRO — $199/mo", color: "#f59e0b", features: ["Everything in Retail", "Custom agent tuning", "API & webhook access", "Priority support"] },
               ].map(({ label, color, features }) => (

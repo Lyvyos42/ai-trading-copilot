@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getMemories, deleteMemory, getMemoryStats, getMemoryPreferences, getAgentCorrections } from "@/lib/api";
 import type { Memory, MemoryStats, UserPreferences, AgentCorrectionItem } from "@/lib/api";
+import { PremiumGate } from "@/components/PremiumGate";
 
 const TYPE_COLORS: Record<string, string> = {
   BEHAVIOURAL: "#D4A240",
@@ -20,6 +21,14 @@ const IMPORTANCE_BADGE: Record<string, { bg: string; color: string }> = {
 };
 
 export default function MemoryPage() {
+  return (
+    <PremiumGate requiredTier="retail" feature="Memory Layer" reason="AI memory tracks your behavior and agent corrections to improve signal accuracy over time. Available on Retail and above.">
+      <MemoryContent />
+    </PremiumGate>
+  );
+}
+
+function MemoryContent() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);

@@ -561,7 +561,7 @@ export default function AgentsPage() {
         onClose={() => setUpgradeOpen(false)}
         feature="Bull/Bear Agent Debate"
         requiredTier="retail"
-        reason="Force a live Bull vs Bear debate between the 4 analyst agents and get a final TraderAgent verdict. Available on Retail and above."
+        reason="Force a live Bull vs Bear debate between the 9 analyst agents and get a final TraderAgent verdict. Available on Retail and above."
       />
     </div>
   );

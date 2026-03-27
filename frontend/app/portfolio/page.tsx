@@ -52,6 +52,7 @@ export default function PortfolioPage() {
     setClosing(posId);
     try {
       await closePosition(posId);
+      window.dispatchEvent(new CustomEvent("signal-resolved"));
       await load(); // refresh after closing
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to close position");

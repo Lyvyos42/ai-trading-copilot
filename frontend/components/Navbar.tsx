@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
@@ -25,7 +25,7 @@ import {
 } from "@/components/icons/GeoIcons";
 
 const NAV_ITEMS = [
-  { href: "/dashboard",    label: "TERMINAL",     Icon: IconTerminal },
+  { href: "/dashboard",    label: "DASHBOARD",    Icon: IconTerminal },
   { href: "/signals",      label: "SIGNALS",      Icon: IconSignal },
   { href: "/performance",  label: "PERFORMANCE",  Icon: IconSignal },
   { href: "/journal",      label: "JOURNAL",      Icon: IconPortfolio },
@@ -59,7 +59,7 @@ const TIER_COLOR: Record<UserTier, string> = {
 
 const TIER_QUOTA: Record<UserTier, number | null> = {
   visitor:    0,
-  free:       5,
+  free:       2,
   retail:     50,
   pro:        200,
   enterprise: null,
@@ -91,25 +91,39 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [dropdownOpen]);
 
+  const refreshSignalCount = useCallback(async () => {
+    if (!isLoggedIn) return;
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${API}/api/v1/signals?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const signals: { timestamp: string; status?: string }[] = await res.json();
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const todayActive = signals.filter(s =>
+        new Date(s.timestamp) >= todayStart &&
+        (!s.status || s.status === "ACTIVE" || s.status === "EXECUTED")
+      );
+      setSignalsToday(todayActive.length);
+    } catch {}
+  }, [isLoggedIn]);
+
+  // Refresh when dropdown opens
   useEffect(() => {
-    if (!dropdownOpen || !isLoggedIn) return;
-    (async () => {
-      try {
-        const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token ?? localStorage.getItem("token");
-        if (!token) return;
-        const res = await fetch(`${API}/api/v1/signals?limit=100`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const signals: { timestamp: string }[] = await res.json();
-        const todayStart = new Date();
-        todayStart.setUTCHours(0, 0, 0, 0);
-        setSignalsToday(signals.filter(s => new Date(s.timestamp) >= todayStart).length);
-      } catch {}
-    })();
-  }, [dropdownOpen, isLoggedIn]);
+    if (dropdownOpen) refreshSignalCount();
+  }, [dropdownOpen, refreshSignalCount]);
+
+  // Refresh when a signal is resolved anywhere in the app
+  useEffect(() => {
+    const handler = () => refreshSignalCount();
+    window.addEventListener("signal-resolved", handler);
+    return () => window.removeEventListener("signal-resolved", handler);
+  }, [refreshSignalCount]);
 
   const handleLogout = async () => {
     setDropdownOpen(false);

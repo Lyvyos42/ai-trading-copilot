@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { BarChart2, Play, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, X } from "lucide-react";
 import { runBacktest, listStrategies } from "@/lib/api";
 import { formatPct } from "@/lib/utils";
+import { PremiumGate } from "@/components/PremiumGate";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -73,6 +74,14 @@ function EquityCurve({ data, positive }: { data: number[]; positive: boolean }) 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function BacktestPage() {
+  return (
+    <PremiumGate requiredTier="retail" feature="Backtesting Engine" reason="Run full backtests with equity curves and performance metrics. Available on Retail and above.">
+      <BacktestContent />
+    </PremiumGate>
+  );
+}
+
+function BacktestContent() {
   const [tab, setTab] = useState<Tab>("chart");
 
   // ── Chart state ──────────────────────────────────────────────────────────────

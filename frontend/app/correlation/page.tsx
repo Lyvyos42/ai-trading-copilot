@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getCorrelationMatrix, getCorrelationPair, wakeBackend, type CorrelationMatrix, type CorrelationPair } from "@/lib/api";
+import { PremiumGate } from "@/components/PremiumGate";
 
 const PERIODS = [
   { label: "30D", value: 30 },
@@ -29,6 +30,14 @@ function corrTextColor(v: number): string {
 }
 
 export default function CorrelationPage() {
+  return (
+    <PremiumGate requiredTier="retail" feature="Correlation Map" reason="Cross-asset correlation heatmap and pair analysis. Available on Retail and above.">
+      <CorrelationContent />
+    </PremiumGate>
+  );
+}
+
+function CorrelationContent() {
   const [data, setData] = useState<CorrelationMatrix | null>(null);
   const [period, setPeriod] = useState(90);
   const [loading, setLoading] = useState(true);

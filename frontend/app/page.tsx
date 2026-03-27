@@ -54,7 +54,7 @@ const TIERS = [
     name: "Free",
     price: "$0",
     period: null,
-    features: ["Paper trading", "5 signals / day", "1 asset class", "Delayed data"],
+    features: ["Paper trading", "2 signals / day", "1 asset class", "Delayed data"],
     cta: "Start Free",
     highlight: false,
     color: "hsl(var(--muted-foreground))",

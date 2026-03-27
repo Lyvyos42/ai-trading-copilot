@@ -87,13 +87,13 @@
     --perspective:     800px;
 
     /* Typography scale — readable, professional */
-    --text-xs:    13px;
-    --text-sm:    14px;
-    --text-base:  16px;
-    --text-lg:    18px;
-    --text-xl:    22px;
-    --text-2xl:   26px;
-    --text-3xl:   32px;
+    --text-xs:    12px;
+    --text-sm:    13px;
+    --text-base:  15px;
+    --text-lg:    17px;
+    --text-xl:    21px;
+    --text-2xl:   25px;
+    --text-3xl:   31px;
 
     --radius: 2px;
   }

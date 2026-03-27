@@ -264,8 +264,9 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                   signal={signal}
                   compact
                   onExecute={() => setTradeOpened(true)}
-                  onResolve={(id, outcome) => {
-                    setSignals(prev => prev.map(s => s.signal_id === id ? { ...s, status: outcome } : s));
+                  onResolve={(id) => {
+                    setSignals(prev => prev.filter(s => s.signal_id !== id));
+                    if (selectedSignal?.signal_id === id) setSelectedSignal(null);
                   }}
                 />
               </div>
@@ -320,7 +321,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         onClose={() => setUpgradeOpen(false)}
         feature="Unlimited AI Analysis"
         requiredTier="retail"
-        reason="Free accounts can run 3 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
+        reason="Free accounts can run 2 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
       />
     </div>
   );

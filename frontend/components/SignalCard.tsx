@@ -39,6 +39,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executed, setExecuted]   = useState(false);
   const [resolving, setResolving]   = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const [resolved, setResolved]     = useState<"WIN" | "LOSS" | null>(
     signal.status === "WIN" || signal.status === "LOSS" ? (signal.status as "WIN" | "LOSS") : null
   );
@@ -76,12 +77,15 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   const handleResolve = async (e: React.MouseEvent, outcome: "WIN" | "LOSS") => {
     e.stopPropagation();
     setResolving(true);
+    setResolveError(null);
     try {
       await resolveSignal(signal.signal_id, outcome);
       setResolved(outcome);
       onResolve?.(signal.signal_id, outcome);
-    } catch {
-      // silent — user can retry
+      // Dispatch global event so Navbar can refresh signal count
+      window.dispatchEvent(new CustomEvent("signal-resolved"));
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : "Failed to resolve");
     } finally {
       setResolving(false);
     }
@@ -195,6 +199,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
             </>
           )}
           <div className="ml-auto flex items-center gap-1.5">
+            {resolveError && <span className="text-[8px] font-mono text-bear truncate">{resolveError}</span>}
             {executeError && <span className="text-[8px] font-mono text-bear truncate">Error</span>}
             {executed ? (
               <span className="text-[8px] font-mono text-bull">

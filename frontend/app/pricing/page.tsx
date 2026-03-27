@@ -30,7 +30,7 @@ const TIERS = [
       "3 strategies (momentum, MA, value)",
       "1 asset class (stocks)",
       "Delayed data (15min)",
-      "10 signals/day",
+      "2 signals/day",
       "Community support",
     ],
     cta: "Start Free",

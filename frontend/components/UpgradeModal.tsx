@@ -16,7 +16,7 @@ const TIER_INFO = {
     color: "text-muted-foreground",
     borderColor: "border-border",
     icon: Zap,
-    features: ["3 AI signals/day", "Paper trading", "Basic charts", "Market intel"],
+    features: ["2 AI signals/day", "Paper trading", "Basic charts", "Market intel"],
   },
   retail: {
     label: "RETAIL",
@@ -94,7 +94,7 @@ export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }:
             SEE ALL PLANS
           </a>
           <a
-            href="https://wa.me/message/YOURWANUMBER"
+            href="https://wa.me/40770338051"
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 py-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[13px] font-mono font-bold text-center hover:bg-primary/20 transition-colors"
