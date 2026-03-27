@@ -95,14 +95,14 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={cn(
-              "text-[9px] font-mono font-bold px-1 rounded",
+              "text-[13px] font-mono font-bold px-1 rounded",
               isBullish ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
             )}>
               {isBullish ? "▲" : "▼"}
             </span>
             <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
             <span className={cn(
-              "text-[9px] font-mono font-semibold px-1.5 rounded border",
+              "text-[13px] font-mono font-semibold px-1.5 rounded border",
               leanBg, leanColor
             )}>
               {Math.round(prob)}% {lean}
@@ -116,17 +116,17 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         {/* Row 2: Research Target + Invalidation + R:R */}
         <div className="flex items-center gap-3 mt-1.5">
           {signal.research_target && (
-            <span className="text-[9px] font-mono text-muted-foreground">
+            <span className="text-[13px] font-mono text-muted-foreground">
               TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target)}</span>
             </span>
           )}
           {signal.invalidation_level && (
-            <span className="text-[9px] font-mono text-muted-foreground">
+            <span className="text-[13px] font-mono text-muted-foreground">
               INVAL <span className="text-bear font-semibold">{formatPrice(signal.invalidation_level)}</span>
             </span>
           )}
           {rrRatio > 0 && (
-            <span className="text-[9px] font-mono text-muted-foreground">
+            <span className="text-[13px] font-mono text-muted-foreground">
               R:R <span className="text-foreground font-semibold">{typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1</span>
             </span>
           )}
@@ -137,7 +137,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           <div className="flex items-center gap-2 flex-1 mr-3">
             <ProbabilityBar bullPct={bullPct} bearPct={bearPct} />
           </div>
-          <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground shrink-0">
+          <div className="flex items-center gap-1 text-[13px] font-mono text-muted-foreground shrink-0">
             <Clock className="h-2.5 w-2.5" />
             {timeAgo(signal.timestamp)}
             {signal.analytical_window && (
@@ -233,7 +233,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               </span>
               <ConvictionBadge tier={convictionTier} />
               {signal.analytical_window && (
-                <span className="text-[9px] font-mono text-primary/70 border border-primary/20 px-1.5 py-0.5 rounded">
+                <span className="text-[13px] font-mono text-primary/70 border border-primary/20 px-1.5 py-0.5 rounded">
                   {signal.analytical_window}
                 </span>
               )}
@@ -254,8 +254,8 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         {/* Probability bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
-            <span className="text-[10px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
+            <span className="text-[14px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
+            <span className="text-[14px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
           </div>
           <ProbabilityBar bullPct={bullPct} bearPct={bearPct} tall />
         </div>
@@ -270,7 +270,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               {signal.research_target ? formatPrice(signal.research_target) : formatPrice(signal.take_profit_1)}
             </div>
             {signal.research_target && signal.entry_price > 0 && (
-              <div className="text-[9px] font-mono text-bull/70 mt-0.5">
+              <div className="text-[13px] font-mono text-bull/70 mt-0.5">
                 +{((Math.abs(signal.research_target - signal.entry_price) / signal.entry_price) * 100).toFixed(1)}%
               </div>
             )}
@@ -283,7 +283,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               {signal.invalidation_level ? formatPrice(signal.invalidation_level) : formatPrice(signal.stop_loss)}
             </div>
             {signal.invalidation_level && signal.entry_price > 0 && (
-              <div className="text-[9px] font-mono text-bear/70 mt-0.5">
+              <div className="text-[13px] font-mono text-bear/70 mt-0.5">
                 -{((Math.abs(signal.entry_price - signal.invalidation_level) / signal.entry_price) * 100).toFixed(1)}%
               </div>
             )}
@@ -293,7 +293,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
             <div className="text-xs font-mono font-bold text-primary">
               {typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1
             </div>
-            <div className="text-[9px] font-mono text-muted-foreground mt-0.5">
+            <div className="text-[13px] font-mono text-muted-foreground mt-0.5">
               risk/reward
             </div>
           </div>
@@ -312,7 +312,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               const isPos = net >= 0;
               return (
                 <div key={agent} className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-muted-foreground w-20 shrink-0 uppercase">
+                  <span className="text-[14px] font-mono text-muted-foreground w-20 shrink-0 uppercase">
                     {AGENT_LABELS[agent] || agent}
                   </span>
                   <div className="flex-1 flex items-center gap-1">
@@ -329,7 +329,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
                     </div>
                   </div>
                   <span className={cn(
-                    "text-[10px] font-mono font-bold w-10 text-right",
+                    "text-[14px] font-mono font-bold w-10 text-right",
                     isPos ? "text-bull" : "text-bear"
                   )}>
                     {isPos ? "+" : ""}{net.toFixed(0)}pp
@@ -345,18 +345,18 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           <div className="grid grid-cols-2 gap-2 mb-4">
             {signal.bull_case && (
               <div className="p-2.5 rounded border border-bull/20 bg-bull/5">
-                <div className="text-[9px] font-mono font-bold text-bull mb-1 flex items-center gap-1">
+                <div className="text-[13px] font-mono font-bold text-bull mb-1 flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3" /> BULL CASE
                 </div>
-                <p className="text-[10px] font-mono text-foreground/80 leading-relaxed">{signal.bull_case}</p>
+                <p className="text-[14px] font-mono text-foreground/80 leading-relaxed">{signal.bull_case}</p>
               </div>
             )}
             {signal.bear_case && (
               <div className="p-2.5 rounded border border-bear/20 bg-bear/5">
-                <div className="text-[9px] font-mono font-bold text-bear mb-1 flex items-center gap-1">
+                <div className="text-[13px] font-mono font-bold text-bear mb-1 flex items-center gap-1">
                   <ArrowDownRight className="h-3 w-3" /> BEAR CASE
                 </div>
-                <p className="text-[10px] font-mono text-foreground/80 leading-relaxed">{signal.bear_case}</p>
+                <p className="text-[14px] font-mono text-foreground/80 leading-relaxed">{signal.bear_case}</p>
               </div>
             )}
           </div>
@@ -382,12 +382,12 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
             </div>
           )}
           {signal.strategy_sources?.length > 0 && signal.strategy_sources.slice(0, 3).map((s) => (
-            <span key={s} className="text-[9px] font-mono bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded border border-border/50">
+            <span key={s} className="text-[13px] font-mono bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded border border-border/50">
               {s.replace(/_/g, " ")}
             </span>
           ))}
           {(signal.strategy_sources?.length ?? 0) > 3 && (
-            <span className="text-[9px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
+            <span className="text-[13px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
           )}
         </div>
 
@@ -407,32 +407,32 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         {/* Actions */}
         <div className="flex flex-col gap-1.5 pt-2 border-t border-border/50">
           {executeError && (
-            <div className="text-[10px] font-mono text-bear bg-bear/10 border border-bear/30 rounded px-2 py-1">
+            <div className="text-[14px] font-mono text-bear bg-bear/10 border border-bear/30 rounded px-2 py-1">
               {executeError}
             </div>
           )}
           {executed && (
-            <div className="text-[10px] font-mono text-bull bg-bull/10 border border-bull/30 rounded px-2 py-1">
+            <div className="text-[14px] font-mono text-bull bg-bull/10 border border-bull/30 rounded px-2 py-1">
               Paper trade opened — check Portfolio
             </div>
           )}
           <div className="flex items-center justify-between">
             <button
-              className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-[14px] font-mono text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               {expanded ? "HIDE" : "REASONING"}
             </button>
             <div className="flex gap-2">
-              <button className="text-[10px] font-mono px-2 py-1 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <button className="text-[14px] font-mono px-2 py-1 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                 <Target className="h-2.5 w-2.5" /> BACKTEST
               </button>
               <button
                 onClick={handleExecute}
                 disabled={loading || executed}
                 className={cn(
-                  "text-[10px] font-mono px-3 py-1 rounded border font-bold transition-colors",
+                  "text-[14px] font-mono px-3 py-1 rounded border font-bold transition-colors",
                   (loading || executed) ? "opacity-50 cursor-not-allowed" : "",
                   isBullish
                     ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
@@ -471,7 +471,7 @@ function ProbabilityDonut({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-[11px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}%</span>
+        <span className="text-[13px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}%</span>
         <span className="text-[7px] font-mono text-muted-foreground leading-none mt-0.5">
           {isBull ? "BULL" : "BEAR"}
         </span>
@@ -494,7 +494,7 @@ function ConvictionBadge({ tier, size }: { tier: string; size?: "sm" }) {
   return (
     <span className={cn(
       "font-mono font-bold rounded border",
-      isSm ? "text-[8px] px-1 py-0.5" : "text-[9px] px-1.5 py-0.5",
+      isSm ? "text-[8px] px-1 py-0.5" : "text-[13px] px-1.5 py-0.5",
       tier === "HIGH"     ? "bg-bull/10 text-bull border-bull/20" :
       tier === "MODERATE" ? "bg-warn/10 text-warn border-warn/20" :
       tier === "LOW"      ? "bg-muted text-muted-foreground border-border/30" :

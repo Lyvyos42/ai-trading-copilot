@@ -59,7 +59,7 @@ export function AlertToast({ alert, onDismiss }: AlertToastProps) {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Zap className="h-3 w-3 text-primary animate-pulse" />
-            <span className="text-[9px] font-mono font-bold text-primary tracking-widest">
+            <span className="text-[13px] font-mono font-bold text-primary tracking-widest">
               OPPORTUNITY DETECTED
             </span>
           </div>
@@ -71,7 +71,7 @@ export function AlertToast({ alert, onDismiss }: AlertToastProps) {
         {/* Ticker + direction */}
         <div className="flex items-center gap-2 mb-1.5">
           <div className={cn(
-            "flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold",
+            "flex items-center gap-1 px-1.5 py-0.5 rounded border text-[13px] font-mono font-bold",
             isLong ? "bg-bull/10 border-bull/30 text-bull" : "bg-bear/10 border-bear/30 text-bear"
           )}>
             {isLong ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
@@ -79,7 +79,7 @@ export function AlertToast({ alert, onDismiss }: AlertToastProps) {
           </div>
           <span className="font-mono text-sm font-bold text-foreground">{alert.ticker}</span>
           <span className={cn(
-            "ml-auto text-[10px] font-mono font-bold",
+            "ml-auto text-[14px] font-mono font-bold",
             alert.confidence >= 80 ? "text-bull" : "text-warn"
           )}>
             {Math.round(alert.confidence)}%
@@ -87,33 +87,33 @@ export function AlertToast({ alert, onDismiss }: AlertToastProps) {
         </div>
 
         {/* Summary */}
-        <p className="text-[10px] text-muted-foreground font-mono leading-relaxed mb-2 line-clamp-2">
+        <p className="text-[14px] text-muted-foreground font-mono leading-relaxed mb-2 line-clamp-2">
           {alert.summary}
         </p>
 
         {/* Entry hint */}
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[9px] font-mono text-muted-foreground">
+          <span className="text-[13px] font-mono text-muted-foreground">
             ENTRY HINT <span className="text-foreground font-semibold">
               {alert.entry_hint > 1000
                 ? alert.entry_hint.toLocaleString("en-US", { maximumFractionDigits: 0 })
                 : alert.entry_hint.toFixed(4)}
             </span>
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground">{timeLeft}s</span>
+          <span className="text-[13px] font-mono text-muted-foreground">{timeLeft}s</span>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleViewIntel}
-            className="flex-1 text-[9px] font-mono font-bold px-2 py-1.5 rounded border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+            className="flex-1 text-[13px] font-mono font-bold px-2 py-1.5 rounded border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
           >
             VIEW INTEL →
           </button>
           <button
             onClick={handleDismiss}
-            className="text-[9px] font-mono px-2 py-1.5 rounded border border-border/40 text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[13px] font-mono px-2 py-1.5 rounded border border-border/40 text-muted-foreground hover:text-foreground transition-colors"
           >
             DISMISS
           </button>

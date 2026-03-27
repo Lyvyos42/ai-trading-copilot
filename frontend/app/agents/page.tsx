@@ -240,14 +240,14 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
           <div className="flex-1 min-w-0">
             {/* Role description */}
             <p
-              className="text-[10px] leading-relaxed mb-2"
+              className="text-[14px] leading-relaxed mb-2"
               style={{ color: "hsl(var(--muted-foreground))" }}
             >
               {meta.role}
             </p>
             {/* Model badge */}
             <span
-              className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5"
+              className="inline-flex items-center text-[13px] font-bold px-1.5 py-0.5"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 color,
@@ -380,7 +380,7 @@ export default function AgentsPage() {
             Agent Network
           </span>
           <span
-            className="text-[9px] font-bold"
+            className="text-[13px] font-bold"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
           >
             — LangGraph DAG Pipeline
@@ -496,7 +496,7 @@ export default function AgentsPage() {
                     />
                     <span className="terminal-label text-bull">BULL CASE</span>
                   </div>
-                  <p className="p-3 text-[11px] leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  <p className="p-3 text-[13px] leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
                     {debate.bull_case as string}
                   </p>
                 </div>
@@ -515,7 +515,7 @@ export default function AgentsPage() {
                     />
                     <span className="terminal-label text-bear">BEAR CASE</span>
                   </div>
-                  <p className="p-3 text-[11px] leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  <p className="p-3 text-[13px] leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
                     {debate.bear_case as string}
                   </p>
                 </div>
@@ -544,7 +544,7 @@ export default function AgentsPage() {
                     {debate.final_direction as string}
                   </div>
                   <div
-                    className="text-[11px]"
+                    className="text-[13px]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
                   >
                     CONFIDENCE {Math.round(debate.confidence_score as number)}%

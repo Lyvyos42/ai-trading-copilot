@@ -169,7 +169,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     key={ticker}
                     onClick={() => setActiveTicker(ticker)}
                     className={cn(
-                      "px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors",
+                      "px-2 py-0.5 rounded text-[14px] font-mono font-bold border transition-colors",
                       activeTicker === ticker
                         ? "bg-primary/10 border-primary/50 text-primary"
                         : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
@@ -190,7 +190,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 }}
                 disabled={loading || activeTickerLocked}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
                   loading || activeTickerLocked
                     ? "border-border/40 text-muted-foreground/50 cursor-not-allowed"
                     : "border-primary/50 text-primary hover:bg-primary/10"
@@ -222,7 +222,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           <div className="terminal-header shrink-0">
             <span className="terminal-label">SIGNAL FEED</span>
             {loading && (
-              <div className="ml-auto flex items-center gap-1 text-[9px] font-mono text-primary">
+              <div className="ml-auto flex items-center gap-1 text-[13px] font-mono text-primary">
                 <Activity className="h-2.5 w-2.5 animate-spin" />
                 RUNNING
               </div>
@@ -231,20 +231,20 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
           <div className="flex-1 overflow-y-auto">
             {analysisError && (
-              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bear/30 bg-bear/5 text-[10px] font-mono text-bear">
+              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bear/30 bg-bear/5 text-[14px] font-mono text-bear">
                 {analysisError}
               </div>
             )}
             {signals.length === 0 && !loading && !analysisError && (
               <div className="flex flex-col items-center justify-center h-40 text-center px-4">
                 <Zap className="h-6 w-6 text-muted-foreground/30 mb-2" />
-                <p className="text-[10px] font-mono text-muted-foreground">
+                <p className="text-[14px] font-mono text-muted-foreground">
                   No signals yet.<br />Select a ticker and run analysis.
                 </p>
               </div>
             )}
             {tradeOpened && (
-              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bull/30 bg-bull/5 text-[10px] font-mono text-bull flex items-center justify-between">
+              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bull/30 bg-bull/5 text-[14px] font-mono text-bull flex items-center justify-between">
                 <span>✓ Paper position opened</span>
                 <a href="/portfolio" className="underline text-bull hover:text-bull/80">View Portfolio →</a>
               </div>
@@ -277,7 +277,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         <div className="hidden xl:flex flex-col w-64 shrink-0">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">AGENT NETWORK</span>
-            <span className="ml-auto font-mono text-[9px] text-bull">{healthyAgents}/{agents.length || 11} HEALTHY</span>
+            <span className="ml-auto font-mono text-[13px] text-bull">{healthyAgents}/{agents.length || 11} HEALTHY</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -300,8 +300,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     <span className="text-[8px] font-bold text-primary">{n}</span>
                   </div>
                   <div>
-                    <div className="text-[10px] font-medium text-foreground leading-tight">{name}</div>
-                    <div className="text-[9px] text-muted-foreground">{detail}</div>
+                    <div className="text-[14px] font-medium text-foreground leading-tight">{name}</div>
+                    <div className="text-[13px] text-muted-foreground">{detail}</div>
                   </div>
                 </div>
               ))}

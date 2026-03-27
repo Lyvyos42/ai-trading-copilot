@@ -27,7 +27,7 @@ export function CalibrationChart({ data }: CalibrationChartProps) {
   return (
     <div className="panel p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">CONFIDENCE CALIBRATION</span>
+        <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">CONFIDENCE CALIBRATION</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet">
         <line x1={scaleX(0)} y1={scaleY(0)} x2={scaleX(100)} y2={scaleY(100)} stroke="hsl(0,0%,20%)" strokeWidth="1" strokeDasharray="4,4" />
@@ -62,7 +62,7 @@ export function CalibrationChart({ data }: CalibrationChartProps) {
           );
         })}
       </svg>
-      <p className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] mt-1">
+      <p className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] mt-1">
         Dots above the diagonal = model is underconfident (good). Below = overconfident.
       </p>
     </div>

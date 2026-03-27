@@ -133,7 +133,7 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
     <div className={fillContainer ? "w-full h-full relative" : "w-full relative rounded overflow-hidden border border-border/50 bg-card"}>
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/70 z-10">
-          <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+          <div className="flex items-center gap-2 text-[14px] font-mono text-muted-foreground">
             <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
             LOADING {ticker}…
           </div>

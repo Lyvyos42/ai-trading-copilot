@@ -85,17 +85,17 @@ export default function JournalPage() {
       {/* Personal Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="panel p-3">
-          <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">TOTAL SIGNALS</span>
+          <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">TOTAL SIGNALS</span>
           <div className="text-lg font-mono font-bold">{totalSignals}</div>
         </div>
         <div className="panel p-3">
-          <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">WIN RATE</span>
+          <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">WIN RATE</span>
           <div className={cn("text-lg font-mono font-bold", Number(winRate) >= 50 ? "text-bull" : resolved > 0 ? "text-bear" : "text-[hsl(var(--foreground))]")}>
             {winRate}{winRate !== "—" && "%"}
           </div>
         </div>
         <div className="panel p-3">
-          <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">W / L</span>
+          <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">W / L</span>
           <div className="text-lg font-mono font-bold">
             <span className="text-bull">{wins}</span>
             <span className="text-[hsl(var(--muted-foreground))]"> / </span>
@@ -103,7 +103,7 @@ export default function JournalPage() {
           </div>
         </div>
         <div className="panel p-3">
-          <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">CUMULATIVE P&L</span>
+          <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">CUMULATIVE P&L</span>
           <div className={cn("text-lg font-mono font-bold", avgPnl >= 0 ? "text-bull" : "text-bear")}>
             {avgPnl >= 0 ? "+" : ""}{avgPnl.toFixed(2)}%
           </div>
@@ -145,7 +145,7 @@ export default function JournalPage() {
         </select>
         {(tickerFilter || outcomeFilter || assetFilter) && (
           <button
-            className="btn btn-ghost text-[9px]"
+            className="btn btn-ghost text-[13px]"
             onClick={() => { setTickerFilter(""); setOutcomeFilter(""); setAssetFilter(""); setPage(0); }}
           >
             CLEAR
@@ -168,13 +168,13 @@ export default function JournalPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">DATE</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">TICKER</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">PROB</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">ENTRY</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">CONF</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-center">OUTCOME</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">P&L</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">DATE</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">TICKER</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-left">PROB</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">ENTRY</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">CONF</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-center">OUTCOME</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3 text-right">P&L</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,36 +184,36 @@ export default function JournalPage() {
                     className="border-b border-[hsl(var(--border)/0.5)] hover:bg-[hsl(var(--surface-2)/0.5)] cursor-pointer transition-colors"
                     onClick={() => setSelectedSignal(signal)}
                   >
-                    <td className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3">
+                    <td className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] py-2 px-3">
                       {new Date(signal.timestamp).toLocaleDateString()}
                     </td>
-                    <td className="text-[11px] font-mono font-bold text-[hsl(var(--foreground))] py-2 px-3">{signal.ticker}</td>
+                    <td className="text-[13px] font-mono font-bold text-[hsl(var(--foreground))] py-2 px-3">{signal.ticker}</td>
                     <td className="py-2 px-3">
                       {(() => {
                         const p = signal.probability_score ?? signal.confidence_score ?? 50;
                         const bull = p >= 50;
                         return (
-                          <span className={cn("text-[10px] font-mono font-bold", bull ? "text-bull" : "text-bear")}>
+                          <span className={cn("text-[14px] font-mono font-bold", bull ? "text-bull" : "text-bear")}>
                             {Math.round(p)}% {bull ? "BULL" : "BEAR"}
                           </span>
                         );
                       })()}
                     </td>
-                    <td className="text-[10px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.entry_price.toFixed(2)}</td>
-                    <td className="text-[10px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.confidence_score}</td>
+                    <td className="text-[14px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.entry_price.toFixed(2)}</td>
+                    <td className="text-[14px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.confidence_score}</td>
                     <td className="text-center py-2 px-3">
                       {signal.outcome ? (
                         <span className={cn(
-                          "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded",
+                          "text-[13px] font-mono font-bold px-1.5 py-0.5 rounded",
                           signal.outcome === "WIN" ? "bg-[hsl(var(--bull)/0.1)] text-bull" : signal.outcome === "LOSS" ? "bg-[hsl(var(--bear)/0.1)] text-bear" : "bg-[hsl(var(--warn)/0.1)] text-[hsl(var(--warn))]"
                         )}>
                           {signal.outcome}
                         </span>
                       ) : (
-                        <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))]">ACTIVE</span>
+                        <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))]">ACTIVE</span>
                       )}
                     </td>
-                    <td className={cn("text-[10px] font-mono font-bold text-right py-2 px-3",
+                    <td className={cn("text-[14px] font-mono font-bold text-right py-2 px-3",
                       signal.pnl_pct != null ? (signal.pnl_pct >= 0 ? "text-bull" : "text-bear") : "text-[hsl(var(--muted-foreground))]"
                     )}>
                       {signal.pnl_pct != null ? `${signal.pnl_pct >= 0 ? "+" : ""}${signal.pnl_pct.toFixed(2)}%` : "—"}
@@ -227,7 +227,7 @@ export default function JournalPage() {
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-3 py-2 border-t border-[hsl(var(--border))]">
-          <span className="text-[9px] font-mono text-[hsl(var(--muted-foreground))]">
+          <span className="text-[13px] font-mono text-[hsl(var(--muted-foreground))]">
             Page {page + 1} · {signals.length} results
           </span>
           <div className="flex items-center gap-1">

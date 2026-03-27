@@ -36,7 +36,7 @@ export default function PerformancePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="live-dot mx-auto mb-3" />
-          <p className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">LOADING PERFORMANCE DATA</p>
+          <p className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] tracking-widest">LOADING PERFORMANCE DATA</p>
         </div>
       </div>
     );
@@ -85,11 +85,11 @@ export default function PerformancePage() {
         <div className="flex items-center gap-4 mb-6">
           <div className="flex items-center gap-1.5">
             <div className="live-dot" />
-            <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+            <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))]">
               {summary.active_signals} ACTIVE
             </span>
           </div>
-          <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))]">
             {summary.wins}W / {summary.losses}L resolved
           </span>
         </div>
@@ -108,7 +108,7 @@ export default function PerformancePage() {
         <div className="panel p-4">
           <div className="flex items-center gap-2 mb-3">
             <BarChart2 className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />
-            <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">BY ASSET CLASS</span>
+            <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">BY ASSET CLASS</span>
           </div>
           {assetClasses.length === 0 ? (
             <div className="flex items-center justify-center h-[120px]">
@@ -118,21 +118,21 @@ export default function PerformancePage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[hsl(var(--border))]">
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">CLASS</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">SIGNALS</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">WIN RATE</th>
-                  <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">AVG P&L</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">CLASS</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">SIGNALS</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">WIN RATE</th>
+                  <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">AVG P&L</th>
                 </tr>
               </thead>
               <tbody>
                 {assetClasses.map((ac) => (
                   <tr key={ac.asset_class} className="border-b border-[hsl(var(--border)/0.5)]">
-                    <td className="text-[11px] font-mono font-bold text-[hsl(var(--foreground))] py-1.5 uppercase">{ac.asset_class}</td>
-                    <td className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{ac.total}</td>
-                    <td className={cn("text-[11px] font-mono font-bold text-right py-1.5", ac.win_rate_pct >= 50 ? "text-bull" : "text-bear")}>
+                    <td className="text-[13px] font-mono font-bold text-[hsl(var(--foreground))] py-1.5 uppercase">{ac.asset_class}</td>
+                    <td className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{ac.total}</td>
+                    <td className={cn("text-[13px] font-mono font-bold text-right py-1.5", ac.win_rate_pct >= 50 ? "text-bull" : "text-bear")}>
                       {ac.win_rate_pct.toFixed(1)}%
                     </td>
-                    <td className={cn("text-[10px] font-mono text-right py-1.5", ac.avg_pnl_pct >= 0 ? "text-bull" : "text-bear")}>
+                    <td className={cn("text-[14px] font-mono text-right py-1.5", ac.avg_pnl_pct >= 0 ? "text-bull" : "text-bear")}>
                       {ac.avg_pnl_pct >= 0 ? "+" : ""}{ac.avg_pnl_pct.toFixed(2)}%
                     </td>
                   </tr>
@@ -157,7 +157,7 @@ function StatCard({ label, value, icon, valueColor }: { label: string; value: st
     <div className="panel p-3">
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
-        <span className="text-[9px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">{label}</span>
+        <span className="text-[13px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">{label}</span>
       </div>
       <span className={cn("text-lg font-mono font-bold", valueColor || "text-[hsl(var(--foreground))]")}>{value}</span>
     </div>

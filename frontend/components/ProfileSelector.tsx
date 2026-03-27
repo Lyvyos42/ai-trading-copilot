@@ -57,7 +57,7 @@ export function ProfileSelector({ value, onChange, compact }: ProfileSelectorPro
         className={cn(
           "flex items-center gap-1.5 rounded border transition-colors font-mono",
           compact
-            ? "px-2 py-0.5 text-[10px]"
+            ? "px-2 py-0.5 text-[14px]"
             : "px-3 py-1 text-xs",
           "border-primary/30 text-primary hover:bg-primary/10"
         )}
@@ -85,7 +85,7 @@ export function ProfileSelector({ value, onChange, compact }: ProfileSelectorPro
               </span>
               <div className="min-w-0">
                 <div className="text-xs font-mono font-bold truncate">{p.name}</div>
-                <div className="text-[9px] text-muted-foreground leading-tight mt-0.5">
+                <div className="text-[13px] text-muted-foreground leading-tight mt-0.5">
                   {p.description}
                 </div>
               </div>

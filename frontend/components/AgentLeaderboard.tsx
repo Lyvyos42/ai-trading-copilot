@@ -29,35 +29,35 @@ export function AgentLeaderboard({ data }: AgentLeaderboardProps) {
   return (
     <div className="panel p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">AGENT LEADERBOARD</span>
+        <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">AGENT LEADERBOARD</span>
       </div>
       <table className="w-full">
         <thead>
           <tr className="border-b border-[hsl(var(--border))]">
-            <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">#</th>
-            <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">AGENT</th>
-            <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">ACCURACY</th>
-            <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">SIGNALS</th>
-            <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">AVG CONF</th>
+            <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">#</th>
+            <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-left">AGENT</th>
+            <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">ACCURACY</th>
+            <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">SIGNALS</th>
+            <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] py-1.5 text-right">AVG CONF</th>
           </tr>
         </thead>
         <tbody>
           {data.map((agent, i) => (
             <tr key={agent.agent} className="border-b border-[hsl(var(--border)/0.5)]">
-              <td className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] py-1.5">{i + 1}</td>
-              <td className={cn("text-[11px] font-mono font-bold py-1.5 uppercase", AGENT_COLORS[agent.agent] || "text-[hsl(var(--foreground))]")}>
+              <td className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] py-1.5">{i + 1}</td>
+              <td className={cn("text-[13px] font-mono font-bold py-1.5 uppercase", AGENT_COLORS[agent.agent] || "text-[hsl(var(--foreground))]")}>
                 {agent.agent.replace("_", " ")}
               </td>
               <td className="text-right">
                 <span className={cn(
-                  "text-[11px] font-mono font-bold",
+                  "text-[13px] font-mono font-bold",
                   agent.accuracy_pct >= 55 ? "text-bull" : agent.accuracy_pct >= 45 ? "text-[hsl(var(--foreground))]" : "text-bear"
                 )}>
                   {agent.accuracy_pct.toFixed(1)}%
                 </span>
               </td>
-              <td className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{agent.total_signals}</td>
-              <td className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{agent.avg_confidence.toFixed(0)}</td>
+              <td className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{agent.total_signals}</td>
+              <td className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] text-right py-1.5">{agent.avg_confidence.toFixed(0)}</td>
             </tr>
           ))}
         </tbody>

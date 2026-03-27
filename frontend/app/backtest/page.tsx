@@ -428,7 +428,7 @@ export default function BacktestPage() {
                   <div className="flex gap-0.5">
                     {(["slow","normal","fast"] as const).map(s=>(
                       <button key={s} onClick={()=>setReplaySpeed(s)}
-                        className={`px-1.5 py-0.5 text-[10px] font-mono border transition-colors ${replaySpeed===s ? "border-warn/50 bg-warn/10 text-warn" : "border-border/40 text-muted-foreground hover:border-warn/30"}`}>
+                        className={`px-1.5 py-0.5 text-[14px] font-mono border transition-colors ${replaySpeed===s ? "border-warn/50 bg-warn/10 text-warn" : "border-border/40 text-muted-foreground hover:border-warn/30"}`}>
                         {s === "fast" ? "F" : s === "normal" ? "N" : "S"}
                       </button>
                     ))}
@@ -516,7 +516,7 @@ export default function BacktestPage() {
               <div ref={chartRef} className="flex-1" style={{cursor:tool!=="none"?"crosshair":"default"}}/>
 
               {/* Status bar */}
-              <div className="px-3 py-1 border-t border-border/30 bg-background flex gap-4 text-[10px] font-mono text-muted-foreground">
+              <div className="px-3 py-1 border-t border-border/30 bg-background flex gap-4 text-[14px] font-mono text-muted-foreground">
                 <span className={tool!=="none"?"text-primary":""}>
                   {TOOL_INFO[tool]}
                 </span>
@@ -555,7 +555,7 @@ export default function BacktestPage() {
                   <button onClick={()=>removeMarker(i)} className="text-muted-foreground hover:text-bear transition-colors"><X className="h-3 w-3"/></button>
                 </div>
               ))}
-              <div className="mx-2 my-3 p-2 border border-border/30 text-[10px] font-mono text-muted-foreground leading-relaxed">
+              <div className="mx-2 my-3 p-2 border border-border/30 text-[14px] font-mono text-muted-foreground leading-relaxed">
                 <span className="text-primary">Coming soon:</span><br/>
                 Fibonacci<br/>Rectangle zones<br/>Text labels<br/>Save drawings
               </div>
@@ -645,7 +645,7 @@ export default function BacktestPage() {
                 <div className="terminal-panel">
                   <div className="terminal-header">
                     <span className="terminal-label">Equity Curve</span>
-                    <span className="ml-2 font-mono text-[10px] text-foreground">{ticker} / {selected.replace(/_/g," ")} / {period}</span>
+                    <span className="ml-2 font-mono text-[14px] text-foreground">{ticker} / {selected.replace(/_/g," ")} / {period}</span>
                   </div>
                   <div className="p-3">
                     <EquityCurve data={result.equity_curve} positive={isPositive}/>
@@ -673,7 +673,7 @@ export default function BacktestPage() {
                             <td className={`px-4 py-2 font-mono font-semibold ${t.return_pct>=0?"text-bull":"text-bear"}`}>{formatPct(t.return_pct)}</td>
                             <td className="px-4 py-2 font-mono text-muted-foreground">{t.hold_days}d</td>
                             <td className="px-4 py-2">
-                              <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 border ${t.outcome==="WIN"?"border-bull/30 bg-bull/10 text-bull":"border-bear/30 bg-bear/10 text-bear"}`}>{t.outcome}</span>
+                              <span className={`text-[14px] font-mono font-bold px-1.5 py-0.5 border ${t.outcome==="WIN"?"border-bull/30 bg-bull/10 text-bull":"border-bear/30 bg-bear/10 text-bear"}`}>{t.outcome}</span>
                             </td>
                           </tr>
                         ))}

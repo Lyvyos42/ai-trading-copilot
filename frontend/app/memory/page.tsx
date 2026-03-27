@@ -64,7 +64,7 @@ export default function MemoryPage() {
   return (
     <div className="min-h-screen" style={{ background: "hsl(var(--surface-0))" }}>
       <section className="max-w-5xl mx-auto px-6 pt-16 pb-6">
-        <p className="text-[9px] font-bold tracking-[0.18em] mb-3"
+        <p className="text-[13px] font-bold tracking-[0.18em] mb-3"
            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}>
           MEMORY LAYER
         </p>
@@ -87,7 +87,7 @@ export default function MemoryPage() {
               { label: "Status", value: stats.status === "active" ? "ACTIVE" : "WARMING UP", color: stats.status === "active" ? "#22c55e" : "#D4A240" },
             ].map(s => (
               <div key={s.label} style={panelStyle}>
-                <div className="text-[9px] font-bold tracking-[0.14em] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{s.label.toUpperCase()}</div>
+                <div className="text-[13px] font-bold tracking-[0.14em] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{s.label.toUpperCase()}</div>
                 <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
               </div>
             ))}
@@ -98,7 +98,7 @@ export default function MemoryPage() {
         <div className="flex gap-2 mb-6">
           {(["memories", "corrections", "profile"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className="text-[10px] font-bold tracking-[0.08em] uppercase px-4 py-2 transition-all"
+              className="text-[14px] font-bold tracking-[0.08em] uppercase px-4 py-2 transition-all"
               style={{
                 borderRadius: 4,
                 background: tab === t ? "hsl(var(--primary) / 0.1)" : "transparent",
@@ -126,16 +126,16 @@ export default function MemoryPage() {
                 <div key={i} style={panelStyle}>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[9px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
+                      <span className="text-[13px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
                         style={{ background: `${TYPE_COLORS[m.type] || "#666"}20`, color: TYPE_COLORS[m.type] || "#888", border: `1px solid ${TYPE_COLORS[m.type] || "#666"}30` }}>
                         {m.type}
                       </span>
-                      <span className="text-[9px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
+                      <span className="text-[13px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
                         style={{ background: badge.bg, color: badge.color }}>
                         {m.importance}
                       </span>
                     </div>
-                    <span className="text-[10px] shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>
+                    <span className="text-[14px] shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>
                       {m.created_at ? new Date(m.created_at).toLocaleDateString() : ""}
                     </span>
                   </div>
@@ -159,12 +159,12 @@ export default function MemoryPage() {
             {corrections.map(c => (
               <div key={c.id} style={panelStyle}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
+                  <span className="text-[13px] font-bold tracking-[0.1em] px-2 py-0.5 rounded"
                     style={{ background: "hsl(0 70% 50% / 0.1)", color: "hsl(0 70% 60%)", border: "1px solid hsl(0 70% 50% / 0.2)" }}>
                     {c.correction_type}
                   </span>
-                  <span className="text-[10px] font-bold" style={{ color: "hsl(var(--primary))" }}>{c.agent_name}</span>
-                  {c.ticker && <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>{c.ticker}</span>}
+                  <span className="text-[14px] font-bold" style={{ color: "hsl(var(--primary))" }}>{c.agent_name}</span>
+                  {c.ticker && <span className="text-[14px]" style={{ color: "hsl(var(--muted-foreground))" }}>{c.ticker}</span>}
                 </div>
                 <p className="text-xs leading-relaxed" style={{ color: "hsl(var(--foreground))" }}>{c.lesson}</p>
               </div>
@@ -194,7 +194,7 @@ export default function MemoryPage() {
                     { label: "Last Updated", value: prefs.last_computed ? new Date(prefs.last_computed).toLocaleDateString() : "—" },
                   ].map(item => (
                     <div key={item.label}>
-                      <div className="text-[9px] font-bold tracking-[0.14em] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{item.label.toUpperCase()}</div>
+                      <div className="text-[13px] font-bold tracking-[0.14em] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{item.label.toUpperCase()}</div>
                       <div className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>{item.value}</div>
                     </div>
                   ))}

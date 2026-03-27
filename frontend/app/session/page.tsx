@@ -129,7 +129,7 @@ export default function SessionPage() {
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0">
         <div className="flex items-center gap-2">
           <span className={cn("h-2 w-2 rounded-full", sessionActive ? "bg-bull animate-pulse" : "bg-muted-foreground")} />
-          <span className="text-[10px] font-mono font-bold text-primary tracking-widest">
+          <span className="text-[14px] font-mono font-bold text-primary tracking-widest">
             SESSION MODE
           </span>
         </div>
@@ -141,7 +141,7 @@ export default function SessionPage() {
             <button
               onClick={handleStartSession}
               disabled={loading || !isLoggedIn}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border border-bull/50 text-bull hover:bg-bull/10 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border border-bull/50 text-bull hover:bg-bull/10 transition-colors disabled:opacity-40"
             >
               <Play className="h-3 w-3" />
               START SESSION
@@ -149,13 +149,13 @@ export default function SessionPage() {
           </>
         ) : (
           <>
-            <span className="text-[11px] font-mono font-bold text-foreground">{activeTicker}</span>
-            <span className="text-[9px] font-mono text-muted-foreground">{activeProfile.toUpperCase()}</span>
+            <span className="text-[13px] font-mono font-bold text-foreground">{activeTicker}</span>
+            <span className="text-[13px] font-mono text-muted-foreground">{activeProfile.toUpperCase()}</span>
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
+                "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
                 analyzing
                   ? "border-border/40 text-muted-foreground/50 cursor-not-allowed"
                   : "border-primary/50 text-primary hover:bg-primary/10"
@@ -167,7 +167,7 @@ export default function SessionPage() {
             <button
               onClick={handleStopSession}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-mono font-bold border border-bear/50 text-bear hover:bg-bear/10 transition-colors ml-auto disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border border-bear/50 text-bear hover:bg-bear/10 transition-colors ml-auto disabled:opacity-40"
             >
               <Square className="h-3 w-3" />
               END SESSION
@@ -177,7 +177,7 @@ export default function SessionPage() {
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-bear/10 border-b border-bear/30 text-[10px] font-mono text-bear">
+        <div className="px-4 py-2 bg-bear/10 border-b border-bear/30 text-[14px] font-mono text-bear">
           {error}
         </div>
       )}
@@ -190,7 +190,7 @@ export default function SessionPage() {
           {!sessionActive && signals.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <Zap className="h-10 w-10 text-primary/20" />
-              <div className="text-[11px] font-mono text-muted-foreground max-w-sm">
+              <div className="text-[13px] font-mono text-muted-foreground max-w-sm">
                 Start a session to begin real-time intraday analysis.
                 Select a ticker and strategy profile, then click START SESSION.
               </div>
@@ -234,12 +234,12 @@ export default function SessionPage() {
 
           {latestSignal?.reasoning_chain && latestSignal.reasoning_chain.length > 0 && (
             <div className="rounded-lg border border-border bg-background p-4">
-              <div className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest mb-2">
+              <div className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest mb-2">
                 REASONING CHAIN
               </div>
               <div className="space-y-1">
                 {latestSignal.reasoning_chain.map((step, i) => (
-                  <div key={i} className="text-[9px] font-mono text-muted-foreground leading-relaxed">
+                  <div key={i} className="text-[13px] font-mono text-muted-foreground leading-relaxed">
                     {step}
                   </div>
                 ))}

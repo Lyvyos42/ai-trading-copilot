@@ -72,7 +72,7 @@ export default function CorrelationPage() {
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={cn(
-                "text-[10px] font-mono font-bold px-2.5 py-1 rounded border transition-colors",
+                "text-[14px] font-mono font-bold px-2.5 py-1 rounded border transition-colors",
                 period === p.value
                   ? "bg-primary/10 border-primary/50 text-primary"
                   : "border-border/40 text-muted-foreground hover:text-foreground"
@@ -86,16 +86,16 @@ export default function CorrelationPage() {
 
       {/* Color scale legend */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-[9px] font-mono text-muted-foreground">CORRELATION:</span>
+        <span className="text-[13px] font-mono text-muted-foreground">CORRELATION:</span>
         <div className="flex items-center gap-0.5">
-          <span className="text-[9px] font-mono text-bear">-1.0</span>
+          <span className="text-[13px] font-mono text-bear">-1.0</span>
           <div className="w-32 h-2 rounded overflow-hidden flex">
             {Array.from({ length: 20 }, (_, i) => {
               const v = -1 + (i / 19) * 2;
               return <div key={i} className="flex-1" style={{ backgroundColor: corrColor(v) }} />;
             })}
           </div>
-          <span className="text-[9px] font-mono text-bull">+1.0</span>
+          <span className="text-[13px] font-mono text-bull">+1.0</span>
         </div>
       </div>
 
@@ -112,9 +112,9 @@ export default function CorrelationPage() {
           {/* Heatmap */}
           <div className="panel p-4 lg:col-span-2">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest">CORRELATION MATRIX</span>
+              <span className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest">CORRELATION MATRIX</span>
               {data.data_points > 0 && (
-                <span className="text-[9px] font-mono text-muted-foreground">({data.data_points} data points)</span>
+                <span className="text-[13px] font-mono text-muted-foreground">({data.data_points} data points)</span>
               )}
             </div>
             <div className="overflow-x-auto -mx-4 px-4" style={{ minWidth: 0 }}>
@@ -131,10 +131,10 @@ export default function CorrelationPage() {
 
           {/* Pair detail panel */}
           <div className="panel p-4">
-            <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest">PAIR DETAIL</span>
+            <span className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest">PAIR DETAIL</span>
             {!selectedPair ? (
               <div className="flex items-center justify-center h-[200px]">
-                <span className="text-[10px] font-mono text-muted-foreground">Click a cell to compare</span>
+                <span className="text-[14px] font-mono text-muted-foreground">Click a cell to compare</span>
               </div>
             ) : pairLoading ? (
               <div className="flex items-center justify-center h-[200px]">
@@ -147,7 +147,7 @@ export default function CorrelationPage() {
                     {pairData.t1} vs {pairData.t2}
                   </span>
                   <span className={cn(
-                    "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border",
+                    "text-[14px] font-mono font-bold px-1.5 py-0.5 rounded border",
                     pairData.correlation >= 0.5 ? "text-bull bg-bull/10 border-bull/20" :
                     pairData.correlation <= -0.5 ? "text-bear bg-bear/10 border-bear/20" :
                     "text-muted-foreground bg-muted border-border/30"
@@ -158,11 +158,11 @@ export default function CorrelationPage() {
                 {pairData.series.length > 0 ? (
                   <PairChart series={pairData.series} t1={pairData.t1} t2={pairData.t2} />
                 ) : (
-                  <div className="text-[10px] font-mono text-muted-foreground text-center py-8">No data</div>
+                  <div className="text-[14px] font-mono text-muted-foreground text-center py-8">No data</div>
                 )}
               </div>
             ) : (
-              <div className="text-[10px] font-mono text-muted-foreground text-center py-8">Failed to load</div>
+              <div className="text-[14px] font-mono text-muted-foreground text-center py-8">Failed to load</div>
             )}
           </div>
         </div>

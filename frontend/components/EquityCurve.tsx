@@ -51,7 +51,7 @@ export function EquityCurve({ data }: EquityCurveProps) {
   return (
     <div className="panel p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">EQUITY CURVE</span>
+        <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">EQUITY CURVE</span>
         <span className={`text-sm font-mono font-bold ${isPositive ? "text-bull" : "text-bear"}`}>
           {lastVal >= 0 ? "+" : ""}{lastVal.toFixed(2)}%
         </span>

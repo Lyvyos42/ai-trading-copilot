@@ -29,9 +29,9 @@ export function SessionTimer({ killZone, killZoneActive, minutesRemaining, marke
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest">SESSION TIMER</span>
+          <span className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest">SESSION TIMER</span>
         </div>
-        <span className="text-[9px] font-mono text-muted-foreground">{utcTime}</span>
+        <span className="text-[13px] font-mono text-muted-foreground">{utcTime}</span>
       </div>
 
       {/* Kill Zone Status */}
@@ -46,13 +46,13 @@ export function SessionTimer({ killZone, killZoneActive, minutesRemaining, marke
             ) : (
               <AlertTriangle className="h-3 w-3 opacity-50" />
             )}
-            <span className="text-[11px] font-mono font-bold">
+            <span className="text-[13px] font-mono font-bold">
               {killZoneActive ? killZone.replace("_", " ") : "NO KILL ZONE"}
             </span>
           </div>
           {killZoneActive && (
             <span className={cn(
-              "text-[10px] font-mono font-bold",
+              "text-[14px] font-mono font-bold",
               minutesRemaining < 10 ? "text-bear animate-pulse" : ""
             )}>
               {minutesRemaining}m left
@@ -62,7 +62,7 @@ export function SessionTimer({ killZone, killZoneActive, minutesRemaining, marke
       </div>
 
       {/* Session elapsed + phase */}
-      <div className="flex items-center justify-between text-[9px] font-mono">
+      <div className="flex items-center justify-between text-[13px] font-mono">
         <span className="text-muted-foreground">
           Session: <span className="text-foreground font-bold">{hours}h {mins}m</span>
         </span>

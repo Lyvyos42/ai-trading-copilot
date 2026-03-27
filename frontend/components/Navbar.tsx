@@ -152,7 +152,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
             </svg>
           </div>
           <span
-            className="hidden sm:block text-[11px] font-bold tracking-[0.18em] uppercase"
+            className="hidden sm:block text-[13px] font-bold tracking-[0.18em] uppercase"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
           >
             QuantNeural
@@ -210,7 +210,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 href={href}
                 className={cn(
                   "relative flex items-center gap-1 px-2 lg:px-3 h-10 transition-colors shrink-0",
-                  "text-[9px] font-bold tracking-[0.08em] lg:tracking-[0.12em] uppercase",
+                  "text-[13px] font-bold tracking-[0.08em] lg:tracking-[0.12em] uppercase",
                   "border-b-[1.5px]",
                 )}
                 style={{
@@ -267,7 +267,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           >
             <span className="terminal-label">PAPER</span>
             <span
-              className="text-[9px] font-bold"
+              className="text-[13px] font-bold"
               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
             >
               $100,000
@@ -285,7 +285,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                   onClick={() => setDropdownOpen((v) => !v)}
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1 transition-colors",
-                    "text-[9px] font-bold tracking-[0.08em]",
+                    "text-[13px] font-bold tracking-[0.08em]",
                   )}
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
@@ -359,7 +359,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div
-                            className="text-[10px] truncate"
+                            className="text-[14px] truncate"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
                           >
                             {user.email}
@@ -387,7 +387,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="terminal-label">SIGNALS TODAY</span>
                           <span
-                            className="text-[9px] font-bold"
+                            className="text-[13px] font-bold"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
                           >
                             {signalsToday ?? "—"} / {quota}
@@ -439,7 +439,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                         >
                           <div>
                             <div
-                              className="text-[9px] font-bold"
+                              className="text-[13px] font-bold"
                               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
                             >
                               UPGRADE TO RETAIL
@@ -452,7 +452,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                             </div>
                           </div>
                           <span
-                            className="text-[9px] font-bold transition-transform group-hover:translate-x-0.5"
+                            className="text-[13px] font-bold transition-transform group-hover:translate-x-0.5"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
                           >
                             $49/mo
@@ -587,7 +587,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           {isLoggedIn && user && (
             <div className="pt-2 mt-2 space-y-0.5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
               <div
-                className="px-3 py-1.5 text-[10px] truncate"
+                className="px-3 py-1.5 text-[14px] truncate"
                 style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
               >
                 {user.email}

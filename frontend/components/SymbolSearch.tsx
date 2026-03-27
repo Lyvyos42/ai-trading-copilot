@@ -155,7 +155,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
       >
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
         <span>{displaySymbol}</span>
-        <span className="ml-auto text-[10px] text-muted-foreground border border-border/50 rounded px-1">▾</span>
+        <span className="ml-auto text-[14px] text-muted-foreground border border-border/50 rounded px-1">▾</span>
       </button>
 
       {/* Dropdown panel */}
@@ -195,7 +195,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
               <>
                 {/* Quick picks row */}
                 <div className="px-3 py-2 border-b border-border/30">
-                  <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-2">
+                  <div className="text-[14px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-2">
                     Quick Pick
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -218,7 +218,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
                 {/* Full catalogue grouped by asset class */}
                 {GROUP_ORDER.filter(g => groupedSymbols[g]?.length).map(group => (
                   <div key={group}>
-                    <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                    <div className="px-3 pt-2.5 pb-1 text-[14px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
                       {group}
                     </div>
                     {groupedSymbols[group].map(s => {
@@ -239,7 +239,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-medium text-foreground truncate">{s.name}</div>
-                            <div className="text-[10px] text-muted-foreground">{s.exchange}</div>
+                            <div className="text-[14px] text-muted-foreground">{s.exchange}</div>
                           </div>
                           {isActive && <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
                         </button>
@@ -275,7 +275,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-foreground truncate">{s.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{s.exchange}</div>
+                    <div className="text-[14px] text-muted-foreground">{s.exchange}</div>
                   </div>
                   {isActive && <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
                 </button>

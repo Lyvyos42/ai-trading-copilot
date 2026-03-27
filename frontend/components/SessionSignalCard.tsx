@@ -30,13 +30,13 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
           <span className={cn("text-sm font-mono font-bold", dirColor)}>
             {signal.direction}
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground">
+          <span className="text-[14px] font-mono text-muted-foreground">
             {signal.ticker}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className={cn(
-            "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border",
+            "text-[13px] font-mono font-bold px-1.5 py-0.5 rounded border",
             signal.urgency === "EXECUTE_NOW"
               ? "text-bull border-bull/30 bg-bull/10 animate-pulse"
               : signal.urgency === "WAIT_FOR_LEVEL"
@@ -62,7 +62,7 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-background px-3 py-2 text-center">
               <div className="text-[8px] font-mono text-muted-foreground">{label}</div>
-              <div className={cn("text-[12px] font-mono font-bold", color)}>
+              <div className={cn("text-[14px] font-mono font-bold", color)}>
                 {typeof value === "number" ? value.toFixed(2) : "—"}
               </div>
             </div>

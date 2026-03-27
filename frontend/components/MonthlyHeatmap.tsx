@@ -38,17 +38,17 @@ export function MonthlyHeatmap({ data }: MonthlyHeatmapProps) {
   return (
     <div className="panel p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">MONTHLY RETURNS</span>
+        <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">MONTHLY RETURNS</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>
-              <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-left">YEAR</th>
+              <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-left">YEAR</th>
               {MONTH_LABELS.map((m) => (
-                <th key={m} className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-center w-[60px]">{m}</th>
+                <th key={m} className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-center w-[60px]">{m}</th>
               ))}
-              <th className="text-[9px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-center">YTD</th>
+              <th className="text-[13px] font-mono text-[hsl(var(--muted-foreground))] px-1 py-1 text-center">YTD</th>
             </tr>
           </thead>
           <tbody>
@@ -57,23 +57,23 @@ export function MonthlyHeatmap({ data }: MonthlyHeatmapProps) {
               const ytd = Object.values(yearData).reduce((sum, m) => sum + m.total_pnl_pct, 0);
               return (
                 <tr key={year}>
-                  <td className="text-[10px] font-mono font-bold text-[hsl(var(--foreground))] px-1 py-0.5">{year}</td>
+                  <td className="text-[14px] font-mono font-bold text-[hsl(var(--foreground))] px-1 py-0.5">{year}</td>
                   {Array.from({ length: 12 }, (_, i) => {
                     const m = yearData[i];
                     return (
                       <td key={i} className="px-0.5 py-0.5">
                         {m ? (
-                          <div className={cn("text-center text-[10px] font-mono font-bold rounded px-1 py-1", cellColor(m.total_pnl_pct))}>
+                          <div className={cn("text-center text-[14px] font-mono font-bold rounded px-1 py-1", cellColor(m.total_pnl_pct))}>
                             {m.total_pnl_pct >= 0 ? "+" : ""}{m.total_pnl_pct.toFixed(1)}%
                           </div>
                         ) : (
-                          <div className="text-center text-[10px] font-mono text-[hsl(var(--muted-foreground)/0.3)] px-1 py-1">—</div>
+                          <div className="text-center text-[14px] font-mono text-[hsl(var(--muted-foreground)/0.3)] px-1 py-1">—</div>
                         )}
                       </td>
                     );
                   })}
                   <td className="px-0.5 py-0.5">
-                    <div className={cn("text-center text-[10px] font-mono font-bold rounded px-1 py-1", cellColor(ytd))}>
+                    <div className={cn("text-center text-[14px] font-mono font-bold rounded px-1 py-1", cellColor(ytd))}>
                       {ytd >= 0 ? "+" : ""}{ytd.toFixed(1)}%
                     </div>
                   </td>

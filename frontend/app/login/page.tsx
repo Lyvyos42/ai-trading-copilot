@@ -115,7 +115,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-[10px] text-muted-foreground mt-4">
+        <p className="text-center text-[14px] text-muted-foreground mt-4">
           No financial advice. Paper trading only until you connect a broker.
         </p>
       </div>

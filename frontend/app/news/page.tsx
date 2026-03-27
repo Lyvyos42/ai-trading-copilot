@@ -190,11 +190,11 @@ export default function NewsPage() {
 
         {summary && (
           <div className="flex items-center gap-3 ml-4">
-            <span className="text-[9px] font-mono text-muted-foreground">
+            <span className="text-[13px] font-mono text-muted-foreground">
               {summary.total.toLocaleString()} articles
             </span>
             {summary.last_scraped && (
-              <span className="text-[9px] font-mono text-muted-foreground">
+              <span className="text-[13px] font-mono text-muted-foreground">
                 last update {timeAgo(summary.last_scraped)}
               </span>
             )}
@@ -205,7 +205,7 @@ export default function NewsPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-1.5 text-[9px] font-mono font-bold px-2.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 text-[13px] font-mono font-bold px-2.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
           >
             <RefreshCw className={cn("h-2.5 w-2.5", refreshing && "animate-spin")} />
             {refreshing ? "SCRAPING…" : "REFRESH"}
@@ -217,8 +217,8 @@ export default function NewsPage() {
       {waking && (
         <div className="flex items-center gap-3 px-4 py-2 bg-warn/10 border-b border-warn/30 shrink-0">
           <Zap className="h-3.5 w-3.5 text-warn shrink-0 animate-pulse" />
-          <span className="text-[10px] font-mono font-bold text-warn tracking-widest">WAKING BACKEND</span>
-          <span className="text-[10px] font-mono text-warn/80">
+          <span className="text-[14px] font-mono font-bold text-warn tracking-widest">WAKING BACKEND</span>
+          <span className="text-[14px] font-mono text-warn/80">
             Render free tier — cold start in progress, retrying…
           </span>
         </div>
@@ -228,15 +228,15 @@ export default function NewsPage() {
       {crisisArticles.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2 bg-bear/10 border-b border-bear/30 shrink-0">
           <AlertTriangle className="h-3.5 w-3.5 text-bear shrink-0" />
-          <span className="text-[10px] font-mono font-bold text-bear tracking-widest">ALERT</span>
-          <span className="text-[10px] font-mono text-bear/80 truncate">
+          <span className="text-[14px] font-mono font-bold text-bear tracking-widest">ALERT</span>
+          <span className="text-[14px] font-mono text-bear/80 truncate">
             {crisisArticles[0].headline}
           </span>
           <a
             href={crisisArticles[0].url}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto text-[9px] font-mono text-bear hover:text-bear/70 flex items-center gap-1 shrink-0"
+            className="ml-auto text-[13px] font-mono text-bear hover:text-bear/70 flex items-center gap-1 shrink-0"
           >
             READ <ExternalLink className="h-2.5 w-2.5" />
           </a>
@@ -256,7 +256,7 @@ export default function NewsPage() {
               key={cat}
               onClick={() => setActive(cat)}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2.5 text-[10px] font-mono font-bold tracking-widest whitespace-nowrap border-b-2 transition-colors",
+                "flex items-center gap-1.5 px-4 py-2.5 text-[14px] font-mono font-bold tracking-widest whitespace-nowrap border-b-2 transition-colors",
                 activeCategory === cat
                   ? "text-primary border-primary bg-primary/5"
                   : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
@@ -285,7 +285,7 @@ export default function NewsPage() {
 
           {loading && (
             <div className="flex items-center justify-center h-40">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+              <div className="flex items-center gap-2 text-[14px] font-mono text-muted-foreground">
                 <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                 LOADING INTEL FEED…
               </div>
@@ -301,9 +301,9 @@ export default function NewsPage() {
           {!loading && !fetchError && articles.length === 0 && (
             <div className="flex flex-col items-center justify-center h-60 gap-3">
               <Globe className="h-8 w-8 text-muted-foreground/20" />
-              <div className="text-[10px] font-mono text-muted-foreground text-center">
+              <div className="text-[14px] font-mono text-muted-foreground text-center">
                 NO ARTICLES YET<br />
-                <span className="text-[9px]">Click REFRESH to trigger the first scrape</span>
+                <span className="text-[13px]">Click REFRESH to trigger the first scrape</span>
               </div>
             </div>
           )}
@@ -316,7 +316,7 @@ export default function NewsPage() {
               <div className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center gap-1.5 mb-3">
                   <PieChart className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">SENTIMENT</span>
+                  <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">SENTIMENT</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <SentimentDonut positive={posCount} neutral={neuCount} negative={negCount} />
@@ -328,8 +328,8 @@ export default function NewsPage() {
                     ].map(({ label, count, color, textColor }) => (
                       <div key={label} className="flex items-center gap-2">
                         <div className={cn("h-2 w-2 rounded-full", color)} />
-                        <span className={cn("text-[9px] font-mono", textColor)}>{label}</span>
-                        <span className="text-[9px] font-mono text-muted-foreground ml-auto">{Math.round(count / totalArticles * 100)}%</span>
+                        <span className={cn("text-[13px] font-mono", textColor)}>{label}</span>
+                        <span className="text-[13px] font-mono text-muted-foreground ml-auto">{Math.round(count / totalArticles * 100)}%</span>
                       </div>
                     ))}
                   </div>
@@ -340,7 +340,7 @@ export default function NewsPage() {
               <div className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center gap-1.5 mb-3">
                   <BarChart3 className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">CATEGORIES</span>
+                  <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">CATEGORIES</span>
                 </div>
                 <div className="space-y-2">
                   {summary?.categories
@@ -372,10 +372,10 @@ export default function NewsPage() {
               <div className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Hash className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">TRENDING TICKERS</span>
+                  <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">TRENDING TICKERS</span>
                 </div>
                 {trendingTickers.length === 0 ? (
-                  <div className="text-[9px] font-mono text-muted-foreground/50">No ticker mentions yet</div>
+                  <div className="text-[13px] font-mono text-muted-foreground/50">No ticker mentions yet</div>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {trendingTickers.map(([ticker, count], i) => (
@@ -390,7 +390,7 @@ export default function NewsPage() {
                               : "border-border/50 bg-muted/20 text-muted-foreground"
                         )}
                       >
-                        <span className="text-[9px] font-bold">{ticker}</span>
+                        <span className="text-[13px] font-bold">{ticker}</span>
                         <span className="text-[7px] opacity-60">{count}</span>
                       </div>
                     ))}
@@ -402,15 +402,15 @@ export default function NewsPage() {
               <div className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Globe className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">TOP SOURCES</span>
+                  <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">TOP SOURCES</span>
                 </div>
                 <div className="space-y-1.5">
                   {topSources.map(([source, count]) => {
                     const srcColor = SOURCE_COLORS[source] || "text-muted-foreground";
                     return (
                       <div key={source} className="flex items-center justify-between">
-                        <span className={cn("text-[9px] font-mono font-bold truncate", srcColor)}>{source}</span>
-                        <span className="text-[9px] font-mono text-muted-foreground ml-2 shrink-0">{count}</span>
+                        <span className={cn("text-[13px] font-mono font-bold truncate", srcColor)}>{source}</span>
+                        <span className="text-[13px] font-mono text-muted-foreground ml-2 shrink-0">{count}</span>
                       </div>
                     );
                   })}
@@ -527,11 +527,11 @@ function ArticleCard({ article }: { article: Article }) {
           <div className={cn("flex items-center gap-0.5", sentMeta.color)}>
             <SentIcon className="h-2.5 w-2.5" />
           </div>
-          <span className={cn("text-[9px] font-mono font-bold", srcColor)}>
+          <span className={cn("text-[13px] font-mono font-bold", srcColor)}>
             {article.source.toUpperCase()}
           </span>
           {article.published_at && (
-            <span className="text-[9px] font-mono text-muted-foreground ml-auto">
+            <span className="text-[13px] font-mono text-muted-foreground ml-auto">
               {timeAgo(article.published_at)}
             </span>
           )}
@@ -544,7 +544,7 @@ function ArticleCard({ article }: { article: Article }) {
 
         {/* Summary */}
         {article.summary && (
-          <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-3">
+          <div className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2 mb-3">
             {article.summary}
           </div>
         )}
@@ -590,7 +590,7 @@ function SentimentDonut({ positive, neutral, negative }: { positive: number; neu
       {/* Inner cutout */}
       <div className="absolute inset-[5px] rounded-full bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="text-[11px] font-mono font-bold text-foreground">{dominantPct}%</div>
+          <div className="text-[13px] font-mono font-bold text-foreground">{dominantPct}%</div>
           <div className="text-[7px] font-mono text-muted-foreground">{dominantLabel}</div>
         </div>
       </div>

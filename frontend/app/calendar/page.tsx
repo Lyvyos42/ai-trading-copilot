@@ -59,7 +59,7 @@ export default function CalendarPage() {
               key={w}
               onClick={() => setWeeks(w)}
               className={cn(
-                "text-[10px] font-mono font-bold px-2.5 py-1 rounded border transition-colors",
+                "text-[14px] font-mono font-bold px-2.5 py-1 rounded border transition-colors",
                 weeks === w
                   ? "bg-primary/10 border-primary/50 text-primary"
                   : "border-border/40 text-muted-foreground hover:text-foreground"
@@ -73,9 +73,9 @@ export default function CalendarPage() {
 
       {/* Impact legend */}
       <div className="flex items-center gap-3 mb-4 overflow-x-auto">
-        <span className="text-[9px] font-mono text-muted-foreground shrink-0">IMPACT:</span>
+        <span className="text-[13px] font-mono text-muted-foreground shrink-0">IMPACT:</span>
         {(["HIGH", "MEDIUM", "LOW"] as const).map((level) => (
-          <span key={level} className={cn("text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0", IMPACT_STYLE[level])}>
+          <span key={level} className={cn("text-[13px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0", IMPACT_STYLE[level])}>
             {level}
           </span>
         ))}
@@ -112,7 +112,7 @@ export default function CalendarPage() {
                   isToday ? "bg-primary/5" : isPast ? "bg-muted/20" : ""
                 )}>
                   <span className={cn(
-                    "text-[11px] font-mono font-bold",
+                    "text-[13px] font-mono font-bold",
                     isToday ? "text-primary" : isPast ? "text-muted-foreground" : "text-foreground"
                   )}>
                     {dayLabel}
@@ -120,7 +120,7 @@ export default function CalendarPage() {
                   {isToday && (
                     <span className="text-[8px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">TODAY</span>
                   )}
-                  <span className="text-[9px] font-mono text-muted-foreground ml-auto">{dayEvents.length} event{dayEvents.length > 1 ? "s" : ""}</span>
+                  <span className="text-[13px] font-mono text-muted-foreground ml-auto">{dayEvents.length} event{dayEvents.length > 1 ? "s" : ""}</span>
                 </div>
 
                 {/* Events table */}
@@ -143,13 +143,13 @@ export default function CalendarPage() {
                         isPast ? "opacity-50" : "",
                         evt.impact === "HIGH" && !isPast ? "bg-bear/3" : ""
                       )}>
-                        <td className="text-[10px] font-mono text-muted-foreground py-1.5 px-3 sm:px-4">{evt.time}</td>
+                        <td className="text-[14px] font-mono text-muted-foreground py-1.5 px-3 sm:px-4">{evt.time}</td>
                         <td className="py-1.5 px-2">
                           <div className="flex items-center gap-2">
                             <span className="text-[8px] font-mono font-bold text-primary/60 bg-primary/5 px-1 rounded">
                               {CATEGORY_EMOJI[evt.category] || evt.category}
                             </span>
-                            <span className="text-[11px] font-mono text-foreground">{evt.name}</span>
+                            <span className="text-[13px] font-mono text-foreground">{evt.name}</span>
                           </div>
                         </td>
                         <td className="text-center py-1.5 px-2">
@@ -157,10 +157,10 @@ export default function CalendarPage() {
                             {evt.impact}
                           </span>
                         </td>
-                        <td className="text-[10px] font-mono text-muted-foreground text-right py-1.5 px-2 hidden sm:table-cell">{evt.previous || "—"}</td>
-                        <td className="text-[10px] font-mono text-foreground text-right py-1.5 px-2 font-bold hidden sm:table-cell">{evt.forecast || "—"}</td>
+                        <td className="text-[14px] font-mono text-muted-foreground text-right py-1.5 px-2 hidden sm:table-cell">{evt.previous || "—"}</td>
+                        <td className="text-[14px] font-mono text-foreground text-right py-1.5 px-2 font-bold hidden sm:table-cell">{evt.forecast || "—"}</td>
                         <td className={cn(
-                          "text-[10px] font-mono text-right py-1.5 px-2 font-bold",
+                          "text-[14px] font-mono text-right py-1.5 px-2 font-bold",
                           evt.actual ? "text-primary" : "text-muted-foreground"
                         )}>
                           {evt.actual || "—"}

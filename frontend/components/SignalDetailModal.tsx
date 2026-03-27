@@ -31,14 +31,14 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         <div className="flex items-center gap-3 mb-4">
           <span className="text-lg font-mono font-bold">{signal.ticker}</span>
           <span className={cn(
-            "px-2 py-0.5 rounded text-[10px] font-mono font-bold",
+            "px-2 py-0.5 rounded text-[14px] font-mono font-bold",
             isBullish ? "bg-[hsl(var(--bull)/0.1)] text-bull" : "bg-[hsl(var(--bear)/0.1)] text-bear"
           )}>
             {Math.round(prob)}% {isBullish ? "BULLISH" : "BEARISH"}
           </span>
-          <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] uppercase">{signal.asset_class}</span>
+          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] uppercase">{signal.asset_class}</span>
           <span className={cn(
-            "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border",
+            "text-[13px] font-mono font-bold px-1.5 py-0.5 rounded border",
             convictionTier === "HIGH" ? "bg-[hsl(var(--bull)/0.1)] text-bull border-[hsl(var(--bull)/0.2)]" :
             convictionTier === "MODERATE" ? "bg-[hsl(38,85%,52%,0.1)] text-[hsl(38,85%,52%)] border-[hsl(38,85%,52%,0.2)]" :
             "bg-[hsl(var(--muted)/0.5)] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border)/0.3)]"
@@ -46,7 +46,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
             {convictionTier}
           </span>
           {signal.outcome && (
-            <div className={cn("px-2 py-0.5 rounded text-[10px] font-mono font-bold ml-auto",
+            <div className={cn("px-2 py-0.5 rounded text-[14px] font-mono font-bold ml-auto",
               isWin ? "bg-[hsl(var(--bull)/0.1)] text-bull" : "bg-[hsl(var(--bear)/0.1)] text-bear"
             )}>
               {signal.outcome} {signal.pnl_pct != null && `(${signal.pnl_pct >= 0 ? "+" : ""}${signal.pnl_pct.toFixed(2)}%)`}
@@ -57,8 +57,8 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         {/* Probability bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULL</span>
-            <span className="text-[10px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEAR</span>
+            <span className="text-[14px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULL</span>
+            <span className="text-[14px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEAR</span>
           </div>
           <div className="w-full flex h-2.5 rounded overflow-hidden">
             <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
@@ -87,7 +87,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center gap-4 mb-4 text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+        <div className="flex items-center gap-4 mb-4 text-[14px] font-mono text-[hsl(var(--muted-foreground))]">
           <span>STATUS: <span className="text-[hsl(var(--foreground))] font-bold">{signal.status}</span></span>
           {signal.analytical_window && (
             <span>WINDOW: <span className="text-[hsl(var(--foreground))] font-bold">{signal.analytical_window}</span></span>
@@ -100,18 +100,18 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
           <div className="grid grid-cols-2 gap-3 mb-4">
             {signal.bull_case && (
               <div className="p-3 rounded border border-[hsl(var(--bull)/0.2)] bg-[hsl(var(--bull)/0.05)]">
-                <span className="text-[9px] font-mono font-bold text-bull flex items-center gap-1 mb-1">
+                <span className="text-[13px] font-mono font-bold text-bull flex items-center gap-1 mb-1">
                   <ArrowUpRight className="h-3 w-3" /> BULL CASE
                 </span>
-                <p className="text-[10px] font-mono text-[hsl(var(--foreground)/0.8)] leading-relaxed">{signal.bull_case}</p>
+                <p className="text-[14px] font-mono text-[hsl(var(--foreground)/0.8)] leading-relaxed">{signal.bull_case}</p>
               </div>
             )}
             {signal.bear_case && (
               <div className="p-3 rounded border border-[hsl(var(--bear)/0.2)] bg-[hsl(var(--bear)/0.05)]">
-                <span className="text-[9px] font-mono font-bold text-bear flex items-center gap-1 mb-1">
+                <span className="text-[13px] font-mono font-bold text-bear flex items-center gap-1 mb-1">
                   <ArrowDownRight className="h-3 w-3" /> BEAR CASE
                 </span>
-                <p className="text-[10px] font-mono text-[hsl(var(--foreground)/0.8)] leading-relaxed">{signal.bear_case}</p>
+                <p className="text-[14px] font-mono text-[hsl(var(--foreground)/0.8)] leading-relaxed">{signal.bear_case}</p>
               </div>
             )}
           </div>
@@ -120,7 +120,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         {/* Agent contributions */}
         {signal.agent_votes && typeof signal.agent_votes === "object" && (
           <div className="mb-4">
-            <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">AGENT CONTRIBUTIONS</span>
+            <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">AGENT CONTRIBUTIONS</span>
             <div className="space-y-1.5 mt-2">
               {Object.entries(signal.agent_votes).map(([agent, vote]) => {
                 if (typeof vote !== "object" || vote === null || ["risk_approved", "quant_validated"].includes(agent)) return null;
@@ -131,7 +131,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                 const isPos = net >= 0;
                 return (
                   <div key={agent} className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground))] w-20 shrink-0 uppercase">
+                    <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] w-20 shrink-0 uppercase">
                       {agent.replace("_", " ")}
                     </span>
                     <div className="flex-1 h-2 bg-[hsl(var(--muted)/0.3)] rounded overflow-hidden relative">
@@ -145,7 +145,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                       )}
                     </div>
                     <span className={cn(
-                      "text-[10px] font-mono font-bold w-10 text-right",
+                      "text-[14px] font-mono font-bold w-10 text-right",
                       isPos ? "text-bull" : "text-bear"
                     )}>
                       {isPos ? "+" : ""}{net.toFixed(0)}pp
@@ -160,10 +160,10 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         {/* Reasoning chain */}
         {signal.reasoning_chain && signal.reasoning_chain.length > 0 && (
           <div className="mb-4">
-            <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">REASONING CHAIN</span>
+            <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">REASONING CHAIN</span>
             <div className="mt-2 space-y-1">
               {signal.reasoning_chain.map((step, i) => (
-                <div key={i} className="text-[11px] font-mono text-[hsl(var(--foreground)/0.8)] flex gap-2">
+                <div key={i} className="text-[13px] font-mono text-[hsl(var(--foreground)/0.8)] flex gap-2">
                   <span className="text-[hsl(var(--muted-foreground))] shrink-0">{i + 1}.</span>
                   <span>{step}</span>
                 </div>
@@ -175,10 +175,10 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         {/* Strategy sources */}
         {signal.strategy_sources && signal.strategy_sources.length > 0 && (
           <div>
-            <span className="text-[10px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">STRATEGIES</span>
+            <span className="text-[14px] font-mono font-bold text-[hsl(var(--muted-foreground))] tracking-widest">STRATEGIES</span>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {signal.strategy_sources.map((s, i) => (
-                <span key={i} className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">{s}</span>
+                <span key={i} className="px-1.5 py-0.5 rounded text-[13px] font-mono bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]">{s}</span>
               ))}
             </div>
           </div>

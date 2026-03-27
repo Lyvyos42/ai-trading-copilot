@@ -215,7 +215,7 @@ export default function SignalsPage() {
           <div className="panel-header">
             <IconLock size={12} color="hsl(var(--primary))" />
             <span
-              className="text-[9px] font-bold tracking-[0.1em]"
+              className="text-[13px] font-bold tracking-[0.1em]"
               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
             >
               SIGN IN TO USE AI SIGNAL GENERATOR
@@ -238,7 +238,7 @@ export default function SignalsPage() {
                   }}
                 >
                   <div
-                    className="text-[9px] font-bold mb-2 tracking-[0.1em]"
+                    className="text-[13px] font-bold mb-2 tracking-[0.1em]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
                   >
                     {label}
@@ -247,7 +247,7 @@ export default function SignalsPage() {
                     {features.map(f => (
                       <li
                         key={f}
-                        className="flex items-center gap-1.5 text-[10px]"
+                        className="flex items-center gap-1.5 text-[14px]"
                         style={{ color: "hsl(var(--muted-foreground))" }}
                       >
                         <div className="h-1 w-1 shrink-0" style={{ background: color, borderRadius: "0.5px" }} />
@@ -261,7 +261,7 @@ export default function SignalsPage() {
             <div className="flex gap-2">
               <a
                 href="/login"
-                className="px-4 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+                className="px-4 py-1.5 text-[14px] font-bold tracking-[0.08em] transition-colors"
                 style={{
                   fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                   border: "1px solid hsl(var(--primary) / 0.4)",
@@ -274,7 +274,7 @@ export default function SignalsPage() {
               </a>
               <a
                 href="/pricing"
-                className="px-4 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+                className="px-4 py-1.5 text-[14px] font-bold tracking-[0.08em] transition-colors"
                 style={{
                   fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                   border: "1px solid hsl(var(--border-strong))",
@@ -294,7 +294,7 @@ export default function SignalsPage() {
         <div className="panel-header">
           <IconSignal size={12} color="hsl(var(--primary))" />
           <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
-          <span className="text-[9px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
+          <span className="text-[13px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
             — 9-Agent LangGraph Pipeline
           </span>
           <div className="ml-auto flex items-center gap-1.5">
@@ -315,7 +315,7 @@ export default function SignalsPage() {
               <button
                 key={ac}
                 onClick={() => setAssetClass(ac)}
-                className="px-3 py-1 text-[9px] font-bold tracking-[0.08em] uppercase transition-colors"
+                className="px-3 py-1 text-[13px] font-bold tracking-[0.08em] uppercase transition-colors"
                 style={{
                   fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                   border: "1px solid",
@@ -345,7 +345,7 @@ export default function SignalsPage() {
                     handleGenerate(ticker);
                   }}
                   disabled={loading !== null}
-                  className="px-2.5 py-1 text-[10px] font-bold transition-all"
+                  className="px-2.5 py-1 text-[14px] font-bold transition-all"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                     border: "1px solid",
@@ -369,7 +369,7 @@ export default function SignalsPage() {
             <span className="terminal-label shrink-0">CUSTOM TICKER</span>
             <div className="relative">
               <span
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[14px] font-bold"
                 style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
               >
                 &rsaquo;
@@ -385,7 +385,7 @@ export default function SignalsPage() {
             <button
               type="submit"
               disabled={!customTicker.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold tracking-[0.08em] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[14px] font-bold tracking-[0.08em] transition-colors"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 border: "1px solid hsl(var(--primary) / 0.4)",
@@ -404,7 +404,7 @@ export default function SignalsPage() {
           {/* Error */}
           {error && (
             <div
-              className="flex items-center gap-3 px-3 py-2 text-[10px]"
+              className="flex items-center gap-3 px-3 py-2 text-[14px]"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 color: "hsl(var(--bear))",
@@ -452,19 +452,19 @@ export default function SignalsPage() {
                   <IconSignal size={12} color="hsl(var(--warn))" />
                 </div>
                 <span
-                  className="text-[9px] font-bold tracking-[0.1em] ml-1"
+                  className="text-[13px] font-bold tracking-[0.1em] ml-1"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn))" }}
                 >
                   WAKING BACKEND
                 </span>
                 <span
-                  className="ml-2 text-[9px]"
+                  className="ml-2 text-[13px]"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.7)" }}
                 >
                   {loading}
                 </span>
                 <span
-                  className="mx-auto text-[9px]"
+                  className="mx-auto text-[13px]"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn) / 0.6)" }}
                 >
                   Render cold start — auto-retrying (~26s max)
@@ -473,13 +473,13 @@ export default function SignalsPage() {
             ) : (
               <>
                 <span
-                  className="text-[9px] font-bold tracking-[0.1em]"
+                  className="text-[13px] font-bold tracking-[0.1em]"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
                 >
                   PIPELINE RUNNING
                 </span>
                 <span
-                  className="ml-2 text-[9px]"
+                  className="ml-2 text-[13px]"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.8)" }}
                 >
                   {loading}
@@ -488,7 +488,7 @@ export default function SignalsPage() {
             )}
             <button
               onClick={cancelAnalysis}
-              className="ml-auto flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 transition-colors"
+              className="ml-auto flex items-center gap-1 text-[13px] font-bold px-2 py-0.5 transition-colors"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 border: "1px solid hsl(var(--border-strong))",

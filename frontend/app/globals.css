@@ -86,14 +86,14 @@
     --depth-unit:      40px;
     --perspective:     800px;
 
-    /* Typography scale — tight, tool-grade */
-    --text-xs:    11px;
-    --text-sm:    12px;
-    --text-base:  14px;
-    --text-lg:    16px;
-    --text-xl:    19px;
-    --text-2xl:   23px;
-    --text-3xl:   28px;
+    /* Typography scale — readable, professional */
+    --text-xs:    13px;
+    --text-sm:    14px;
+    --text-base:  16px;
+    --text-lg:    18px;
+    --text-xl:    22px;
+    --text-2xl:   26px;
+    --text-3xl:   32px;
 
     --radius: 2px;
   }
@@ -286,7 +286,7 @@
 
 .terminal-label {
   font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -481,7 +481,7 @@
 .data-cell { display: flex; flex-direction: column; gap: 1px; }
 .data-cell-label {
   font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -508,7 +508,7 @@
   align-items: center;
   gap: 6px;
   font-family: 'BerkeleyMono', 'IBM Plex Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;

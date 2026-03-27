@@ -131,7 +131,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
 
   if (loading) {
     return (
-      <div className="px-3 py-4 flex items-center gap-2 text-[9px] font-mono text-muted-foreground">
+      <div className="px-3 py-4 flex items-center gap-2 text-[13px] font-mono text-muted-foreground">
         <span className="h-2 w-2 rounded-full border border-primary/40 border-t-primary animate-spin" />
         Loading scanner…
       </div>
@@ -141,8 +141,8 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
   if (error === "pro_required") {
     return (
       <div className="px-3 py-3">
-        <div className="text-[9px] font-mono font-bold text-primary mb-1 tracking-widest">AGENT SCANNER</div>
-        <div className="text-[9px] font-mono text-muted-foreground leading-relaxed">
+        <div className="text-[13px] font-mono font-bold text-primary mb-1 tracking-widest">AGENT SCANNER</div>
+        <div className="text-[13px] font-mono text-muted-foreground leading-relaxed">
           Agent Scanner is available on <span className="text-primary font-bold">Pro</span> and{" "}
           <span className="text-primary font-bold">Enterprise</span> plans.
           <br />
@@ -160,7 +160,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Zap className={cn("h-3 w-3", enabled ? "text-primary" : "text-muted-foreground")} />
-          <span className="text-[9px] font-mono font-bold tracking-widest text-foreground">AGENT SCANNER</span>
+          <span className="text-[13px] font-mono font-bold tracking-widest text-foreground">AGENT SCANNER</span>
         </div>
         <button
           onClick={toggleEnabled}
@@ -285,7 +285,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
         <div className="flex items-center justify-between">
           <span className="text-[8px] font-mono text-muted-foreground">EST. COST / HOUR</span>
           <span className={cn(
-            "text-[9px] font-mono font-bold",
+            "text-[13px] font-mono font-bold",
             parseFloat(costPerHour) < 0.02 ? "text-bull" : parseFloat(costPerHour) < 0.05 ? "text-warn" : "text-bear"
           )}>
             ~${costPerHour}

@@ -135,7 +135,7 @@ export default function HomePage() {
               style={{ background: "hsl(var(--bull))", animation: "pulse-live 1.6s ease-in-out infinite" }}
             />
             <span
-              className="text-[9px] font-bold tracking-[0.12em]"
+              className="text-[13px] font-bold tracking-[0.12em]"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 color: "hsl(var(--primary))",
@@ -235,7 +235,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span
-                    className="text-[9px] font-bold tracking-[0.08em]"
+                    className="text-[13px] font-bold tracking-[0.08em]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: agent.color }}
                   >
                     {agent.name.toUpperCase()}
@@ -291,7 +291,7 @@ export default function HomePage() {
       >
         <div className="mb-12">
           <p
-            className="text-[9px] font-bold tracking-[0.18em] mb-3"
+            className="text-[13px] font-bold tracking-[0.18em] mb-3"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
           >
             CAPABILITIES
@@ -335,7 +335,7 @@ export default function HomePage() {
                 {title}
               </h3>
               <p
-                className="text-[11px] leading-relaxed"
+                className="text-[13px] leading-relaxed"
                 style={{ color: "hsl(var(--muted-foreground))" }}
               >
                 {description}
@@ -352,7 +352,7 @@ export default function HomePage() {
       >
         <div className="mb-12">
           <p
-            className="text-[9px] font-bold tracking-[0.18em] mb-3"
+            className="text-[13px] font-bold tracking-[0.18em] mb-3"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
           >
             PRICING
@@ -402,7 +402,7 @@ export default function HomePage() {
               <div className="p-5 flex-1">
                 <div className="mb-4">
                   <div
-                    className="text-[9px] font-bold tracking-[0.12em] mb-2"
+                    className="text-[13px] font-bold tracking-[0.12em] mb-2"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
                   >
                     {name.toUpperCase()}
@@ -416,7 +416,7 @@ export default function HomePage() {
                     </span>
                     {period && (
                       <span
-                        className="text-[11px]"
+                        className="text-[13px]"
                         style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
                       >
                         {period}
@@ -429,7 +429,7 @@ export default function HomePage() {
                   {features.map((f) => (
                     <li
                       key={f}
-                      className="flex items-center gap-2 text-[11px]"
+                      className="flex items-center gap-2 text-[13px]"
                       style={{ color: "hsl(var(--muted-foreground))" }}
                     >
                       {/* Geometric bullet — small square, not a circle */}
@@ -446,7 +446,7 @@ export default function HomePage() {
               <div className="px-5 pb-5">
                 <Link
                   href="/login"
-                  className="flex items-center justify-center gap-1.5 w-full py-2 transition-all text-[10px] font-bold tracking-[0.08em] uppercase"
+                  className="flex items-center justify-center gap-1.5 w-full py-2 transition-all text-[14px] font-bold tracking-[0.08em] uppercase"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                     border: `1px solid ${highlight ? "hsl(var(--bull))" : "hsl(var(--border-strong))"}`,

@@ -124,6 +124,34 @@ const SECTIONS = [
       "Integrated into the signal generation pipeline",
     ],
   },
+  {
+    icon: IconSignal,
+    title: "Session Mode",
+    href: "/session",
+    description: "Active trading session with continuous monitoring. Start a session on any ticker and get real-time analysis updates with kill zone detection, tilt coaching, and risk gate enforcement. Designed for intraday traders who need live guidance.",
+    features: [
+      "Continuous real-time analysis updates",
+      "Kill zone detection (London, NY Open, NY Close)",
+      "Tilt detection and coaching (overtrading, revenge trading)",
+      "Risk gate with 15 hard veto rules",
+      "Session PnL tracking and trade counter",
+      "Strategy profile integration",
+    ],
+  },
+  {
+    icon: IconShield,
+    title: "Memory Layer",
+    href: "/memory",
+    description: "The platform learns from every interaction. It stores observations about your trading patterns, preferences, and performance as semantic memories. Agents retrieve relevant memories before each analysis to personalize their output and avoid past mistakes.",
+    features: [
+      "7 memory types: Behavioural, Performance, Psychological, Preference, Learning, Account State, Session Context",
+      "Agents self-correct from past wrong predictions",
+      "User behaviour learning (tickers, direction lean, timeframes)",
+      "Memory dashboard — see and delete what the platform knows",
+      "Signal feedback (thumbs up/down) stored as behavioural memory",
+      "The more you use it, the smarter it gets",
+    ],
+  },
 ];
 
 export default function GuidePage() {
@@ -135,7 +163,7 @@ export default function GuidePage() {
       {/* Header */}
       <section className="max-w-5xl mx-auto px-6 pt-16 pb-12">
         <p
-          className="text-[9px] font-bold tracking-[0.18em] mb-3"
+          className="text-[13px] font-bold tracking-[0.18em] mb-3"
           style={{
             fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
             color: "hsl(var(--primary))",
@@ -171,7 +199,7 @@ export default function GuidePage() {
             <a
               key={href}
               href={`#${title.toLowerCase().replace(/ /g, "-")}`}
-              className="text-[10px] font-bold tracking-[0.06em] uppercase px-3 py-1.5 transition-colors"
+              className="text-[14px] font-bold tracking-[0.06em] uppercase px-3 py-1.5 transition-colors"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 border: "1px solid hsl(var(--border))",
@@ -229,7 +257,7 @@ export default function GuidePage() {
                       </h2>
                       <Link
                         href={href}
-                        className="inline-flex items-center gap-1 text-[9px] font-bold tracking-[0.08em] uppercase transition-colors"
+                        className="inline-flex items-center gap-1 text-[13px] font-bold tracking-[0.08em] uppercase transition-colors"
                         style={{
                           fontFamily:
                             "'BerkeleyMono', 'IBM Plex Mono', monospace",
@@ -248,7 +276,7 @@ export default function GuidePage() {
 
                 {/* Description */}
                 <p
-                  className="text-[12px] leading-relaxed mb-4"
+                  className="text-[14px] leading-relaxed mb-4"
                   style={{ color: "hsl(var(--muted-foreground))" }}
                 >
                   {description}
@@ -259,7 +287,7 @@ export default function GuidePage() {
                   {features.map((f) => (
                     <li
                       key={f}
-                      className="flex items-start gap-2 text-[11px]"
+                      className="flex items-start gap-2 text-[13px]"
                       style={{ color: "hsl(var(--muted-foreground))" }}
                     >
                       <div
@@ -286,7 +314,7 @@ export default function GuidePage() {
       >
         <div className="pt-8">
           <p
-            className="text-[10px] leading-relaxed max-w-2xl"
+            className="text-[14px] leading-relaxed max-w-2xl"
             style={{ color: "hsl(var(--muted-foreground) / 0.6)" }}
           >
             AI Trading Copilot is an analysis and decision-support tool. It does

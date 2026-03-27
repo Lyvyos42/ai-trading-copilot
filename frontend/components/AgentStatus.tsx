@@ -67,7 +67,7 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1">
                   <span className={cn(
-                    "text-[10px] font-mono font-bold truncate",
+                    "text-[14px] font-mono font-bold truncate",
                     isTrader ? "text-primary" : "text-foreground"
                   )}>
                     {AGENT_SHORT[agent.name] || agent.name.toUpperCase()}
@@ -77,15 +77,15 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[9px] font-mono text-muted-foreground">{agent.avg_latency_ms}ms</span>
-                  <span className="text-[9px] font-mono text-muted-foreground">{agent.signals_today} sig</span>
+                  <span className="text-[13px] font-mono text-muted-foreground">{agent.avg_latency_ms}ms</span>
+                  <span className="text-[13px] font-mono text-muted-foreground">{agent.signals_today} sig</span>
                 </div>
               </div>
 
               {/* Status + accuracy */}
               <div className="text-right shrink-0">
                 <div className={cn(
-                  "text-[10px] font-mono font-bold",
+                  "text-[14px] font-mono font-bold",
                   agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear"
                 )}>
                   {agent.accuracy_7d}%
@@ -132,7 +132,7 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{agent.name}</span>
                   {isTrader && (
-                    <span className="text-[9px] font-mono text-primary border border-primary/30 rounded px-1">OPUS 4.6</span>
+                    <span className="text-[13px] font-mono text-primary border border-primary/30 rounded px-1">OPUS 4.6</span>
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">{agent.role}</div>
@@ -148,13 +148,13 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
                 )}>
                   {agent.accuracy_7d}%
                 </div>
-                <div className="text-[9px] text-muted-foreground">7d accuracy</div>
+                <div className="text-[13px] text-muted-foreground">7d accuracy</div>
                 <div className="flex items-center justify-end gap-1 mt-1">
                   <div className={cn(
                     "h-1.5 w-1.5 rounded-full",
                     healthy ? "bg-bull animate-pulse" : "bg-bear"
                   )} />
-                  <span className="text-[9px] font-mono text-muted-foreground">{healthy ? "HEALTHY" : "DOWN"}</span>
+                  <span className="text-[13px] font-mono text-muted-foreground">{healthy ? "HEALTHY" : "DOWN"}</span>
                 </div>
               </div>
             </div>

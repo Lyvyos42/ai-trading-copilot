@@ -60,7 +60,7 @@ export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }:
             <Icon className={`h-4 w-4 ${info.color}`} />
           </div>
           <div>
-            <div className="text-[10px] font-mono text-muted-foreground">UPGRADE REQUIRED</div>
+            <div className="text-[14px] font-mono text-muted-foreground">UPGRADE REQUIRED</div>
             <div className="font-mono text-sm font-bold text-foreground">{feature}</div>
           </div>
         </div>
@@ -89,7 +89,7 @@ export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }:
         <div className="flex gap-2">
           <a
             href="/pricing"
-            className={`flex-1 py-2 rounded-md border ${info.borderColor} ${info.color} text-[11px] font-mono font-bold text-center hover:bg-white/5 transition-colors`}
+            className={`flex-1 py-2 rounded-md border ${info.borderColor} ${info.color} text-[13px] font-mono font-bold text-center hover:bg-white/5 transition-colors`}
           >
             SEE ALL PLANS
           </a>
@@ -97,13 +97,13 @@ export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }:
             href="https://wa.me/message/YOURWANUMBER"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 py-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[11px] font-mono font-bold text-center hover:bg-primary/20 transition-colors"
+            className="flex-1 py-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[13px] font-mono font-bold text-center hover:bg-primary/20 transition-colors"
           >
             CONTACT US
           </a>
         </div>
 
-        <p className="text-[10px] text-muted-foreground text-center mt-3">
+        <p className="text-[14px] text-muted-foreground text-center mt-3">
           No automatic charges. We&apos;ll contact you to set up your subscription.
         </p>
       </div>

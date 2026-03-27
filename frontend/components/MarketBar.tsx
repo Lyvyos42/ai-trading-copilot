@@ -121,7 +121,7 @@ export function MarketBar() {
             STALE
           </span>
         )}
-        <span className="font-mono text-[9px] font-bold text-muted-foreground tracking-widest">MARKETS</span>
+        <span className="font-mono text-[13px] font-bold text-muted-foreground tracking-widest">MARKETS</span>
       </div>
 
       <div className="flex-1 overflow-hidden relative">
@@ -130,9 +130,9 @@ export function MarketBar() {
             const up = tick.changePct >= 0;
             return (
               <div key={i} className="inline-flex items-center gap-2 px-4 border-r border-border/30 h-8 shrink-0">
-                <span className="font-mono text-[10px] font-bold text-foreground">{tick.symbol}</span>
-                <span className="font-mono text-[10px] text-foreground">{fmt(tick)}</span>
-                <span className={`font-mono text-[9px] font-semibold ${up ? "text-bull" : "text-bear"}`}>
+                <span className="font-mono text-[14px] font-bold text-foreground">{tick.symbol}</span>
+                <span className="font-mono text-[14px] text-foreground">{fmt(tick)}</span>
+                <span className={`font-mono text-[13px] font-semibold ${up ? "text-bull" : "text-bear"}`}>
                   {fmtChg(tick)}
                 </span>
               </div>
@@ -158,5 +158,5 @@ function ClockDisplay() {
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, []);
-  return <span className="font-mono text-[9px] text-muted-foreground whitespace-nowrap">{time}</span>;
+  return <span className="font-mono text-[13px] text-muted-foreground whitespace-nowrap">{time}</span>;
 }
