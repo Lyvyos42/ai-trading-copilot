@@ -22,5 +22,22 @@ class BaseAgent:
     # Alias — keeps existing call sites working during transition
     _call_claude = _call_llm
 
+    @staticmethod
+    def _strategy_context(state: TradingState) -> str:
+        """Build a strategy/timeframe context block from the pipeline state."""
+        profile = state.get("strategy_profile", "balanced")
+        timeframe = state.get("timeframe", "1D")
+        if profile == "balanced" and timeframe == "1D":
+            return ""
+        lines = [f"ACTIVE STRATEGY: {profile.upper()}",
+                 f"ANALYSIS TIMEFRAME: {timeframe}"]
+        if timeframe in ("1m", "5m"):
+            lines.append("Focus on micro price action, order flow, and very tight levels. Fundamentals and macro are minimal factors.")
+        elif timeframe in ("15m", "30m"):
+            lines.append("Focus on intraday levels, session structure, and volume. Fundamentals are secondary.")
+        elif timeframe in ("1h", "4h"):
+            lines.append("Intraday-to-swing horizon. Balance technical levels with sentiment and macro context.")
+        return "\n".join(lines) + "\n\n"
+
     async def analyze(self, state: TradingState) -> dict:
         raise NotImplementedError

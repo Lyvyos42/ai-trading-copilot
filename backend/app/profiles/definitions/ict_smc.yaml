@@ -2,6 +2,8 @@ name: ICT / Smart Money Concepts
 slug: ict_smc
 description: Fair value gaps, order blocks, liquidity sweeps. Institutional footprint analysis.
 default: false
+default_timeframe: "15m"
+recommended_chart: "15"
 
 weights:
   fundamental: 0.5

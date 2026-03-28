@@ -104,6 +104,7 @@ class TechnicalAnalyst(BaseAgent):
         ema_cross = "BULLISH" if ema12 > ema26 else ("BEARISH" if ema12 < ema26 else "NEUTRAL")
 
         user_msg = (
+            f"{self._strategy_context(state)}"
             f"Analyze {ticker} technically.\n"
             f"EMA12={ema12:.{dec}f}, EMA26={ema26:.{dec}f}, RSI={rsi:.1f}\n"
             f"Z-Score (20d)={zscore:.2f} (mean reversion signal, strategy 3.9)\n"

@@ -57,7 +57,7 @@ class OrderFlowAnalyst(BaseAgent):
                     obv -= volumes[i]
             obv_trend = "RISING" if obv > 0 else "FALLING"
 
-        user_msg = f"""Analyze order flow for {ticker}.
+        user_msg = f"""{self._strategy_context(state)}Analyze order flow for {ticker}.
 Current price: {close}
 VWAP: {vwap}, deviation: {vwap_dev:+.2f}%
 Volume: {volume:,.0f} (ratio vs 30d avg: {vol_ratio:.2f}x)

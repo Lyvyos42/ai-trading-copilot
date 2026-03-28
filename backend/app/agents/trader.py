@@ -92,10 +92,13 @@ class TraderAgent(BaseAgent):
         # ── Memory context injection ────────────────────────────────────
         memory_block = state.get("memory_context", "")
 
-        user_msg = f"""{memory_block}Produce a probability assessment for {ticker}.
+        timeframe = state.get("timeframe", "1D")
+        user_msg = f"""{memory_block}{self._strategy_context(state)}Produce a probability assessment for {ticker}.
 
+ANALYSIS TIMEFRAME: {timeframe}
 CURRENT PRICE: {current_price:{_pfmt}}
 Base your research_target and invalidation_level on this exact current price.
+Set analytical_window appropriate for the {timeframe} timeframe.
 
 ANALYST CONSENSUS (7 agents):
 - Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}

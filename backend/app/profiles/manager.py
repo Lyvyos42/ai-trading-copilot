@@ -24,7 +24,8 @@ _ANALYST_KEYS = [
 class Profile:
     """Loaded strategy profile."""
 
-    __slots__ = ("name", "slug", "description", "weights", "prompt_block", "is_default")
+    __slots__ = ("name", "slug", "description", "weights", "prompt_block", "is_default",
+                 "default_timeframe", "recommended_chart")
 
     def __init__(self, data: dict[str, Any]):
         self.name: str = data["name"]
@@ -32,6 +33,8 @@ class Profile:
         self.description: str = data.get("description", "")
         self.is_default: bool = data.get("default", False)
         self.prompt_block: str = data.get("prompt_block", "")
+        self.default_timeframe: str = data.get("default_timeframe", "1D")
+        self.recommended_chart: str = data.get("recommended_chart", "D")
         raw_weights = data.get("weights", {})
         self.weights: dict[str, float] = {
             k: float(raw_weights.get(k, _DEFAULT_WEIGHT))
@@ -45,6 +48,8 @@ class Profile:
             "description": self.description,
             "weights": self.weights,
             "is_default": self.is_default,
+            "default_timeframe": self.default_timeframe,
+            "recommended_chart": self.recommended_chart,
         }
 
 

@@ -2,6 +2,8 @@ name: Scalper
 slug: scalper
 description: 1-5 minute charts. Tight stops, rapid execution. High win rate focus.
 default: false
+default_timeframe: "5m"
+recommended_chart: "5"
 
 weights:
   fundamental: 0.2

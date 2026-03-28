@@ -30,7 +30,7 @@ class FundamentalAnalyst(BaseAgent):
         ticker = state.get("ticker", "UNKNOWN")
         market_data = state.get("market_data", {})
 
-        user_msg = f"""Analyze {ticker} fundamentally.
+        user_msg = f"""{self._strategy_context(state)}Analyze {ticker} fundamentally.
 Current price: {market_data.get('close', 'N/A')}
 P/E Ratio: {market_data.get('pe_ratio', 'N/A')}
 P/B Ratio: {market_data.get('pb_ratio', 'N/A')}

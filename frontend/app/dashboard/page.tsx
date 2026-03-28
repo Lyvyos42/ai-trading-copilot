@@ -14,6 +14,17 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 
+// Map profile slug → default chart interval for auto-switching
+const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> = {
+  balanced:      { timeframe: "1D",  chart: "1d" },
+  swing:         { timeframe: "1D",  chart: "1d" },
+  orb:           { timeframe: "15m", chart: "15m" },
+  scalper:       { timeframe: "5m",  chart: "5m" },
+  ict_smc:       { timeframe: "15m", chart: "15m" },
+  vwap_pullback: { timeframe: "30m", chart: "30m" },
+  news_catalyst: { timeframe: "1h",  chart: "1h" },
+};
+
 const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
 
 
@@ -31,8 +42,19 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const [activeProfile, setActiveProfile]   = useState(() =>
     (typeof window !== "undefined" && localStorage.getItem("dashboard_profile")) || "balanced"
   );
+  const [chartInterval, setChartInterval]   = useState(() => {
+    const saved = typeof window !== "undefined" && localStorage.getItem("dashboard_profile");
+    return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
+  });
 
   const { isLoggedIn } = useAuth();
+
+  // Auto-switch chart timeframe when profile changes
+  function handleProfileChange(slug: string) {
+    setActiveProfile(slug);
+    const tf = PROFILE_TIMEFRAMES[slug];
+    if (tf) setChartInterval(tf.chart);
+  }
 
   useEffect(() => {
     wakeBackend();
@@ -69,7 +91,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setAnalysisError(null);
     setActiveTicker(t);
     try {
-      const signal = await generateSignal(t, undefined, "1D", activeProfile);
+      const signal = await generateSignal(t, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
       // Deduplicate: replace existing signal for same ticker, keep latest
       setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)]);
       setSelectedSignal(signal);
@@ -159,7 +181,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           {/* Control bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0 flex-wrap">
             <SymbolSearch value={activeTicker} onChange={setActiveTicker} />
-            <ProfileSelector value={activeProfile} onChange={setActiveProfile} compact />
+            <ProfileSelector value={activeProfile} onChange={handleProfileChange} compact />
 
             <div className="flex items-center gap-1 flex-wrap overflow-x-auto">
               {WATCHLIST.map((ticker) => {
@@ -212,7 +234,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
             <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "300px" }}>
-              <TradingViewChart ticker={activeTicker} fillContainer />
+              <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
             </div>
           </div>
         </div>

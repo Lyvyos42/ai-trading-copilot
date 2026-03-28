@@ -2,6 +2,8 @@ name: Opening Range Breakout
 slug: orb
 description: First 15-30 min range breakout strategy. Momentum-driven, time-gated entries.
 default: false
+default_timeframe: "15m"
+recommended_chart: "15"
 
 weights:
   fundamental: 0.4

@@ -2,6 +2,8 @@ name: VWAP Pullback
 slug: vwap_pullback
 description: Mean reversion to VWAP. Institutional entry zones. Strategy 3.9 core.
 default: false
+default_timeframe: "30m"
+recommended_chart: "30"
 
 weights:
   fundamental: 0.6

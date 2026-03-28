@@ -2,6 +2,8 @@ name: Balanced
 slug: balanced
 description: Equal weight across all analysts. No style bias — pure multi-factor signal.
 default: true
+default_timeframe: "1D"
+recommended_chart: "D"
 
 weights:
   fundamental: 1.0

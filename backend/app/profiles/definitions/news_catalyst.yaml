@@ -2,6 +2,8 @@ name: News Catalyst
 slug: news_catalyst
 description: Event-driven trading. Earnings, macro releases, breaking news.
 default: false
+default_timeframe: "1h"
+recommended_chart: "60"
 
 weights:
   fundamental: 1.2

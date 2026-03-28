@@ -167,11 +167,9 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     return () => {
       container.innerHTML = "";
     };
-  // Only recreate the widget when the TICKER changes — not on interval change.
-  // This preserves drawings (position boxes, trendlines etc) when the user
-  // switches timeframes using our buttons or TradingView's own toolbar.
+  // Recreate the widget when the TICKER or INTERVAL changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker]);
+  }, [ticker, interval]);
 
   return (
     <div

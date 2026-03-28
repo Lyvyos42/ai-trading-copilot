@@ -225,6 +225,8 @@ export interface StrategyProfile {
   description: string;
   weights: Record<string, number>;
   is_default: boolean;
+  default_timeframe: string;
+  recommended_chart: string;
 }
 
 export async function listProfiles(): Promise<StrategyProfile[]> {
