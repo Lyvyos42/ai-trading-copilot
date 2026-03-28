@@ -54,9 +54,9 @@ def _check_ip_rate_limit(ip: str) -> None:
 # ── Layer 1: Per-user daily quota by tier ────────────────────────────────────────
 _DAILY_QUOTA: dict[str, int] = {
     "free":       2,
-    "retail":    50,
-    "pro":       200,
-    "enterprise": 9999,
+    "retail":     3,
+    "pro":       10,
+    "enterprise": 30,
     "admin":      9999,
 }
 
