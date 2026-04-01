@@ -226,7 +226,7 @@ export default function SignalsPage() {
               {[
                 { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["2 AI signals / day", "Stocks & ETFs only", "Paper trading portfolio", "Market intel & news"] },
                 { label: "RETAIL — $49/mo", color: "hsl(var(--primary))", features: ["Unlimited signals", "All 8 asset classes", "All 80+ strategies", "Bull/Bear agent debate"] },
-                { label: "PRO — $199/mo", color: "#f59e0b", features: ["Everything in Retail", "Custom agent tuning", "API & webhook access", "Priority support"] },
+                { label: "PRO — $149/mo", color: "#f59e0b", features: ["Everything in Retail", "Custom agent tuning", "API & webhook access", "Priority support"] },
               ].map(({ label, color, features }) => (
                 <div
                   key={label}

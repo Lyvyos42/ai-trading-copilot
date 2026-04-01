@@ -11,6 +11,8 @@ from app.config import settings
 from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market, news, profiles, session
 from app.api.routes import evaluation, performance, calendar, correlations, memory
 from app.api.routes.scanner import router as scanner_router, alerts_router
+from app.api.routes.paper_trading import router as paper_trading_router
+from app.api.routes.billing import router as billing_router
 from app.api.websocket import router as ws_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -58,6 +60,10 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE signals ADD COLUMN conviction_tier VARCHAR",
             # User model — active_profile column (Phase 3)
             "ALTER TABLE users ADD COLUMN active_profile VARCHAR DEFAULT 'balanced'",
+            # Stripe billing columns
+            "ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR UNIQUE",
+            "ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR",
+            "ALTER TABLE users ADD COLUMN subscription_status VARCHAR DEFAULT 'none'",
         ]
         for _stmt in _migrations:
             try:
@@ -160,6 +166,8 @@ app.include_router(performance.router)
 app.include_router(calendar.router)
 app.include_router(correlations.router)
 app.include_router(memory.router)
+app.include_router(paper_trading_router)
+app.include_router(billing_router)
 app.include_router(ws_router)
 
 

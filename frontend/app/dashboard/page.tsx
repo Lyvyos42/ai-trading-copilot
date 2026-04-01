@@ -56,9 +56,21 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     if (tf) setChartInterval(tf.chart);
   }
 
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+
   useEffect(() => {
     wakeBackend();
     loadData();
+    // Handle Stripe checkout success redirect
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("checkout") === "success") {
+        setCheckoutSuccess(true);
+        // Clean up URL
+        window.history.replaceState({}, "", window.location.pathname);
+        setTimeout(() => setCheckoutSuccess(false), 8000);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -120,6 +132,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
   return (
     <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
+
+      {/* Checkout success banner */}
+      {checkoutSuccess && (
+        <div className="bg-bull/10 border-b border-bull/30 px-4 py-2 text-center text-sm text-bull font-medium">
+          Subscription activated! Your account has been upgraded. Welcome aboard.
+        </div>
+      )}
 
       {/* ── TOP STATS BAR ──────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:flex items-stretch border-b border-border bg-[hsl(0_0%_3%)] shrink-0">

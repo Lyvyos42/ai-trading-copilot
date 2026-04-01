@@ -2,6 +2,7 @@ import json
 import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
+from app.data.fred_provider import format_for_agent as format_fred
 
 
 SYSTEM_PROMPT = """You are an expert macro economist applying global macro trading strategies:
@@ -45,15 +46,16 @@ class MacroAnalyst(BaseAgent):
         asset_class = state.get("asset_class", "stocks")
         news_ctx   = state.get("news_context", {})
         has_news   = news_ctx.get("has_news", False)
+        fred_block = format_fred(state.get("fred_data", {}))
 
         if has_news:
-            return await self._analyze_with_live_news(ticker, asset_class, news_ctx)
+            return await self._analyze_with_live_news(ticker, asset_class, news_ctx, fred_block)
         else:
-            return await self._analyze_with_mock(ticker, asset_class)
+            return await self._analyze_with_mock(ticker, asset_class, fred_block)
 
     # ── Live news path ────────────────────────────────────────────────────────
 
-    async def _analyze_with_live_news(self, ticker: str, asset_class: str, news_ctx: dict) -> dict:
+    async def _analyze_with_live_news(self, ticker: str, asset_class: str, news_ctx: dict, fred_block: str = "") -> dict:
         macro_hl   = news_ctx.get("macro_headlines", [])
         geo_hl     = news_ctx.get("geo_headlines", [])
         crisis_hl  = news_ctx.get("crisis_headlines", [])
@@ -97,6 +99,8 @@ GEOPOLITICAL HEADLINES ({len(geo_hl)} articles):
 • Overall news sentiment: {avg_sent:+.3f}
 • Estimated geopolitical risk index: {geo_risk_est}/100
 • Crisis alert level: {"HIGH" if len(crisis_hl) >= 2 else "ELEVATED" if crisis_hl else "NORMAL"}
+
+{fred_block}
 
 Strategy 19.2: Determine the current macro regime from the real headlines above.
 Strategy 8.2: Assess FX carry implications.
@@ -205,7 +209,7 @@ Output JSON only."""
         "ECB Policy Meeting", "PCE Inflation Data",
     ]
 
-    async def _analyze_with_mock(self, ticker: str, asset_class: str) -> dict:
+    async def _analyze_with_mock(self, ticker: str, asset_class: str, fred_block: str = "") -> dict:
         rng = random.Random(sum(ord(c) for c in ticker) + 99)
         regime_data = rng.choice(self.MACRO_REGIMES)
         events = rng.sample(self.UPCOMING_EVENTS, 2)
@@ -219,6 +223,8 @@ Current macro regime indicators:
 - Geopolitical risk: {regime_data['geo_risk']}/100 (Strategy 19.2 state variable 4)
 - FX Carry: USD vs G10 high-yield spread {rng.uniform(-0.5, 0.5):.2f}% (Strategy 8.2)
 - Upcoming events: {', '.join(events)} (Strategy 19.5)
+
+{fred_block}
 Output JSON only."""
 
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg)

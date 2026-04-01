@@ -27,3 +27,5 @@ apscheduler==3.10.4
 beautifulsoup4==4.12.3
 chromadb==0.5.23
 openai==1.65.0
+alpaca-py==0.28.0
+stripe==8.0.0

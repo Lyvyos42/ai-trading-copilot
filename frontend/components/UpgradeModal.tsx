@@ -1,5 +1,7 @@
 "use client";
-import { X, Zap, TrendingUp, Crown } from "lucide-react";
+import { useState } from "react";
+import { X, Zap, TrendingUp, Crown, Loader2 } from "lucide-react";
+import { createCheckout } from "@/lib/api";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -12,6 +14,7 @@ interface UpgradeModalProps {
 const TIER_INFO = {
   free: {
     label: "FREE",
+    slug: "free",
     price: "$0",
     color: "text-muted-foreground",
     borderColor: "border-border",
@@ -20,6 +23,7 @@ const TIER_INFO = {
   },
   retail: {
     label: "RETAIL",
+    slug: "retail",
     price: "$49/mo",
     color: "text-primary",
     borderColor: "border-primary/50",
@@ -28,7 +32,8 @@ const TIER_INFO = {
   },
   pro: {
     label: "PRO",
-    price: "$199/mo",
+    slug: "pro",
+    price: "$149/mo",
     color: "text-yellow-400",
     borderColor: "border-yellow-400/50",
     icon: Crown,
@@ -37,10 +42,24 @@ const TIER_INFO = {
 };
 
 export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }: UpgradeModalProps) {
+  const [loading, setLoading] = useState(false);
+
   if (!isOpen) return null;
 
   const info = TIER_INFO[requiredTier];
   const Icon = info.icon;
+
+  async function handleUpgrade() {
+    if (info.slug === "free") return;
+    setLoading(true);
+    try {
+      const { checkout_url } = await createCheckout(info.slug);
+      window.location.href = checkout_url;
+    } catch {
+      // Fall back to pricing page if checkout fails (e.g. not logged in)
+      window.location.href = "/pricing";
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -93,18 +112,17 @@ export function UpgradeModal({ isOpen, onClose, feature, requiredTier, reason }:
           >
             SEE ALL PLANS
           </a>
-          <a
-            href="https://wa.me/40770338051"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 py-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[13px] font-mono font-bold text-center hover:bg-primary/20 transition-colors"
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="flex-1 py-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[13px] font-mono font-bold text-center hover:bg-primary/20 transition-colors disabled:opacity-50"
           >
-            CONTACT US
-          </a>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : "UPGRADE NOW"}
+          </button>
         </div>
 
         <p className="text-[14px] text-muted-foreground text-center mt-3">
-          No automatic charges. We&apos;ll contact you to set up your subscription.
+          Secure checkout powered by Stripe. Questions? <a href="mailto:quantneuraledge@gmail.com" className="text-primary hover:underline">quantneuraledge@gmail.com</a>
         </p>
       </div>
     </div>

@@ -21,6 +21,27 @@ class Settings(BaseSettings):
     binance_secret_key: str = ""
     oanda_api_key: str = ""
 
+    # FRED (Federal Reserve Economic Data) — free, get key at https://fred.stlouisfed.org/docs/api/fred/
+    fred_api_key: str = ""
+
+    # Tiingo — financial news + market data. Free tier: 500 req/day
+    tiingo_api_key: str = ""
+
+    # Alpaca — paper trading + market data. Free paper trading account.
+    alpaca_api_key: str = ""
+    alpaca_secret_key: str = ""
+    alpaca_base_url: str = "https://paper-api.alpaca.markets"  # paper trading default
+
+    # QuiverQuant — alternative data (congressional trades, insider activity)
+    quiver_api_key: str = ""
+
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_retail: str = ""     # Stripe Price ID for $49/mo Retail
+    stripe_price_pro: str = ""        # Stripe Price ID for $149/mo Pro
+    stripe_price_enterprise: str = "" # Stripe Price ID for $499/mo Enterprise
+
     # Auth
     jwt_secret: str = "change_me_in_production"
     jwt_algorithm: str = "HS256"

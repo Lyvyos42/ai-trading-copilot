@@ -70,7 +70,7 @@ const TIERS = [
   },
   {
     name: "Pro",
-    price: "$199",
+    price: "$149",
     period: "/mo",
     features: ["Custom agent tuning", "API access", "Webhook execution", "Priority support"],
     cta: "Go Pro",
@@ -85,6 +85,7 @@ const TIERS = [
     cta: "Contact Sales",
     highlight: false,
     color: "#f59e0b",
+    href: "mailto:quantneuraledge@gmail.com?subject=Enterprise%20Plan%20Inquiry",
   },
 ];
 
@@ -366,7 +367,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {TIERS.map(({ name, price, period, features, cta, highlight, color }) => (
+          {TIERS.map(({ name, price, period, features, cta, highlight, color, ...rest }: any) => (
             <div
               key={name}
               className="panel panel-ao relative flex flex-col"
@@ -445,7 +446,7 @@ export default function HomePage() {
 
               <div className="px-5 pb-5">
                 <Link
-                  href="/login"
+                  href={rest.href || (name === "Free" ? "/login" : "/pricing")}
                   className="flex items-center justify-center gap-1.5 w-full py-2 transition-all text-[14px] font-bold tracking-[0.08em] uppercase"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",

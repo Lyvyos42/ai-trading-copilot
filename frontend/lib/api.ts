@@ -631,3 +631,24 @@ export async function getAgentCorrectionsByName(agentName: string): Promise<{ co
 export async function getMemoryStats(): Promise<MemoryStats> {
   return apiFetch("/api/v1/memory/stats");
 }
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+
+export async function createCheckout(tier: string): Promise<{ checkout_url: string; session_id: string }> {
+  return apiFetch("/api/v1/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({
+      tier,
+      success_url: `${typeof window !== "undefined" ? window.location.origin : ""}/dashboard?checkout=success`,
+      cancel_url: `${typeof window !== "undefined" ? window.location.origin : ""}/pricing?checkout=cancelled`,
+    }),
+  });
+}
+
+export async function createPortal(): Promise<{ portal_url: string }> {
+  return apiFetch("/api/v1/billing/portal", { method: "POST" });
+}
+
+export async function getBillingStatus(): Promise<{ tier: string; has_billing: boolean; stripe_customer_id: string | null }> {
+  return apiFetch("/api/v1/billing/status");
+}

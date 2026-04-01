@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from app.db.database import AsyncSessionLocal
 from app.models.news import NewsArticle
+from app.data.tiingo_provider import fetch_ticker_news, fetch_market_news as tiingo_market_news
 
 log = structlog.get_logger()
 
@@ -302,8 +303,53 @@ async def insert_seed_articles() -> int:
     return saved
 
 
+def _tiingo_to_article(art: dict) -> dict:
+    """Convert a Tiingo news article to the internal article format."""
+    text = f"{art['title']} {art.get('description', '')}"
+    category = _classify_category(text)
+    sentiment, score = _score_sentiment(text)
+    tickers = _extract_tickers(text)
+    # Also include tickers reported by Tiingo
+    for t in art.get("tickers", []):
+        upper = t.upper()
+        if upper not in tickers:
+            tickers.append(upper)
+    pub_str = art.get("published_at", "")
+    try:
+        pub_date = datetime.fromisoformat(pub_str.replace("Z", "+00:00")) if pub_str else datetime.now(timezone.utc)
+    except (ValueError, AttributeError):
+        pub_date = datetime.now(timezone.utc)
+    return {
+        "id": str(uuid.uuid4()),
+        "headline": art["title"],
+        "summary": (art.get("description") or "")[:500] or None,
+        "source": art.get("source", "Tiingo"),
+        "url": art.get("url", ""),
+        "published_at": pub_date,
+        "category": category,
+        "sentiment": sentiment,
+        "sentiment_score": score,
+        "tickers": tickers,
+        "is_active": True,
+    }
+
+
+async def _scrape_tiingo() -> list[dict]:
+    """Try fetching broad market news from Tiingo. Returns article dicts or empty list."""
+    raw = await tiingo_market_news(limit=30)
+    if not raw:
+        return []
+    articles = [_tiingo_to_article(a) for a in raw if a.get("title")]
+    log.info("tiingo_scrape_done", count=len(articles))
+    return articles
+
+
 async def scrape_all_feeds() -> int:
-    """Fetch all feeds and upsert new articles. Returns count of new articles saved."""
+    """Fetch all feeds and upsert new articles. Tries Tiingo first, falls back to RSS."""
+    # Try Tiingo as primary source
+    tiingo_articles = await _scrape_tiingo()
+
+    # Always fetch RSS as well to maximize coverage
     async with httpx.AsyncClient(
         headers={"User-Agent": "Mozilla/5.0 (compatible; QuantNeural/1.0; +https://quantneuraledge.com/bot)"},
         timeout=httpx.Timeout(20.0, connect=8.0),
@@ -313,7 +359,10 @@ async def scrape_all_feeds() -> int:
     # Filter out exceptions (individual feed failures should not crash the whole batch)
     results = [r if isinstance(r, list) else [] for r in results]
 
-    all_articles = [a for batch in results for a in batch]
+    rss_articles = [a for batch in results for a in batch]
+
+    # Combine: Tiingo first (higher quality), then RSS
+    all_articles = tiingo_articles + rss_articles
     if not all_articles:
         log.warning("all_feeds_failed_using_seeds")
         return await insert_seed_articles()

@@ -2,6 +2,7 @@ import json
 import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
+from app.data.quiver_provider import format_for_agent as format_alt_data
 
 
 SYSTEM_PROMPT = """You are an expert fundamental analyst specializing in quantitative equity strategies.
@@ -39,7 +40,10 @@ Revenue Growth YoY: {market_data.get('revenue_growth', 'N/A')}%
 Dividend Yield: {market_data.get('dividend_yield', 'N/A')}%
 Last Earnings Surprise: {market_data.get('earnings_surprise', 'N/A')}%
 
-Apply strategies 3.2 (earnings momentum) and 3.3 (value factor). Output JSON only."""
+Apply strategies 3.2 (earnings momentum) and 3.3 (value factor).
+
+{format_alt_data(state.get("alternative_data", {}))}
+Output JSON only."""
 
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
 

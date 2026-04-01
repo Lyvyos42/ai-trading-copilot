@@ -7,6 +7,8 @@ class TradingState(TypedDict, total=False):
     asset_class: str
     market_data: dict[str, Any]              # OHLCV + indicators
     news_context: dict[str, Any]             # live scraped headlines for agents
+    fred_data: dict[str, Any]                # FRED economic indicators
+    alternative_data: dict[str, Any]         # QuiverQuant alt data (Pro+ only)
     # Stage 1: 7 parallel analysts
     fundamental_analysis: dict[str, Any]
     technical_analysis: dict[str, Any]

@@ -1,28 +1,15 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Check, Zap } from "lucide-react";
+import { Check, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const EMAIL = "quantneuraledge@gmail.com";
-const WA_NUMBER = "40770338051"; // WhatsApp number (no + or spaces)
-
-function waLink(tier: string, price: number) {
-  const msg = encodeURIComponent(
-    `Hi! I'm interested in the AI Trading Copilot ${tier} plan ($${price}/mo). Can you help me get started?`
-  );
-  return `https://wa.me/${WA_NUMBER}?text=${msg}`;
-}
-
-function emailLink(tier: string, price: number) {
-  const subject = encodeURIComponent(`AI Trading Copilot — ${tier} Plan`);
-  const body = encodeURIComponent(
-    `Hi,\n\nI'd like to subscribe to the ${tier} plan ($${price}/mo).\n\nPlease send me payment details.\n\nThank you.`
-  );
-  return `mailto:${EMAIL}?subject=${subject}&body=${body}`;
-}
+import { createCheckout, createPortal, getBillingStatus } from "@/lib/api";
 
 const TIERS = [
   {
     name: "Free",
+    slug: "free",
     price: 0,
     description: "Explore the platform with demo signals",
     features: [
@@ -33,11 +20,11 @@ const TIERS = [
       "Community support",
     ],
     cta: "Start Free",
-    href: "/login",
     variant: "outline" as const,
   },
   {
     name: "Retail",
+    slug: "retail",
     price: 49,
     description: "Real AI signals for individual traders",
     features: [
@@ -50,11 +37,11 @@ const TIERS = [
       "Email support",
     ],
     cta: "Get Started — $49/mo",
-    href: waLink("Retail", 49),
     variant: "outline" as const,
   },
   {
     name: "Pro",
+    slug: "pro",
     price: 149,
     description: "For serious and semi-pro traders",
     features: [
@@ -67,12 +54,12 @@ const TIERS = [
       "Portfolio analytics",
     ],
     cta: "Go Pro — $149/mo",
-    href: waLink("Pro", 149),
     highlight: true,
     variant: "default" as const,
   },
   {
     name: "Enterprise",
+    slug: "enterprise",
     price: 499,
     description: "For funds, prop firms, and RIAs",
     features: [
@@ -85,7 +72,6 @@ const TIERS = [
       "Dedicated account manager",
     ],
     cta: "Contact Sales",
-    href: emailLink("Enterprise", 499),
     variant: "outline" as const,
   },
 ];
@@ -110,6 +96,30 @@ const FAQ = [
 ];
 
 export default function PricingPage() {
+  const [loading, setLoading] = useState<string | null>(null);
+
+  async function handleSubscribe(tier: string) {
+    setLoading(tier);
+    try {
+      const { checkout_url } = await createCheckout(tier);
+      window.location.href = checkout_url;
+    } catch (err: any) {
+      alert(err.message || "Failed to start checkout. Please log in first.");
+      setLoading(null);
+    }
+  }
+
+  async function handleManage() {
+    setLoading("manage");
+    try {
+      const { portal_url } = await createPortal();
+      window.location.href = portal_url;
+    } catch (err: any) {
+      alert(err.message || "Failed to open billing portal.");
+      setLoading(null);
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="text-center mb-12">
@@ -121,7 +131,7 @@ export default function PricingPage() {
 
       {/* Pricing grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
-        {TIERS.map(({ name, price, description, features, cta, href, highlight, variant }) => (
+        {TIERS.map(({ name, slug, price, description, features, cta, highlight, variant }) => (
           <div
             key={name}
             className={`relative p-6 rounded-xl border flex flex-col ${highlight ? "border-primary/50 bg-primary/5 shadow-lg shadow-primary/10" : "border-border/50 bg-card"}`}
@@ -147,13 +157,41 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <Link href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noopener noreferrer" : undefined}>
-              <Button variant={variant} size="sm" className="w-full">
-                {cta}
+            {slug === "free" ? (
+              <Link href="/login">
+                <Button variant={variant} size="sm" className="w-full">
+                  {cta}
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant={variant}
+                size="sm"
+                className="w-full"
+                disabled={loading !== null}
+                onClick={() => handleSubscribe(slug)}
+              >
+                {loading === slug ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Redirecting...</>
+                ) : (
+                  cta
+                )}
               </Button>
-            </Link>
+            )}
           </div>
         ))}
+      </div>
+
+      {/* Manage subscription */}
+      <div className="text-center mb-16">
+        <p className="text-sm text-muted-foreground mb-2">Already subscribed?</p>
+        <Button variant="ghost" size="sm" onClick={handleManage} disabled={loading === "manage"}>
+          {loading === "manage" ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Opening portal...</>
+          ) : (
+            "Manage Subscription"
+          )}
+        </Button>
       </div>
 
       {/* FAQ */}

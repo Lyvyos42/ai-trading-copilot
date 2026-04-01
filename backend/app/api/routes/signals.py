@@ -378,7 +378,8 @@ async def generate_signal(
             profile_slug = db_user.active_profile
 
     user_id_for_pipeline = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
-    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug, user_id=user_id_for_pipeline)
+    user_tier_for_pipeline = tier if tier else "free"
+    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug, user_id=user_id_for_pipeline, user_tier=user_tier_for_pipeline)
 
     final = state.get("final_signal", {})
     if not final:

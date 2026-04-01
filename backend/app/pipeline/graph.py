@@ -353,23 +353,34 @@ def _build_graph() -> StateGraph:
 
 # ─── Public API ───────────────────────────────────────────────────────────
 
-async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced", user_id: str | None = None) -> TradingState:
+async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced", user_id: str | None = None, user_tier: str = "free") -> TradingState:
     """
     Run the full 9-agent pipeline for a given ticker.
     Returns the completed TradingState with final_signal populated.
     """
     from app.data.market_data import fetch_market_data
+    from app.data.fred_provider import get_macro_snapshot
+    from app.data.quiver_provider import get_alternative_data
     from app.services.news_context import get_news_context
     from app.profiles.manager import profile_manager
 
-    # Fetch market data and live news context in parallel
+    # Fetch market data, live news context, and FRED data in parallel
     if market_data is None:
-        market_data, news_ctx = await asyncio.gather(
+        market_data, news_ctx, fred_snapshot = await asyncio.gather(
             fetch_market_data(ticker, asset_class),
             get_news_context(ticker),
+            get_macro_snapshot(),
         )
     else:
-        news_ctx = await get_news_context(ticker)
+        news_ctx, fred_snapshot = await asyncio.gather(
+            get_news_context(ticker),
+            get_macro_snapshot(),
+        )
+
+    # Fetch QuiverQuant alternative data for Pro/Enterprise tiers only
+    alt_data = {}
+    if user_tier in ("pro", "enterprise", "admin"):
+        alt_data = await get_alternative_data(ticker)
 
     # Build reasoning chain prefix describing news context quality
     reasoning_prefix = []
@@ -419,6 +430,8 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "asset_class":      asset_class,
         "market_data":      market_data,
         "news_context":     news_ctx,
+        "fred_data":        fred_snapshot,
+        "alternative_data": alt_data,
         "memory_context":   memory_context,
         "user_id":          user_id or "",
         "strategy_profile": profile,
