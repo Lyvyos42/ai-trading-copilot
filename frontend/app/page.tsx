@@ -427,7 +427,7 @@ export default function HomePage() {
                 </div>
 
                 <ul className="space-y-2 mb-5">
-                  {features.map((f) => (
+                  {features.map((f: string) => (
                     <li
                       key={f}
                       className="flex items-center gap-2 text-[13px]"
