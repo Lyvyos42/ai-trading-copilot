@@ -108,6 +108,67 @@ async def get_lobbying(ticker: str, limit: int = 5) -> Optional[list[dict]]:
         return None
 
 
+async def get_recent_congressional_trades(limit: int = 20) -> Optional[list[dict]]:
+    """Fetch latest congressional trades across all tickers (for Intel feed)."""
+    if not is_configured():
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{_BASE}/live/congresstrading",
+                headers=_headers(),
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            trades = resp.json()[:limit]
+            return [
+                {
+                    "representative": t.get("Representative", ""),
+                    "ticker": t.get("Ticker", ""),
+                    "transaction": t.get("Transaction", ""),
+                    "amount": t.get("Amount", ""),
+                    "date": t.get("TransactionDate", ""),
+                    "party": t.get("Party", ""),
+                    "district": t.get("District", ""),
+                }
+                for t in trades
+            ]
+    except Exception as e:
+        log.warning("quiver_recent_congress_failed", error=str(e))
+        return None
+
+
+async def get_recent_insider_trades(limit: int = 20) -> Optional[list[dict]]:
+    """Fetch latest insider trades across all tickers (for Intel feed)."""
+    if not is_configured():
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{_BASE}/live/insiders",
+                headers=_headers(),
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            trades = resp.json()[:limit]
+            return [
+                {
+                    "insider": t.get("Name", ""),
+                    "ticker": t.get("Ticker", ""),
+                    "title": t.get("Title", ""),
+                    "transaction_type": t.get("TransactionType", ""),
+                    "shares": t.get("Shares", 0),
+                    "price": t.get("Price", 0),
+                    "value": t.get("Value", 0),
+                    "date": t.get("Date", ""),
+                }
+                for t in trades
+            ]
+    except Exception as e:
+        log.warning("quiver_recent_insider_failed", error=str(e))
+        return None
+
+
 async def get_alternative_data(ticker: str) -> dict:
     """Fetch all available alternative data for a ticker. Returns empty dict on failure."""
     if not is_configured():

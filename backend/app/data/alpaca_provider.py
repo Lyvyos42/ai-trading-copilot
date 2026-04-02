@@ -126,6 +126,42 @@ async def get_positions() -> Optional[list[dict]]:
         return None
 
 
+async def fetch_news(limit: int = 30, ticker: str | None = None) -> Optional[list[dict]]:
+    """Fetch market news from Alpaca News API (Benzinga-sourced).
+    Free with any Alpaca account. Returns list of article dicts or None."""
+    if not is_configured():
+        return None
+    try:
+        params: dict = {"limit": limit, "sort": "desc"}
+        if ticker:
+            params["symbols"] = ticker.upper()
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://data.alpaca.markets/v1beta1/news",
+                headers=_headers(),
+                params=params,
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        articles = []
+        for art in data.get("news", []):
+            articles.append({
+                "title": art.get("headline", ""),
+                "description": art.get("summary", ""),
+                "url": art.get("url", ""),
+                "source": art.get("source", "Alpaca"),
+                "published_at": art.get("created_at", ""),
+                "tickers": art.get("symbols", []),
+                "images": [img.get("url") for img in art.get("images", []) if img.get("url")],
+            })
+        log.info("alpaca_news_fetched", count=len(articles), ticker=ticker)
+        return articles
+    except Exception as e:
+        log.warning("alpaca_news_failed", error=str(e))
+        return None
+
+
 async def get_order_history(limit: int = 50) -> Optional[list[dict]]:
     """Get recent paper trading order history."""
     if not is_configured():

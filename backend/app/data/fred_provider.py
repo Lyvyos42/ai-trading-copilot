@@ -130,6 +130,52 @@ def _compute_trend(observations: list[dict]) -> str:
     return "STABLE"
 
 
+async def get_upcoming_releases(limit: int = 15) -> list[dict]:
+    """Fetch upcoming FRED data releases (economic calendar events).
+    Returns list of {name, date, notes} sorted by date ascending."""
+    key = settings.fred_api_key
+    if not key:
+        return []
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        future = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{_BASE}/releases/dates",
+                params={
+                    "api_key": key,
+                    "file_type": "json",
+                    "include_release_dates_with_no_data": "true",
+                    "realtime_start": today,
+                    "realtime_end": future,
+                },
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        releases = []
+        seen = set()
+        for r in data.get("release_dates", [])[:limit * 2]:
+            name = r.get("release_name", "")
+            date = r.get("date", "")
+            key_str = f"{name}|{date}"
+            if key_str in seen:
+                continue
+            seen.add(key_str)
+            releases.append({
+                "name": name,
+                "date": date,
+                "release_id": r.get("release_id"),
+            })
+            if len(releases) >= limit:
+                break
+        log.info("fred_releases_fetched", count=len(releases))
+        return releases
+    except Exception as e:
+        log.warning("fred_releases_failed", error=str(e))
+        return []
+
+
 def format_for_agent(snapshot: dict) -> str:
     """Format FRED snapshot as a text block for injection into agent prompts."""
     if not snapshot:

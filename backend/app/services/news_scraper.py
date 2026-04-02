@@ -18,6 +18,7 @@ from sqlalchemy import select
 from app.db.database import AsyncSessionLocal
 from app.models.news import NewsArticle
 from app.data.tiingo_provider import fetch_ticker_news, fetch_market_news as tiingo_market_news
+from app.data.alpaca_provider import fetch_news as alpaca_fetch_news
 
 log = structlog.get_logger()
 
@@ -344,10 +345,53 @@ async def _scrape_tiingo() -> list[dict]:
     return articles
 
 
+def _alpaca_to_article(art: dict) -> dict:
+    """Convert an Alpaca news article to the internal article format."""
+    text = f"{art['title']} {art.get('description', '')}"
+    category = _classify_category(text)
+    sentiment, score = _score_sentiment(text)
+    tickers = _extract_tickers(text)
+    for t in art.get("tickers", []):
+        upper = t.upper()
+        if upper not in tickers:
+            tickers.append(upper)
+    pub_str = art.get("published_at", "")
+    try:
+        pub_date = datetime.fromisoformat(pub_str.replace("Z", "+00:00")) if pub_str else datetime.now(timezone.utc)
+    except (ValueError, AttributeError):
+        pub_date = datetime.now(timezone.utc)
+    return {
+        "id": str(uuid.uuid4()),
+        "headline": art["title"],
+        "summary": (art.get("description") or "")[:500] or None,
+        "source": art.get("source", "Alpaca"),
+        "url": art.get("url", ""),
+        "published_at": pub_date,
+        "category": category,
+        "sentiment": sentiment,
+        "sentiment_score": score,
+        "tickers": tickers,
+        "is_active": True,
+    }
+
+
+async def _scrape_alpaca() -> list[dict]:
+    """Try fetching market news from Alpaca News API. Returns article dicts or empty list."""
+    raw = await alpaca_fetch_news(limit=30)
+    if not raw:
+        return []
+    articles = [_alpaca_to_article(a) for a in raw if a.get("title")]
+    log.info("alpaca_scrape_done", count=len(articles))
+    return articles
+
+
 async def scrape_all_feeds() -> int:
-    """Fetch all feeds and upsert new articles. Tries Tiingo first, falls back to RSS."""
-    # Try Tiingo as primary source
-    tiingo_articles = await _scrape_tiingo()
+    """Fetch all feeds and upsert new articles. Tries Tiingo + Alpaca first, falls back to RSS."""
+    # Try premium sources in parallel
+    tiingo_articles, alpaca_articles = await asyncio.gather(
+        _scrape_tiingo(),
+        _scrape_alpaca(),
+    )
 
     # Always fetch RSS as well to maximize coverage
     async with httpx.AsyncClient(
@@ -361,8 +405,8 @@ async def scrape_all_feeds() -> int:
 
     rss_articles = [a for batch in results for a in batch]
 
-    # Combine: Tiingo first (higher quality), then RSS
-    all_articles = tiingo_articles + rss_articles
+    # Combine: Tiingo + Alpaca first (higher quality), then RSS
+    all_articles = tiingo_articles + alpaca_articles + rss_articles
     if not all_articles:
         log.warning("all_feeds_failed_using_seeds")
         return await insert_seed_articles()

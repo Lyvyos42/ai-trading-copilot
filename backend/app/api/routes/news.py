@@ -125,6 +125,33 @@ async def get_article(article_id: str, db: AsyncSession = Depends(get_db)):
     return article
 
 
+@router.get("/economic-calendar")
+async def economic_calendar():
+    """Get upcoming FRED economic data releases."""
+    from app.data.fred_provider import get_upcoming_releases, get_macro_snapshot
+    import asyncio
+    releases, snapshot = await asyncio.gather(
+        get_upcoming_releases(limit=15),
+        get_macro_snapshot(),
+    )
+    return {"releases": releases, "macro_snapshot": snapshot}
+
+
+@router.get("/alternative-data")
+async def alternative_data():
+    """Get latest congressional trades + insider activity from QuiverQuant."""
+    from app.data.quiver_provider import get_recent_congressional_trades, get_recent_insider_trades
+    import asyncio
+    congress, insiders = await asyncio.gather(
+        get_recent_congressional_trades(limit=15),
+        get_recent_insider_trades(limit=15),
+    )
+    return {
+        "congressional_trades": congress or [],
+        "insider_trades": insiders or [],
+    }
+
+
 @router.post("/refresh", status_code=202)
 async def trigger_scrape():
     """Manually trigger a news scrape (for testing)."""

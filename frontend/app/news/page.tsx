@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2, BellRing, BarChart3, PieChart, Hash } from "lucide-react";
+import { RefreshCw, ExternalLink, Globe, TrendingUp, TrendingDown, Minus, AlertTriangle, DollarSign, Zap, Building2, BellRing, BarChart3, PieChart, Hash, Calendar, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils";
 import { ScannerPanel } from "@/components/ScannerPanel";
@@ -48,7 +48,40 @@ interface Summary {
   last_scraped: string | null;
 }
 
-const CATEGORIES = ["ALL", "MARKETS", "MACRO", "EARNINGS", "FED", "GEOPOLITICAL", "CRISIS"] as const;
+interface EconRelease {
+  name: string;
+  date: string;
+  release_id: number | null;
+}
+
+interface MacroIndicator {
+  value: number;
+  date: string;
+  trend: string;
+}
+
+interface CongressTrade {
+  representative: string;
+  ticker: string;
+  transaction: string;
+  amount: string;
+  date: string;
+  party: string;
+  district: string;
+}
+
+interface InsiderTrade {
+  insider: string;
+  ticker: string;
+  title: string;
+  transaction_type: string;
+  shares: number;
+  price: number;
+  value: number;
+  date: string;
+}
+
+const CATEGORIES = ["ALL", "MARKETS", "MACRO", "EARNINGS", "FED", "GEOPOLITICAL", "CRISIS", "ECON_CAL", "ALT_DATA"] as const;
 
 const CATEGORY_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; barColor: string }> = {
   MARKETS:      { label: "Markets",      icon: TrendingUp,     color: "text-primary border-primary/30 bg-primary/5",   barColor: "bg-primary" },
@@ -57,6 +90,8 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ComponentType<{
   FED:          { label: "Fed",          icon: Building2,      color: "text-warn border-warn/30 bg-warn/5",             barColor: "bg-warn" },
   GEOPOLITICAL: { label: "Geopolitical", icon: Globe,          color: "text-bear border-bear/30 bg-bear/5",             barColor: "bg-bear" },
   CRISIS:       { label: "Crisis",       icon: AlertTriangle,  color: "text-bear border-bear/50 bg-bear/10",            barColor: "bg-bear" },
+  ECON_CAL:     { label: "Econ Cal",    icon: Calendar,       color: "text-primary border-primary/30 bg-primary/5",   barColor: "bg-primary" },
+  ALT_DATA:     { label: "Alt Data",    icon: Users,          color: "text-warn border-warn/30 bg-warn/5",             barColor: "bg-warn" },
 };
 
 const SENTIMENT_META = {
@@ -88,6 +123,12 @@ export default function NewsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [waking, setWaking]         = useState(false);
   const [scanAlerts, setScanAlerts] = useState<ScannerAlert[]>([]);
+  const [econReleases, setEconReleases] = useState<EconRelease[]>([]);
+  const [macroSnapshot, setMacroSnapshot] = useState<Record<string, MacroIndicator>>({});
+  const [congressTrades, setCongressTrades] = useState<CongressTrade[]>([]);
+  const [insiderTrades, setInsiderTrades] = useState<InsiderTrade[]>([]);
+  const [altDataLoading, setAltDataLoading] = useState(false);
+  const [econLoading, setEconLoading] = useState(false);
 
   // Load recent scanner alerts on mount
   useEffect(() => {
@@ -138,6 +179,34 @@ export default function NewsPage() {
     setLoading(false);
     setRefreshing(false);
   }, []);
+
+  // Load special tab data when selected
+  useEffect(() => {
+    if (activeCategory === "ECON_CAL") {
+      setEconLoading(true);
+      fetch(`${API}/api/v1/news/economic-calendar`)
+        .then(r => r.json())
+        .then(data => {
+          setEconReleases(data.releases || []);
+          setMacroSnapshot(data.macro_snapshot || {});
+        })
+        .catch(() => {})
+        .finally(() => setEconLoading(false));
+      return;
+    }
+    if (activeCategory === "ALT_DATA") {
+      setAltDataLoading(true);
+      fetch(`${API}/api/v1/news/alternative-data`)
+        .then(r => r.json())
+        .then(data => {
+          setCongressTrades(data.congressional_trades || []);
+          setInsiderTrades(data.insider_trades || []);
+        })
+        .catch(() => {})
+        .finally(() => setAltDataLoading(false));
+      return;
+    }
+  }, [activeCategory]);
 
   useEffect(() => { setLoading(true); loadNews(activeCategory); }, [activeCategory, loadNews]);
 
@@ -420,11 +489,174 @@ export default function NewsPage() {
           )}
 
           {/* ── NEWS CARD GRID ──────────────────────────────────────── */}
-          {!loading && normalArticles.length > 0 && (
+          {!loading && normalArticles.length > 0 && activeCategory !== "ECON_CAL" && activeCategory !== "ALT_DATA" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
               {normalArticles.map((article) => (
                 <ArticleCard key={article.id} article={article} />
               ))}
+            </div>
+          )}
+
+          {/* ── ECONOMIC CALENDAR PANEL ────────────────────────────── */}
+          {activeCategory === "ECON_CAL" && (
+            <div className="p-4 space-y-4">
+              {econLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <div className="flex items-center gap-2 text-[14px] font-mono text-muted-foreground">
+                    <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                    LOADING ECONOMIC DATA…
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Macro Snapshot */}
+                  {Object.keys(macroSnapshot).length > 0 && (
+                    <div className="rounded-lg border border-border bg-background p-4">
+                      <div className="flex items-center gap-1.5 mb-3">
+                        <BarChart3 className="h-3 w-3 text-primary" />
+                        <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">LIVE MACRO INDICATORS (FRED)</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {Object.entries(macroSnapshot).map(([key, ind]) => {
+                          const labels: Record<string, string> = {
+                            gdp_growth: "GDP Growth", cpi_yoy: "CPI Index", fed_funds: "Fed Funds Rate",
+                            unemployment: "Unemployment", yield_10y: "10Y Yield", yield_2y: "2Y Yield",
+                            yield_curve_spread: "Yield Spread", initial_claims: "Jobless Claims",
+                            pce_inflation: "PCE Index", ism_manufacturing: "Mfg Employment",
+                          };
+                          const trendColor = ind.trend === "RISING" ? "text-bull" : ind.trend === "FALLING" ? "text-bear" : "text-muted-foreground";
+                          const isPercent = ["gdp_growth", "fed_funds", "unemployment", "yield_10y", "yield_2y", "yield_curve_spread"].includes(key);
+                          return (
+                            <div key={key} className="rounded border border-border/60 bg-background p-3">
+                              <div className="text-[8px] font-mono text-muted-foreground tracking-widest mb-1">
+                                {labels[key] || key.toUpperCase()}
+                              </div>
+                              <div className="text-[14px] font-mono font-bold text-foreground">
+                                {isPercent ? `${ind.value.toFixed(2)}%` : key === "initial_claims" ? ind.value.toLocaleString() : ind.value.toFixed(1)}
+                              </div>
+                              <div className={cn("text-[8px] font-mono font-bold mt-0.5", trendColor)}>
+                                {ind.trend} <span className="text-muted-foreground font-normal">· {ind.date}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upcoming Releases */}
+                  <div className="rounded-lg border border-border bg-background p-4">
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <Calendar className="h-3 w-3 text-primary" />
+                      <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">UPCOMING DATA RELEASES</span>
+                    </div>
+                    {econReleases.length === 0 ? (
+                      <div className="text-[13px] font-mono text-muted-foreground/50 py-4 text-center">
+                        No upcoming releases found. FRED API key may not be configured.
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {econReleases.map((r, i) => (
+                          <div key={`${r.name}-${r.date}-${i}`} className="flex items-center gap-3 px-3 py-2 rounded border border-border/40 hover:border-primary/20 transition-colors">
+                            <div className="text-[13px] font-mono text-primary font-bold w-24 shrink-0">{r.date}</div>
+                            <div className="text-[13px] font-mono text-foreground flex-1">{r.name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── ALTERNATIVE DATA PANEL ─────────────────────────────── */}
+          {activeCategory === "ALT_DATA" && (
+            <div className="p-4 space-y-4">
+              {altDataLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <div className="flex items-center gap-2 text-[14px] font-mono text-muted-foreground">
+                    <span className="h-3 w-3 rounded-full border-2 border-warn/30 border-t-warn animate-spin" />
+                    LOADING ALTERNATIVE DATA…
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Congressional Trades */}
+                  <div className="rounded-lg border border-border bg-background p-4">
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <Building2 className="h-3 w-3 text-warn" />
+                      <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">CONGRESSIONAL TRADES</span>
+                      <span className="text-[8px] font-mono text-warn/60 ml-1">QUIVERQUANT</span>
+                    </div>
+                    {congressTrades.length === 0 ? (
+                      <div className="text-[13px] font-mono text-muted-foreground/50 py-4 text-center">
+                        No data available. QuiverQuant API key may not be configured.
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {congressTrades.map((t, i) => {
+                          const isBuy = t.transaction.toLowerCase().includes("purchase");
+                          return (
+                            <div key={`congress-${i}`} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 hover:border-primary/20 transition-colors">
+                              <span className={cn(
+                                "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                isBuy ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                              )}>
+                                {isBuy ? "BUY" : "SELL"}
+                              </span>
+                              <span className="text-[13px] font-mono text-primary font-bold w-14 shrink-0">{t.ticker}</span>
+                              <span className="text-[13px] font-mono text-foreground flex-1 truncate">{t.representative}</span>
+                              <span className="text-[8px] font-mono text-muted-foreground shrink-0">
+                                ({t.party}) {t.amount}
+                              </span>
+                              <span className="text-[13px] font-mono text-muted-foreground shrink-0">{t.date}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Insider Trades */}
+                  <div className="rounded-lg border border-border bg-background p-4">
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <Users className="h-3 w-3 text-warn" />
+                      <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">INSIDER TRANSACTIONS</span>
+                      <span className="text-[8px] font-mono text-warn/60 ml-1">SEC FILINGS</span>
+                    </div>
+                    {insiderTrades.length === 0 ? (
+                      <div className="text-[13px] font-mono text-muted-foreground/50 py-4 text-center">
+                        No data available. QuiverQuant API key may not be configured.
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {insiderTrades.map((t, i) => {
+                          const isBuy = t.transaction_type.toLowerCase().includes("buy") || t.transaction_type.toLowerCase().includes("purchase");
+                          return (
+                            <div key={`insider-${i}`} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 hover:border-primary/20 transition-colors">
+                              <span className={cn(
+                                "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                isBuy ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                              )}>
+                                {isBuy ? "BUY" : "SELL"}
+                              </span>
+                              <span className="text-[13px] font-mono text-primary font-bold w-14 shrink-0">{t.ticker}</span>
+                              <span className="text-[13px] font-mono text-foreground flex-1 truncate" title={t.title}>
+                                {t.insider}
+                              </span>
+                              <span className="text-[13px] font-mono text-muted-foreground shrink-0">
+                                {t.shares.toLocaleString()} shares
+                              </span>
+                              <span className="text-[13px] font-mono text-muted-foreground shrink-0">{t.date}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
