@@ -105,6 +105,11 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               {isBullish ? "▲" : "▼"}
             </span>
             <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
+            {signal.timeframe && (
+              <span className="text-[8px] font-mono text-primary/70 border border-primary/20 px-1 rounded">
+                {signal.timeframe}
+              </span>
+            )}
             <span className={cn(
               "text-[13px] font-mono font-semibold px-1.5 rounded border",
               leanBg, leanColor
@@ -119,6 +124,11 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
 
         {/* Row 2: Research Target + Invalidation + R:R */}
         <div className="flex items-center gap-3 mt-1.5">
+          {signal.entry_price > 0 && (
+            <span className="text-[13px] font-mono text-muted-foreground">
+              ENTRY <span className="text-foreground font-semibold">{formatPrice(signal.entry_price)}</span>
+            </span>
+          )}
           {signal.research_target && (
             <span className="text-[13px] font-mono text-muted-foreground">
               TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target)}</span>
@@ -236,6 +246,11 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 rounded">
                 {signal.asset_class}
               </span>
+              {signal.timeframe && (
+                <span className="text-xs font-mono text-primary/70 border border-primary/20 px-1.5 rounded">
+                  {signal.timeframe}
+                </span>
+              )}
               <ConvictionBadge tier={convictionTier} />
               {signal.analytical_window && (
                 <span className="text-[13px] font-mono text-primary/70 border border-primary/20 px-1.5 py-0.5 rounded">
@@ -252,6 +267,18 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
                 </span>
               )}
             </div>
+            {signal.strategy_sources && signal.strategy_sources.length > 0 && (
+              <div className="flex gap-1 mt-1 flex-wrap">
+                {signal.strategy_sources.slice(0, 3).map((s: string) => (
+                  <span key={s} className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary/80">
+                    {s}
+                  </span>
+                ))}
+                {signal.strategy_sources.length > 3 && (
+                  <span className="text-[8px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
+                )}
+              </div>
+            )}
           </div>
           <ProbabilityDonut score={prob} />
         </div>
@@ -266,7 +293,18 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         </div>
 
         {/* Research Target + Invalidation Level + R:R */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30">
+            <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
+              <Target className="h-3 w-3 text-primary" /> ENTRY PRICE
+            </div>
+            <div className="text-xs font-mono font-bold text-foreground">
+              {formatPrice(signal.entry_price)}
+            </div>
+            <div className="text-[13px] font-mono text-primary/70 mt-0.5">
+              {signal.timeframe || "1D"} window
+            </div>
+          </div>
           <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
             <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
               <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET

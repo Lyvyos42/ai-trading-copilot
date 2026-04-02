@@ -95,6 +95,7 @@ export interface Signal {
   confidence_score: number;
   agent_votes: Record<string, AgentVote | boolean | null>;
   reasoning_chain: string[];
+  timeframe: string;
   strategy_sources: string[];
   timeframe_levels?: { scalp?: TimeframeLevels; swing?: TimeframeLevels };
   status: string;
