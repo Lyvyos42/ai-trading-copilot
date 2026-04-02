@@ -57,10 +57,20 @@ async def create_checkout(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        user = User(id=user_id, email=email, hashed_password="", tier="free")
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
+        # Check if a user with this email already exists (e.g. seeded or old auth)
+        if email:
+            result = await db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+        if user:
+            # Link existing user row to the Supabase UUID
+            user.id = user_id
+            await db.commit()
+            await db.refresh(user)
+        else:
+            user = User(id=user_id, email=email, hashed_password="", tier="free")
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
 
     stripe.api_key = settings.stripe_secret_key
 

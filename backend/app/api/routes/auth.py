@@ -69,11 +69,21 @@ async def me(token: str = Depends(_oauth2), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        # Auto-create on first Supabase login
-        user = User(id=user_id, email=email, hashed_password="", tier="free")
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
+        # Check if a user with this email already exists (e.g. seeded or old auth)
+        if email:
+            result = await db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+        if user:
+            # Link existing user row to the Supabase UUID
+            user.id = user_id
+            await db.commit()
+            await db.refresh(user)
+        else:
+            # Auto-create on first Supabase login
+            user = User(id=user_id, email=email, hashed_password="", tier="free")
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
     return {"id": str(user.id), "email": user.email, "tier": user.tier, "is_active": user.is_active}
 
 
