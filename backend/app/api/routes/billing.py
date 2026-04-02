@@ -51,12 +51,16 @@ async def create_checkout(
     if not price_id:
         raise HTTPException(status_code=503, detail=f"Price not configured for {req.tier}")
 
-    # Resolve user from DB
+    # Resolve user from DB (auto-create if first Supabase login)
     user_id = token_payload.get("sub")
+    email = token_payload.get("email", "")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(id=user_id, email=email, hashed_password="", tier="free")
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
     stripe.api_key = settings.stripe_secret_key
 
