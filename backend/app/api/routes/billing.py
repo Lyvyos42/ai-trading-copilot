@@ -9,7 +9,7 @@ import stripe
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user
@@ -37,7 +37,7 @@ class CheckoutRequest(BaseModel):
 @router.post("/checkout")
 async def create_checkout(
     req: CheckoutRequest,
-    user: User = Depends(get_current_user),
+    token_payload: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a Stripe Checkout session for subscription."""
@@ -51,23 +51,26 @@ async def create_checkout(
     if not price_id:
         raise HTTPException(status_code=503, detail=f"Price not configured for {req.tier}")
 
+    # Resolve user from DB
+    user_id = token_payload.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     stripe.api_key = settings.stripe_secret_key
 
     # Get or create Stripe customer
-    stripe_customer_id = getattr(user, "stripe_customer_id", None)
-    if not stripe_customer_id:
+    if not user.stripe_customer_id:
         customer = stripe.Customer.create(
-            email=user.email,
+            email=user.email or token_payload.get("email", ""),
             metadata={"user_id": str(user.id)},
         )
-        stripe_customer_id = customer.id
-        await db.execute(
-            update(User).where(User.id == user.id).values(stripe_customer_id=stripe_customer_id)
-        )
+        user.stripe_customer_id = customer.id
         await db.commit()
 
     session = stripe.checkout.Session.create(
-        customer=stripe_customer_id,
+        customer=user.stripe_customer_id,
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
         success_url=req.success_url,
@@ -80,20 +83,22 @@ async def create_checkout(
 
 @router.post("/portal")
 async def create_portal(
-    user: User = Depends(get_current_user),
+    token_payload: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create Stripe Customer Portal session for managing subscription."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=503, detail="Billing not configured")
 
-    stripe_customer_id = getattr(user, "stripe_customer_id", None)
-    if not stripe_customer_id:
+    user_id = token_payload.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.stripe_customer_id:
         raise HTTPException(status_code=400, detail="No billing account found")
 
     stripe.api_key = settings.stripe_secret_key
     session = stripe.billing_portal.Session.create(
-        customer=stripe_customer_id,
+        customer=user.stripe_customer_id,
         return_url="https://app.quantneuraledge.com/dashboard",
     )
 
@@ -133,15 +138,19 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/status")
-async def billing_status(user: User = Depends(get_current_user)):
+async def billing_status(
+    token_payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Get current subscription status."""
-    stripe_customer_id = getattr(user, "stripe_customer_id", None)
-    tier = getattr(user, "tier", "free")
+    user_id = token_payload.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
 
     return {
-        "tier": tier,
-        "has_billing": stripe_customer_id is not None,
-        "stripe_customer_id": stripe_customer_id,
+        "tier": user.tier if user else "free",
+        "has_billing": bool(user and user.stripe_customer_id),
+        "stripe_customer_id": user.stripe_customer_id if user else None,
     }
 
 
