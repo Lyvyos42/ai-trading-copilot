@@ -27,24 +27,12 @@ def _decode_user(token: str | None) -> tuple[str | None, str]:
     try:
         from jose import jwt
         from app.config import settings
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm],
-                             options={"verify_exp": False})
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         return payload.get("sub"), payload.get("tier", "free") or "free"
     except Exception:
-        # Supabase asymmetric token — try without verification for tier claim only
-        try:
-            from jose import jwt as _jwt
-            payload = _jwt.get_unverified_claims(token)
-            # Supabase stores app metadata in user_metadata or app_metadata
-            tier = (
-                payload.get("tier")
-                or payload.get("user_metadata", {}).get("tier")
-                or payload.get("app_metadata", {}).get("tier")
-                or "free"
-            )
-            return payload.get("sub"), tier
-        except Exception:
-            return None, "free"
+        # Token failed verification — treat as unauthenticated free user.
+        # NEVER use get_unverified_claims: an attacker can forge any tier/user_id.
+        return None, "free"
 
 
 @router.websocket("/ws/v1/signals/stream")

@@ -72,21 +72,22 @@ async def lifespan(app: FastAPI):
             except Exception:
                 pass  # column already exists — safe to ignore
 
-        # Seed demo user
-        from app.db.database import AsyncSessionLocal
-        from app.models.user import User
-        from app.auth.jwt import hash_password
-        from sqlalchemy import select
-        async with AsyncSessionLocal() as session:
-            existing = await session.execute(select(User).where(User.email == "demo@tradingcopilot.ai"))
-            if not existing.scalar_one_or_none():
-                session.add(User(
-                    id="00000000-0000-0000-0000-000000000001",
-                    email="demo@tradingcopilot.ai",
-                    hashed_password=hash_password("demo1234"),
-                    tier="pro",
-                ))
-                await session.commit()
+        # Seed demo user — only in development (never in production)
+        if settings.environment == "development":
+            from app.db.database import AsyncSessionLocal
+            from app.models.user import User
+            from app.auth.jwt import hash_password
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as session:
+                existing = await session.execute(select(User).where(User.email == "demo@tradingcopilot.ai"))
+                if not existing.scalar_one_or_none():
+                    session.add(User(
+                        id="00000000-0000-0000-0000-000000000001",
+                        email="demo@tradingcopilot.ai",
+                        hashed_password=hash_password("demo1234"),
+                        tier="pro",
+                    ))
+                    await session.commit()
 
         log.info("startup_db_ok", environment=settings.environment)
     except Exception as exc:
@@ -129,8 +130,8 @@ app = FastAPI(
         "from '151 Trading Strategies' with a 6-agent collaborative AI architecture."
     ),
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.environment == "development" else None,
+    redoc_url="/redoc" if settings.environment == "development" else None,
     lifespan=lifespan,
 )
 

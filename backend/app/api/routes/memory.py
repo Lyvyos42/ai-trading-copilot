@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.jwt import get_optional_user
+from app.auth.jwt import get_current_user, get_optional_user
 from app.db.database import get_db
 from app.models.memory import UserInteraction, UserPreference, AgentCorrection
 from app.services.memory import memory_manager
@@ -167,9 +167,9 @@ async def get_preferences(
 async def get_corrections(
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
-    """Get agent correction history (for performance page)."""
+    """Get agent correction history (for performance page). Requires auth."""
     result = await db.execute(
         select(AgentCorrection)
         .order_by(desc(AgentCorrection.created_at))
@@ -196,6 +196,7 @@ async def get_agent_corrections(
     agent_name: str,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """Get corrections for a specific agent."""
     result = await db.execute(

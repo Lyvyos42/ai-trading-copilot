@@ -20,9 +20,10 @@ async def evaluate_signals(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Check all ACTIVE signals and auto-resolve if TP1 or SL hit."""
+    """Check this user's ACTIVE signals and auto-resolve if TP1 or SL hit."""
+    user_id = user.get("sub") or user.get("id") or user.get("user_id")
     result = await db.execute(
-        select(Signal).where(Signal.status == "ACTIVE")
+        select(Signal).where(Signal.status == "ACTIVE", Signal.user_id == user_id)
     )
     active_signals = result.scalars().all()
 

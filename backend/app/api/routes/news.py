@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.jwt import get_current_user
 from app.db.database import get_db
 from app.models.news import NewsArticle
 
@@ -70,7 +71,8 @@ async def list_news(
     if sentiment and sentiment.upper() in VALID_SENTIMENTS:
         q = q.where(NewsArticle.sentiment == sentiment.upper())
     if source:
-        q = q.where(NewsArticle.source.ilike(f"%{source}%"))
+        safe_source = source.replace("%", "\\%").replace("_", "\\_")
+        q = q.where(NewsArticle.source.ilike(f"%{safe_source}%", escape="\\"))
     if ticker:
         # JSON array contains — works for PostgreSQL
         q = q.where(NewsArticle.tickers.contains([ticker.upper()]))
@@ -153,8 +155,11 @@ async def alternative_data():
 
 
 @router.post("/refresh", status_code=202)
-async def trigger_scrape():
-    """Manually trigger a news scrape (for testing)."""
+async def trigger_scrape(user: dict = Depends(get_current_user)):
+    """Manually trigger a news scrape (admin only)."""
+    tier = user.get("tier", "free")
+    if tier != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     import asyncio
     from app.services.news_scraper import scrape_all_feeds
     asyncio.create_task(scrape_all_feeds())

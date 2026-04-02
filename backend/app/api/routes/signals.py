@@ -564,8 +564,14 @@ async def journal_signals(
 async def get_signal(
     signal_id: str,
     db: AsyncSession = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
 ):
-    result = await db.execute(select(Signal).where(Signal.id == signal_id))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    uid = user.get("sub") or user.get("id") or user.get("user_id")
+    result = await db.execute(
+        select(Signal).where(Signal.id == signal_id, Signal.user_id == uid)
+    )
     signal = result.scalar_one_or_none()
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
