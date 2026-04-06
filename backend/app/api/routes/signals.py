@@ -485,6 +485,7 @@ async def generate_signal(
         "bull_case": final.get("bull_case"),
         "bear_case": final.get("bear_case"),
         "conviction_tier": final.get("conviction_tier"),
+        "signal_mode": final.get("signal_mode", "AI"),
     }
 
     # Store in cache so repeat requests for the same ticker are instant
@@ -732,6 +733,7 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
     if state:
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")
         d["agent_detail"] = _build_agent_detail(state)
+        d["signal_mode"] = state.get("final_signal", {}).get("signal_mode", "AI")
     return d
 
 

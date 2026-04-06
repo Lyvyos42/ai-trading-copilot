@@ -244,6 +244,13 @@ async def run_fund_manager(state: TradingState) -> TradingState:
     signal.setdefault("status", "APPROVED")
     signal["strategy_profile"] = state.get("strategy_profile", "balanced")
 
+    # Tag signal as automated if running in fallback mode
+    if state.get("is_fallback"):
+        signal["signal_mode"] = "AUTOMATED"
+        signal.setdefault("status", "APPROVED")
+    else:
+        signal["signal_mode"] = "AI"
+
     # Attach attribution data from all agents
     signal["agent_attribution"] = _build_attribution(state)
     signal["quant_summary"] = {
@@ -438,6 +445,17 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "reasoning_chain":  reasoning_prefix,
         "errors": [],
     }
+
+    # ── Check if API is available or we're in fallback mode ──────────────────
+    from app.providers.router import model_router
+    _anthropic = model_router._providers.get("anthropic")
+    if _anthropic and _anthropic.is_fallback_mode:
+        reasoning_prefix.append(
+            f"⚡ FALLBACK MODE: Anthropic API unavailable ({_anthropic._fallback_reason}). "
+            f"All agents running Python rule-based analysis (IEB strategy). "
+            f"Signal quality: rule-based, no LLM reasoning."
+        )
+        initial_state["is_fallback"] = True
 
     # ── Stage 1: Run all 7 analysts in parallel ─────────────────────────────
     t0 = time.monotonic()
