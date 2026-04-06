@@ -327,59 +327,27 @@ async def generate_signal(
     elif user:
         tier = user.get("tier", "free") or "free"
 
-    if tier not in _PAID_TIERS:
-        demo = _generate_demo_signal(ticker, body.asset_class, body.timeframe)
-        # Persist demo signal to DB so it shows in signal feed / journal
-        user_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
-        signal = Signal(
-            user_id=user_id,
-            ticker=ticker,
-            asset_class=body.asset_class,
-            timeframe=body.timeframe,
-            direction=demo["direction"],
-            entry_price=demo["entry_price"],
-            stop_loss=demo["stop_loss"],
-            take_profit_1=demo["take_profit_1"],
-            take_profit_2=demo["take_profit_2"],
-            take_profit_3=demo["take_profit_3"],
-            confidence_score=demo["confidence_score"],
-            agent_votes=demo["agent_votes"],
-            reasoning_chain=demo["reasoning_chain"],
-            strategy_sources=demo["strategy_sources"],
-            timeframe_levels={},
-            status="ACTIVE",
-            expiry_time=datetime.utcnow() + timedelta(hours=24),
-            probability_score=demo["probability_score"],
-            bullish_pct=demo["bullish_pct"],
-            bearish_pct=demo["bearish_pct"],
-            research_target=demo["research_target"],
-            invalidation_level=demo["invalidation_level"],
-            risk_reward_ratio=demo["risk_reward_ratio"],
-            analytical_window=demo["analytical_window"],
-            bull_case=demo["bull_case"],
-            bear_case=demo["bear_case"],
-            conviction_tier=demo["conviction_tier"],
-        )
-        try:
-            db.add(signal)
-            await db.commit()
-            await db.refresh(signal)
-            demo["signal_id"] = str(signal.id)
-        except Exception:
-            demo["signal_id"] = None
-        return demo
-
-    # ── Real AI pipeline (paid tiers only) ────────────────────────────────────
-    # Resolve profile: request param takes priority, then user's DB setting, then default
+    # ── Resolve profile ─────────────────────────────────────────────────────
     profile_slug = body.profile
     if profile_slug == "balanced" and user:
-        # Check if user has a non-default profile stored
         if db_user and hasattr(db_user, "active_profile") and db_user.active_profile:
             profile_slug = db_user.active_profile
 
     user_id_for_pipeline = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
     user_tier_for_pipeline = tier if tier else "free"
-    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class, timeframe=body.timeframe, profile=profile_slug, user_id=user_id_for_pipeline, user_tier=user_tier_for_pipeline)
+
+    # Free tier & visitors: real Python analysis with market data (no AI cost)
+    # Paid tiers: full AI-powered multi-agent pipeline
+    is_free = tier not in _PAID_TIERS
+    state = await run_pipeline(
+        ticker=ticker,
+        asset_class=body.asset_class,
+        timeframe=body.timeframe,
+        profile=profile_slug,
+        user_id=user_id_for_pipeline,
+        user_tier=user_tier_for_pipeline,
+        force_fallback=is_free,
+    )
 
     final = state.get("final_signal", {})
     if not final:

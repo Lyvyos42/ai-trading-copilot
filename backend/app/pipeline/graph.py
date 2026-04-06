@@ -360,7 +360,7 @@ def _build_graph() -> StateGraph:
 
 # ─── Public API ───────────────────────────────────────────────────────────
 
-async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced", user_id: str | None = None, user_tier: str = "free") -> TradingState:
+async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str = "1D", market_data: dict | None = None, profile: str = "balanced", user_id: str | None = None, user_tier: str = "free", force_fallback: bool = False) -> TradingState:
     """
     Run the full 9-agent pipeline for a given ticker.
     Returns the completed TradingState with final_signal populated.
@@ -449,7 +449,13 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
     # ── Check if API is available or we're in fallback mode ──────────────────
     from app.providers.router import model_router
     _anthropic = model_router._providers.get("anthropic")
-    if _anthropic and _anthropic.is_fallback_mode:
+    if force_fallback:
+        reasoning_prefix.append(
+            "⚡ RULE-BASED MODE: Python analysis using real market data. "
+            "Upgrade to Pro for full AI-powered multi-agent reasoning."
+        )
+        initial_state["is_fallback"] = True
+    elif _anthropic and _anthropic.is_fallback_mode:
         reasoning_prefix.append(
             f"⚡ FALLBACK MODE: Anthropic API unavailable ({_anthropic._fallback_reason}). "
             f"All agents running Python rule-based analysis (IEB strategy). "
