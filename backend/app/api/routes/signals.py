@@ -51,6 +51,22 @@ def _check_ip_rate_limit(ip: str) -> None:
         )
     _rate_store[ip].append(now)
 
+# ── Layer 0b: IP-based daily limit for visitors (no account) ─────────────────────
+_VISITOR_DAILY_LIMIT = 2
+_visitor_daily_store: dict[str, list[float]] = defaultdict(list)
+
+def _check_visitor_daily_limit(ip: str) -> None:
+    now = time.time()
+    day_start = now - 86400  # 24-hour rolling window
+    _visitor_daily_store[ip] = [t for t in _visitor_daily_store[ip] if t > day_start]
+    if len(_visitor_daily_store[ip]) >= _VISITOR_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Visitor limit reached ({_VISITOR_DAILY_LIMIT} signals per day). Create a free account for more.",
+            headers={"Retry-After": "3600"},
+        )
+    _visitor_daily_store[ip].append(now)
+
 # ── Layer 1: Per-user daily quota by tier ────────────────────────────────────────
 _DAILY_QUOTA: dict[str, int] = {
     "free":       2,
@@ -272,8 +288,12 @@ async def generate_signal(
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
     _check_ip_rate_limit(client_ip)
 
-    # ── Authenticated user guards ────────────────────────────────────────────────
+    # ── Visitor daily limit (unauthenticated) ─────────────────────────────────
     db_user = None
+    if not user:
+        _check_visitor_daily_limit(client_ip)
+
+    # ── Authenticated user guards ────────────────────────────────────────────────
     if user:
         user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
         # Fetch real tier from DB — Supabase JWTs don't carry a tier claim
