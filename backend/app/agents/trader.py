@@ -4,7 +4,21 @@ from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
 
-def _price_decimals(price: float) -> int:
+_FOREX_5DP = {"EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCHF", "USDCAD",
+               "EURGBP", "EURJPY", "GBPJPY", "EURAUD", "EURCHF", "AUDCAD",
+               "AUDNZD", "GBPAUD", "GBPCHF", "NZDCAD", "CADJPY", "CHFJPY",
+               "EURCAD", "EURNZD", "GBPCAD", "GBPNZD", "AUDCHF", "NZDCHF"}
+_FOREX_3DP = {"USDJPY", "EURJPY", "GBPJPY", "CADJPY", "CHFJPY", "AUDJPY", "NZDJPY"}
+
+
+def _price_decimals(price: float, ticker: str = "") -> int:
+    """Return appropriate decimal places for price formatting.
+    Forex pairs get standard pip precision (5dp or 3dp for JPY pairs).
+    """
+    t = ticker.upper().replace("/", "").replace("-", "").replace("=X", "")
+    if t in _FOREX_3DP:  return 3
+    if t in _FOREX_5DP:  return 5
+    # Fallback: price-magnitude based
     if price < 0.001:  return 6
     if price < 0.1:    return 5
     if price < 10:     return 4
@@ -70,7 +84,7 @@ class TraderAgent(BaseAgent):
         market_data = state.get("market_data", {})
 
         current_price = market_data.get("close", 100.0)
-        _dec = _price_decimals(current_price)
+        _dec = _price_decimals(current_price, ticker)
         _pfmt = f".{_dec}f"
 
         # Vote aggregation from all 7 analysts
@@ -242,10 +256,14 @@ Output JSON only."""
             market_data = {}
         rng = random.Random(sum(ord(c) for c in ticker) + 13)
 
-        dec = _price_decimals(price)
-        atr = tech.get("atr", market_data.get("atr", price * 0.012))
+        dec = _price_decimals(price, ticker)
+        # Forex pairs have much smaller ATR (~0.5%) vs stocks (~1.2%)
+        t_upper = ticker.upper().replace("/", "").replace("-", "").replace("=X", "")
+        is_forex = t_upper in _FOREX_5DP or t_upper in _FOREX_3DP
+        default_atr_pct = 0.005 if is_forex else 0.012
+        atr = tech.get("atr", market_data.get("atr", price * default_atr_pct))
         if atr <= 0:
-            atr = price * 0.012
+            atr = price * default_atr_pct
         atr_15m = market_data.get("atr_15m", atr * 0.196)
 
         entry = round(price, dec)
