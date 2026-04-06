@@ -48,7 +48,8 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   const prob = signal.probability_score ?? signal.confidence_score ?? 50;
   const bullPct = signal.bullish_pct ?? prob;
   const bearPct = signal.bearish_pct ?? (100 - bullPct);
-  const isBullish = prob >= 50;
+  const isBullish = bullPct > bearPct;
+  const displayPct = isBullish ? bullPct : bearPct;  // Show the dominant side percentage
   const lean = isBullish ? "BULLISH" : "BEARISH";
   const leanColor = isBullish ? "text-bull" : "text-bear";
   const leanBg = isBullish ? "bg-bull/10 border-bull/30" : "bg-bear/10 border-bear/30";
@@ -114,7 +115,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               "text-[13px] font-mono font-semibold px-1.5 rounded border",
               leanBg, leanColor
             )}>
-              {Math.round(prob)}% {lean}
+              {Math.round(displayPct)}% {lean}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -280,7 +281,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               </div>
             )}
           </div>
-          <ProbabilityDonut score={prob} />
+          <ProbabilityDonut score={displayPct} isBullish={isBullish} />
         </div>
 
         {/* Probability bar */}
@@ -494,8 +495,8 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
 
 /* ── Sub-components ────────────────────────────────────────────── */
 
-function ProbabilityDonut({ score }: { score: number }) {
-  const isBull = score >= 50;
+function ProbabilityDonut({ score, isBullish }: { score: number; isBullish?: boolean }) {
+  const isBull = isBullish ?? score >= 50;
   const color = isBull ? "#00c55a" : "#e63946";
   const bgColor = isBull ? "#e6394620" : "#00c55a20";
   const radius = 18;

@@ -14,7 +14,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
   const prob = signal.probability_score ?? signal.confidence_score ?? 50;
   const bullPct = signal.bullish_pct ?? prob;
   const bearPct = signal.bearish_pct ?? (100 - bullPct);
-  const isBullish = prob >= 50;
+  const isBullish = bullPct > bearPct;
   const isWin = signal.outcome === "WIN";
   const convictionTier = signal.conviction_tier || "MODERATE";
   const rrRatio = signal.risk_reward_ratio ?? 0;
