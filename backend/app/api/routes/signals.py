@@ -487,27 +487,40 @@ async def generate_signal(
         from app.services.memory import memory_manager as _mm
 
         _uid = user.get("sub") or user.get("id") or user.get("user_id") or ""
-        asyncio.create_task(_track(
-            db=db, user_id=_uid, event_type="SIGNAL_GENERATE",
-            ticker=ticker, signal_id=signal_id,
-            payload={"probability_score": final.get("probability_score"),
-                     "direction": direction, "conviction_tier": final.get("conviction_tier"),
-                     "timeframe": body.timeframe, "profile": profile_slug},
-        ))
-        asyncio.create_task(_mm.extract_memories_from_session(
-            user_id=_uid,
-            session_data={
-                "instrument": ticker, "asset_class": body.asset_class,
-                "timeframe": body.timeframe, "direction": direction,
-                "probability_score": final.get("probability_score"),
-                "conviction_tier": final.get("conviction_tier"),
-                "strategy_sources": final.get("strategy_sources", []),
-                "bull_case": final.get("bull_case", "")[:200],
-                "bear_case": final.get("bear_case", "")[:200],
-                "session_timestamp": datetime.now(timezone.utc).isoformat(),
-                "profile": profile_slug,
-            },
-        ))
+
+        async def _track_generate():
+            try:
+                from app.db.database import AsyncSessionLocal
+                async with AsyncSessionLocal() as sess:
+                    await _track(
+                        db=sess, user_id=_uid, event_type="SIGNAL_GENERATE",
+                        ticker=ticker, signal_id=signal_id,
+                        payload={"probability_score": final.get("probability_score"),
+                                 "direction": direction, "conviction_tier": final.get("conviction_tier"),
+                                 "timeframe": body.timeframe, "profile": profile_slug},
+                    )
+            except Exception:
+                pass
+        asyncio.create_task(_track_generate())
+
+        # Skip memory extraction when Anthropic API is unavailable
+        from app.providers.router import model_router
+        _anth = model_router._providers.get("anthropic")
+        if not (_anth and _anth.is_fallback_mode):
+            asyncio.create_task(_mm.extract_memories_from_session(
+                user_id=_uid,
+                session_data={
+                    "instrument": ticker, "asset_class": body.asset_class,
+                    "timeframe": body.timeframe, "direction": direction,
+                    "probability_score": final.get("probability_score"),
+                    "conviction_tier": final.get("conviction_tier"),
+                    "strategy_sources": final.get("strategy_sources", []),
+                    "bull_case": final.get("bull_case", "")[:200],
+                    "bear_case": final.get("bear_case", "")[:200],
+                    "session_timestamp": datetime.now(timezone.utc).isoformat(),
+                    "profile": profile_slug,
+                },
+            ))
 
     return result
 
@@ -633,11 +646,19 @@ async def set_signal_outcome(
 
     _uid = owner_id or ""
     if _uid:
-        asyncio.create_task(_track(
-            db=db, user_id=_uid, event_type="OUTCOME_MARK",
-            ticker=signal.ticker, signal_id=signal_id,
-            payload={"outcome": body.outcome, "pnl_pct": body.pnl_pct},
-        ))
+        # Use a fresh session for the background task — request session closes after response
+        async def _track_outcome():
+            try:
+                from app.db.database import AsyncSessionLocal
+                async with AsyncSessionLocal() as sess:
+                    await _track(
+                        db=sess, user_id=_uid, event_type="OUTCOME_MARK",
+                        ticker=signal.ticker, signal_id=signal_id,
+                        payload={"outcome": body.outcome, "pnl_pct": body.pnl_pct},
+                    )
+            except Exception:
+                pass
+        asyncio.create_task(_track_outcome())
 
     # Store outcome as a memory for the user
     pnl_str = f" ({body.pnl_pct:+.1f}%)" if body.pnl_pct else ""
@@ -656,8 +677,14 @@ async def set_signal_outcome(
     )
 
     # Generate agent corrections (async — uses Haiku for lesson generation)
+    # Skip when Anthropic API is unavailable (circuit breaker open)
     async def _store_corrections():
         try:
+            from app.providers.router import model_router
+            _anth = model_router._providers.get("anthropic")
+            if _anth and _anth.is_fallback_mode:
+                return  # no point calling LLM — credits exhausted
+
             signal_data = {
                 "signal_id": signal_id,
                 "ticker": signal.ticker,
