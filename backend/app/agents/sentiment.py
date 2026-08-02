@@ -43,15 +43,16 @@ class SentimentAnalyst(BaseAgent):
         market_data = state.get("market_data", {})
         news_ctx    = state.get("news_context", {})
         has_news    = news_ctx.get("has_news", False)
+        strategy_ctx = self._strategy_context(state)
 
         if has_news:
-            return await self._analyze_with_live_news(ticker, market_data, news_ctx)
+            return await self._analyze_with_live_news(ticker, market_data, news_ctx, strategy_ctx)
         else:
             return await self._analyze_with_mock(ticker, market_data)
 
     # ── Live news path ────────────────────────────────────────────────────────
 
-    async def _analyze_with_live_news(self, ticker: str, market_data: dict, news_ctx: dict) -> dict:
+    async def _analyze_with_live_news(self, ticker: str, market_data: dict, news_ctx: dict, strategy_ctx: str = "") -> dict:
         ticker_hl  = news_ctx.get("ticker_headlines", [])
         market_hl  = news_ctx.get("market_headlines", [])
         avg_sent   = news_ctx.get("avg_sentiment", 0.0)
@@ -76,7 +77,7 @@ BROADER MARKET HEADLINES ({len(market_hl)} articles):
 {chr(10).join(f'  • {h}' for h in market_hl[:8])}
 """
 
-        user_msg = f"""Analyze sentiment for {ticker} using LIVE scraped news data.
+        user_msg = f"""{strategy_ctx}Analyze sentiment for {ticker} using LIVE scraped news data.
 
 === LIVE NEWS FEED (Real headlines, scraped in last 24h) ===
 {ticker_section}

@@ -79,7 +79,8 @@ class QuantAnalyst(BaseAgent):
             for name, a in analysts.items()
         )
 
-        user_msg = f"""Validate the statistical edge for {ticker}.
+        strategy_ctx = self._strategy_context(state)
+        user_msg = f"""{strategy_ctx}Validate the statistical edge for {ticker}.
 
 ANALYST CONSENSUS: {long_count} LONG / {short_count} SHORT / {len(analysts) - long_count - short_count} NEUTRAL
 Average confidence: {avg_conf:.1f}%

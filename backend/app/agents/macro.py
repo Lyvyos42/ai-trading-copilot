@@ -47,15 +47,16 @@ class MacroAnalyst(BaseAgent):
         news_ctx   = state.get("news_context", {})
         has_news   = news_ctx.get("has_news", False)
         fred_block = format_fred(state.get("fred_data", {}))
+        strategy_ctx = self._strategy_context(state)
 
         if has_news:
-            return await self._analyze_with_live_news(ticker, asset_class, news_ctx, fred_block)
+            return await self._analyze_with_live_news(ticker, asset_class, news_ctx, fred_block, strategy_ctx)
         else:
             return await self._analyze_with_mock(ticker, asset_class, fred_block)
 
     # ── Live news path ────────────────────────────────────────────────────────
 
-    async def _analyze_with_live_news(self, ticker: str, asset_class: str, news_ctx: dict, fred_block: str = "") -> dict:
+    async def _analyze_with_live_news(self, ticker: str, asset_class: str, news_ctx: dict, fred_block: str = "", strategy_ctx: str = "") -> dict:
         macro_hl   = news_ctx.get("macro_headlines", [])
         geo_hl     = news_ctx.get("geo_headlines", [])
         crisis_hl  = news_ctx.get("crisis_headlines", [])
@@ -89,7 +90,7 @@ GEOPOLITICAL HEADLINES ({len(geo_hl)} articles):
 {chr(10).join(f'  • {h}' for h in crisis_hl)}
 """
 
-        user_msg = f"""Assess macro environment for {ticker} ({asset_class}) using LIVE news data.
+        user_msg = f"""{strategy_ctx}Assess macro environment for {ticker} ({asset_class}) using LIVE news data.
 
 === LIVE MACRO INTELLIGENCE (Real headlines, scraped in last 24h) ===
 {macro_section}

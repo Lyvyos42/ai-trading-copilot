@@ -62,7 +62,8 @@ class CorrelationAnalyst(BaseAgent):
         # Find correlated assets for this ticker
         correlated = self._find_correlated_assets(ticker, asset_class)
 
-        user_msg = f"""Analyze correlation risk for {ticker} ({asset_class}).
+        strategy_ctx = self._strategy_context(state)
+        user_msg = f"""{strategy_ctx}Analyze correlation risk for {ticker} ({asset_class}).
 Current price: {close}
 Price change today: {price_change:+.2f}%
 Macro regime: {regime}

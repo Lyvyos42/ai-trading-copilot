@@ -52,7 +52,8 @@ class RegimeChangeAnalyst(BaseAgent):
         # Crisis headlines from news context
         crisis_hl = news_ctx.get("crisis_headlines", [])
 
-        user_msg = f"""Detect regime state for {ticker}.
+        strategy_ctx = self._strategy_context(state)
+        user_msg = f"""{strategy_ctx}Detect regime state for {ticker}.
 VIX level: {vix}
 Price change today: {price_change:+.2f}%
 Volatility (ATR/price): {vol_ratio:.3f}%

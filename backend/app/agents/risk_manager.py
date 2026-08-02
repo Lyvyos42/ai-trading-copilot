@@ -67,7 +67,8 @@ class RiskManager(BaseAgent):
         half_kelly = kelly / 2
         position_size = round(min(5.0, half_kelly * 100), 2)
 
-        user_msg = f"""Validate risk for {ticker}.
+        strategy_ctx = self._strategy_context(state)
+        user_msg = f"""{strategy_ctx}Validate risk for {ticker}.
 Analyst confidence: {avg_confidence:.1f}%
 Kelly fraction: {kelly:.3f} → Half-Kelly position size: {half_kelly * 100:.1f}%
 Estimated reward/risk ratio: {reward_risk:.2f}

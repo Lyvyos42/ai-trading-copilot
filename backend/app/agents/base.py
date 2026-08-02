@@ -22,6 +22,15 @@ class BaseAgent:
     # Alias — keeps existing call sites working during transition
     _call_claude = _call_llm
 
+    _STRATEGY_GUIDANCE = {
+        "scalper": "SCALPER: 1-5 minute charts. Focus on order flow, micro price action, bid-ask imbalance. Extremely tight stops (0.5-1 ATR). Fundamentals and macro are irrelevant at this timeframe. Targets within minutes.",
+        "ict_smc": "ICT/SMART MONEY: 15m charts. Focus on fair value gaps, order blocks, liquidity sweeps, institutional footprint. Identify where smart money is positioned.",
+        "orb": "OPENING RANGE BREAKOUT: 15-30m charts. Focus on first 15-30 min range, breakout direction, volume confirmation. Momentum-gated entries.",
+        "vwap_pullback": "VWAP PULLBACK: 30m charts. Focus on mean reversion to VWAP, institutional entry zones. Strategy 3.9 core.",
+        "news_catalyst": "NEWS CATALYST: 1h charts. Focus on event-driven moves — earnings, macro releases, breaking news. Sentiment and macro are primary.",
+        "swing": "SWING: Daily/weekly charts. Focus on multi-day trends, patient entries, wider stops. Fundamentals and macro are key factors.",
+    }
+
     @staticmethod
     def _strategy_context(state: TradingState) -> str:
         """Build a strategy/timeframe context block from the pipeline state."""
@@ -31,7 +40,10 @@ class BaseAgent:
             return ""
         lines = [f"ACTIVE STRATEGY: {profile.upper()}",
                  f"ANALYSIS TIMEFRAME: {timeframe}"]
-        if timeframe in ("1m", "5m"):
+        guidance = BaseAgent._STRATEGY_GUIDANCE.get(profile, "")
+        if guidance:
+            lines.append(guidance)
+        elif timeframe in ("1m", "5m"):
             lines.append("Focus on micro price action, order flow, and very tight levels. Fundamentals and macro are minimal factors.")
         elif timeframe in ("15m", "30m"):
             lines.append("Focus on intraday levels, session structure, and volume. Fundamentals are secondary.")

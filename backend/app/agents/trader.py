@@ -138,7 +138,8 @@ RISK PARAMETERS:
 - Resistance: {tech.get('resistance', current_price * 1.06):{_pfmt}}
 
 STRATEGY PROFILE: {profile_slug.upper()}
-Set research_target near resistance level and invalidation_level near support.
+DIRECTION LEAN: {direction} (based on analyst vote aggregation)
+{"If BEARISH/SHORT: set research_target BELOW current price (near support) and invalidation_level ABOVE current price (near resistance)." if direction == "SHORT" else "If BULLISH/LONG: set research_target ABOVE current price (near resistance) and invalidation_level BELOW current price (near support)."}
 Output JSON only."""
 
         raw = await self._call_claude(system_prompt, user_msg, max_tokens=3000)
@@ -150,7 +151,8 @@ Output JSON only."""
                 result["probability_score"] = prob
                 result.setdefault("bullish_pct", round(prob, 1))
                 result.setdefault("bearish_pct", round(100 - prob, 1))
-                result.setdefault("analytical_window", "3-7 DAY")
+                _profile_params = self._PROFILE_PARAMS.get(profile_slug, self._PROFILE_PARAMS["balanced"])
+                result.setdefault("analytical_window", _profile_params["window"])
                 result.setdefault("bull_case", "")
                 result.setdefault("bear_case", "")
 
@@ -165,9 +167,20 @@ Output JSON only."""
                 if atr <= 0:
                     atr = current_price * 0.012
 
-                if not rt or abs(rt - current_price) / max(current_price, 1e-9) > 0.30:
-                    # Compute from ATR if hallucinated
-                    result = self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+                # Validate direction coherence: target must be on the correct side of price
+                direction_valid = True
+                if rt and direction == "LONG" and rt < current_price:
+                    direction_valid = False
+                elif rt and direction == "SHORT" and rt > current_price:
+                    direction_valid = False
+                if il and direction == "LONG" and il > current_price:
+                    direction_valid = False
+                elif il and direction == "SHORT" and il < current_price:
+                    direction_valid = False
+
+                if not rt or abs(rt - current_price) / max(current_price, 1e-9) > 0.30 or not direction_valid:
+                    # Compute from ATR if hallucinated or directionally inverted
+                    result = self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data, profile_slug, timeframe)
                 else:
                     # Map to backward-compat fields
                     result["entry_price"] = current_price
@@ -184,7 +197,7 @@ Output JSON only."""
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data)
+        return self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data, profile_slug, timeframe)
 
     def _build_system_prompt(self, profile_slug: str) -> str:
         """Build system prompt with strategy profile injection."""
@@ -251,7 +264,18 @@ Output JSON only."""
     def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
         return self._compute_probability_signal(ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data)
 
-    def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
+    # Profile → analytical window and ATR multipliers
+    _PROFILE_PARAMS = {
+        "scalper":       {"window": "5-30 MIN",  "target_atr": 1.0,  "stop_atr": 0.5},
+        "ict_smc":       {"window": "1-4 HOUR",  "target_atr": 2.0,  "stop_atr": 1.0},
+        "orb":           {"window": "1-4 HOUR",  "target_atr": 2.0,  "stop_atr": 1.0},
+        "vwap_pullback": {"window": "1-4 HOUR",  "target_atr": 2.0,  "stop_atr": 1.0},
+        "news_catalyst": {"window": "1-3 DAY",   "target_atr": 2.5,  "stop_atr": 1.2},
+        "swing":         {"window": "5-15 DAY",  "target_atr": 4.0,  "stop_atr": 2.0},
+        "balanced":      {"window": "3-7 DAY",   "target_atr": 3.5,  "stop_atr": 1.5},
+    }
+
+    def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None, profile: str = "balanced", timeframe: str = "1D") -> dict:
         if market_data is None:
             market_data = {}
         rng = random.Random(sum(ord(c) for c in ticker) + 13)
@@ -268,6 +292,16 @@ Output JSON only."""
 
         entry = round(price, dec)
 
+        # Profile-aware parameters
+        params = self._PROFILE_PARAMS.get(profile, self._PROFILE_PARAMS["balanced"])
+        target_atr_mult = params["target_atr"]
+        stop_atr_mult = params["stop_atr"]
+        analytical_window = params["window"]
+
+        # For scalper, use 15m ATR instead of daily
+        if profile in ("scalper",) and atr_15m > 0:
+            atr = atr_15m
+
         # Compute probability from vote weights
         long_weight = sum(c for d, c in votes if d == "LONG")
         short_weight = sum(c for d, c in votes if d == "SHORT")
@@ -281,17 +315,16 @@ Output JSON only."""
 
         # Research target & invalidation level (replaces TP/SL)
         if direction == "LONG":
-            research_target = round(entry + atr * 3.5, dec)
-            invalidation_level = round(entry - atr * 1.5, dec)
-            # Backward compat fields
+            research_target = round(entry + atr * target_atr_mult, dec)
+            invalidation_level = round(entry - atr * stop_atr_mult, dec)
             stop = invalidation_level
             risk_amt = entry - stop
             tp1 = research_target
             tp2 = round(entry + risk_amt * 2.5, dec)
             tp3 = round(entry + risk_amt * 4.0, dec)
         else:
-            research_target = round(entry - atr * 3.5, dec)
-            invalidation_level = round(entry + atr * 1.5, dec)
+            research_target = round(entry - atr * target_atr_mult, dec)
+            invalidation_level = round(entry + atr * stop_atr_mult, dec)
             stop = invalidation_level
             risk_amt = stop - entry
             tp1 = research_target
@@ -340,7 +373,7 @@ Output JSON only."""
             "research_target": round(research_target, dec),
             "invalidation_level": round(invalidation_level, dec),
             "risk_reward_ratio": risk_reward_ratio,
-            "analytical_window": "3-7 DAY",
+            "analytical_window": analytical_window,
             "bull_case": f"{fund.get('reasoning', '')[:150]}. {sent.get('reasoning', '')[:100]}",
             "bear_case": f"{macro.get('reasoning', '')[:150]}. {tech.get('reasoning', '')[:100]}",
             # Backward compat fields (DB model still uses these)
