@@ -3,6 +3,7 @@ POST /api/v1/signals/generate  — trigger multi-agent pipeline
 GET  /api/v1/signals/{id}      — retrieve signal by ID
 GET  /api/v1/signals           — list recent signals for user
 """
+import asyncio
 import hashlib
 import math
 import random
@@ -20,6 +21,7 @@ from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
+from app.data.market_data import resolve_ticker, _fetch_rest_spot_price
 
 router = APIRouter(prefix="/api/v1/signals", tags=["signals"])
 
@@ -448,6 +450,7 @@ async def generate_signal(
         "timeframe": body.timeframe,
         "direction": direction,
         "entry_price": final.get("entry_price", 0),
+        "current_price": final.get("entry_price", 0),
         "stop_loss": final.get("stop_loss", 0),
         "take_profit_1": final.get("take_profit_1", 0),
         "take_profit_2": final.get("take_profit_2", 0),
@@ -578,7 +581,10 @@ async def get_signal(
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
 
-    return _signal_to_dict(signal)
+    cp = None
+    if signal.status == "ACTIVE":
+        cp = await _fetch_rest_spot_price(resolve_ticker(signal.ticker))
+    return _signal_to_dict(signal, current_price=cp if isinstance(cp, (int, float)) and cp > 0 else None)
 
 
 @router.get("")
@@ -594,7 +600,18 @@ async def list_signals(
             query = query.where(Signal.user_id == uid)
     result = await db.execute(query)
     signals = result.scalars().all()
-    return [_signal_to_dict(s) for s in signals]
+
+    # Batch-fetch current prices for active signals so the frontend shows live entry
+    active_tickers = list({s.ticker for s in signals if s.status == "ACTIVE"})
+    price_map: dict[str, float] = {}
+    if active_tickers:
+        tasks = [_fetch_rest_spot_price(resolve_ticker(t)) for t in active_tickers]
+        prices = await asyncio.gather(*tasks, return_exceptions=True)
+        for ticker, price in zip(active_tickers, prices):
+            if isinstance(price, (int, float)) and price > 0:
+                price_map[ticker] = price
+
+    return [_signal_to_dict(s, current_price=price_map.get(s.ticker)) for s in signals]
 
 
 class OutcomeRequest(BaseModel):
@@ -709,7 +726,7 @@ async def set_signal_outcome(
     return _signal_to_dict(signal)
 
 
-def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
+def _signal_to_dict(signal: Signal, state: dict | None = None, current_price: float | None = None) -> dict:
     d = {
         "signal_id": str(signal.id),
         "ticker": signal.ticker,
@@ -717,6 +734,7 @@ def _signal_to_dict(signal: Signal, state: dict | None = None) -> dict:
         "timeframe": signal.timeframe,
         "direction": signal.direction,
         "entry_price": signal.entry_price,
+        "current_price": current_price,
         "stop_loss": signal.stop_loss,
         "take_profit_1": signal.take_profit_1,
         "take_profit_2": signal.take_profit_2,

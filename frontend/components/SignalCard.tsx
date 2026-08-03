@@ -54,11 +54,15 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   const leanColor = isBullish ? "text-bull" : "text-bear";
   const leanBg = isBullish ? "bg-bull/10 border-bull/30" : "bg-bear/10 border-bear/30";
   const convictionTier = signal.conviction_tier || "MODERATE";
-  const rrRatio = signal.risk_reward_ratio ?? (
-    signal.entry_price && signal.stop_loss && signal.take_profit_1
-      ? Math.abs((signal.take_profit_1 - signal.entry_price) / Math.max(Math.abs(signal.stop_loss - signal.entry_price), 0.0001))
-      : 0
-  );
+
+  const isActive = signal.status === "ACTIVE";
+  const hasLivePrice = isActive && signal.current_price && signal.current_price > 0;
+  const liveEntry = hasLivePrice ? signal.current_price! : signal.entry_price;
+  const target = signal.research_target || signal.take_profit_1;
+  const inval  = signal.invalidation_level || signal.stop_loss;
+  const rrRatio = (liveEntry && inval && target)
+    ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
+    : (signal.risk_reward_ratio ?? 0);
 
   const handleExecute = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,9 +129,10 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
 
         {/* Row 2: Research Target + Invalidation + R:R */}
         <div className="flex items-center gap-3 mt-1.5">
-          {signal.entry_price > 0 && (
+          {liveEntry > 0 && (
             <span className="text-[13px] font-mono text-muted-foreground">
-              ENTRY <span className="text-foreground font-semibold">{formatPrice(signal.entry_price)}</span>
+              {isActive && signal.current_price ? "PRICE" : "ENTRY"}{" "}
+              <span className="text-foreground font-semibold">{formatPrice(liveEntry)}</span>
             </span>
           )}
           {signal.research_target && (
@@ -297,13 +302,13 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
         <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30">
             <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
-              <Target className="h-3 w-3 text-primary" /> ENTRY PRICE
+              <Target className="h-3 w-3 text-primary" /> {isActive && signal.current_price ? "MARKET PRICE" : "ENTRY PRICE"}
             </div>
             <div className="text-xs font-mono font-bold text-foreground">
-              {formatPrice(signal.entry_price)}
+              {formatPrice(liveEntry)}
             </div>
             <div className="text-[13px] font-mono text-primary/70 mt-0.5">
-              {signal.timeframe || "1D"} window
+              {isActive && signal.current_price ? "LIVE" : (signal.timeframe || "1D") + " window"}
             </div>
           </div>
           <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
@@ -311,11 +316,11 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
             </div>
             <div className="text-xs font-mono font-bold text-bull">
-              {signal.research_target ? formatPrice(signal.research_target) : formatPrice(signal.take_profit_1)}
+              {target ? formatPrice(target) : "—"}
             </div>
-            {signal.research_target && signal.entry_price > 0 && (
+            {target && liveEntry > 0 && (
               <div className="text-[13px] font-mono text-bull/70 mt-0.5">
-                +{((Math.abs(signal.research_target - signal.entry_price) / signal.entry_price) * 100).toFixed(1)}%
+                +{((Math.abs(target - liveEntry) / liveEntry) * 100).toFixed(1)}%
               </div>
             )}
           </div>
@@ -324,11 +329,11 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
             </div>
             <div className="text-xs font-mono font-bold text-bear">
-              {signal.invalidation_level ? formatPrice(signal.invalidation_level) : formatPrice(signal.stop_loss)}
+              {inval ? formatPrice(inval) : "—"}
             </div>
-            {signal.invalidation_level && signal.entry_price > 0 && (
+            {inval && liveEntry > 0 && (
               <div className="text-[13px] font-mono text-bear/70 mt-0.5">
-                -{((Math.abs(signal.entry_price - signal.invalidation_level) / signal.entry_price) * 100).toFixed(1)}%
+                -{((Math.abs(liveEntry - inval) / liveEntry) * 100).toFixed(1)}%
               </div>
             )}
           </div>

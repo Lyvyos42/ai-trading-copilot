@@ -17,7 +17,15 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
   const isBullish = bullPct > bearPct;
   const isWin = signal.outcome === "WIN";
   const convictionTier = signal.conviction_tier || "MODERATE";
-  const rrRatio = signal.risk_reward_ratio ?? 0;
+  const isActive = signal.status === "ACTIVE";
+  const liveEntry = (isActive && signal.current_price && signal.current_price > 0)
+    ? signal.current_price
+    : signal.entry_price;
+  const target = signal.research_target || signal.take_profit_1;
+  const inval  = signal.invalidation_level || signal.stop_loss;
+  const rrRatio = (liveEntry && inval && target)
+    ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
+    : (signal.risk_reward_ratio ?? 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>

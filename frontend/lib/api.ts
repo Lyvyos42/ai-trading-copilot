@@ -88,6 +88,7 @@ export interface Signal {
   asset_class: string;
   direction: "LONG" | "SHORT";
   entry_price: number;
+  current_price?: number | null;
   stop_loss: number;
   take_profit_1: number;
   take_profit_2: number;
