@@ -379,6 +379,13 @@ async def generate_signal(
     if direction not in ("LONG", "SHORT"):
         direction = "LONG"
 
+    # Fetch live spot price so the signal always uses the current market price,
+    # not whatever stale close fetch_market_data may have returned.
+    live_spot = await _fetch_rest_spot_price(resolve_ticker(ticker))
+    if live_spot and live_spot > 0:
+        final["entry_price"] = live_spot
+        final["current_price"] = live_spot
+
     # Build agent_votes summary (all 7 analysts + risk + quant)
     agent_votes = {}
     for key, label in [
@@ -443,14 +450,14 @@ async def generate_signal(
     except Exception:
         pass  # DB unavailable — analysis result is still returned
 
-    result = _signal_to_dict(signal, state) if signal_id else {
+    result = _signal_to_dict(signal, state, current_price=live_spot if live_spot and live_spot > 0 else None) if signal_id else {
         "signal_id": None,
         "ticker": ticker,
         "asset_class": body.asset_class,
         "timeframe": body.timeframe,
         "direction": direction,
         "entry_price": final.get("entry_price", 0),
-        "current_price": final.get("entry_price", 0),
+        "current_price": live_spot if live_spot and live_spot > 0 else final.get("entry_price", 0),
         "stop_loss": final.get("stop_loss", 0),
         "take_profit_1": final.get("take_profit_1", 0),
         "take_profit_2": final.get("take_profit_2", 0),

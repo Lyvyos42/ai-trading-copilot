@@ -330,16 +330,18 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
         data = _mock_market_data(ticker, asset_class)
         data_source = "mock"
 
-    # Inject the live REST price as the close ONLY when TradingView wasn't the
-    # source. TradingView returns real-time bar data that's already accurate.
-    # Yahoo REST can return stale futures prices (e.g. GC=F contract roll)
-    # that corrupt the real-time TradingView price.
+    # Always inject live REST price as the close — TradingView WebSocket can
+    # also return stale data from disconnections or delayed feeds.
+    # Sanity check: only apply if within 10% of the bar-data close to avoid
+    # corrupting data when the REST API returns a completely wrong instrument.
     live_price = await live_price_task
-    if live_price and live_price > 0 and data_source != "tradingview":
-        dec = data.get("price_decimals") or _price_decimals(live_price)
-        data["close"] = round(live_price, dec)
-        if data.get("closes"):
-            data["closes"][-1] = round(live_price, dec)
+    if live_price and live_price > 0:
+        bar_close = data.get("close", 0) or 0
+        if bar_close <= 0 or abs(live_price - bar_close) / max(bar_close, 1e-9) < 0.10:
+            dec = data.get("price_decimals") or _price_decimals(live_price)
+            data["close"] = round(live_price, dec)
+            if data.get("closes"):
+                data["closes"][-1] = round(live_price, dec)
 
     # Compute intraday (scalp) ATR via sqrt-of-time rule from daily ATR.
     # sqrt(15min / 390min per session) ≈ 0.196 — gives realistic 15-min ATR

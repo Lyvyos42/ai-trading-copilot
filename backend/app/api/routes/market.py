@@ -593,7 +593,8 @@ async def get_ohlcv(
     # ── 2. yfinance ───────────────────────────────────────────────────────────
     try:
         import yfinance as yf
-        from app.data.market_data import resolve_ticker
+        from app.data.market_data import resolve_ticker, _fetch_rest_spot_price
+
         yf_ticker = resolve_ticker(ticker)
 
         def _sync():
@@ -614,6 +615,15 @@ async def get_ohlcv(
             return candles
 
         candles = await asyncio.to_thread(_sync)
+
+        # Patch the last candle's close with the live REST spot price
+        if candles:
+            live = await _fetch_rest_spot_price(yf_ticker)
+            if live and live > 0:
+                candles[-1]["close"] = round(live, 4)
+                candles[-1]["high"] = round(max(candles[-1]["high"], live), 4)
+                candles[-1]["low"] = round(min(candles[-1]["low"], live), 4)
+
         return {"ticker": ticker, "candles": candles}
 
     except Exception:
@@ -649,7 +659,7 @@ async def get_ohlcv(
             "ZC=F":480,   "ZW=F":555,    "ZS=F":975,   "KC=F":380,  "CT=F":82,
             "CC=F":9100,  "SB=F":18.5,
             # Display name aliases (resolved by _TICKER_ALIAS at fetch time)
-            "XAUUSD":3100,"XAGUSD":34.5,"USOIL":68,"UKOIL":72,"NATGAS":4.2,
+            "XAUUSD":4050,"XAGUSD":32.5,"USOIL":68,"UKOIL":72,"NATGAS":4.2,
             "CORN":480,   "WHEAT":555,  "SOYBEAN":975,
             # Indices
             "^GSPC":5700, "^NDX":20100, "^DJI":42800,"^RUT":2175,  "^VIX":19,

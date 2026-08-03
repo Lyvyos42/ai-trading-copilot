@@ -268,8 +268,10 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
 
   useEffect(() => {
     let cancelled = false;
-    async function fetchData() {
-      setLoading(true);
+    let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+    async function fetchData(isRefresh = false) {
+      if (!isRefresh) setLoading(true);
       const period = INTERVAL_TO_PERIOD[interval] || "6mo";
       try {
         const res = await fetch(
@@ -282,20 +284,38 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
             volume: c.volume ?? 0,
           }));
           const s = state.current;
-          s.candles = candles;
-          s.ticker = ticker;
-          s.interval = interval;
-          s.viewEnd = candles.length;
-          s.viewStart = Math.max(0, candles.length - DEFAULT_VISIBLE);
-          s.lastHeatKey = "";
+          if (isRefresh && s.candles.length > 0) {
+            // On refresh: update price data but preserve zoom/pan position
+            s.candles = candles;
+            s.lastHeatKey = "";
+            // Clamp view if data length changed
+            if (s.viewEnd > candles.length) {
+              const range = s.viewEnd - s.viewStart;
+              s.viewEnd = candles.length;
+              s.viewStart = Math.max(0, candles.length - range);
+            }
+          } else {
+            s.candles = candles;
+            s.ticker = ticker;
+            s.interval = interval;
+            s.viewEnd = candles.length;
+            s.viewStart = Math.max(0, candles.length - DEFAULT_VISIBLE);
+            s.lastHeatKey = "";
+          }
           setLoading(false);
         }
       } catch {
         if (!cancelled) setLoading(false);
       }
     }
+
     fetchData();
-    return () => { cancelled = true; };
+    refreshTimer = setInterval(() => fetchData(true), 60_000);
+
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
   }, [ticker, interval]);
 
   useEffect(() => {
@@ -659,6 +679,7 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
     }
 
     function onMouseDown(e: MouseEvent) {
+      e.preventDefault();
       s.isDragging = true;
       s.dragStartX = e.clientX;
       s.dragViewStart = s.viewStart;
@@ -691,14 +712,23 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
 
     function onMouseUp() {
       s.isDragging = false;
-      canvas!.style.cursor = "crosshair";
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const inside = s.mouseX >= 0 && s.mouseX <= rect.width && s.mouseY >= 0 && s.mouseY <= rect.height;
+        if (!inside) {
+          s.mouseX = -1;
+          s.mouseY = -1;
+        }
+        canvas.style.cursor = "crosshair";
+      }
     }
 
     function onMouseLeave() {
-      s.mouseX = -1;
-      s.mouseY = -1;
-      s.isDragging = false;
-      canvas!.style.cursor = "crosshair";
+      if (!s.isDragging) {
+        s.mouseX = -1;
+        s.mouseY = -1;
+        canvas!.style.cursor = "crosshair";
+      }
     }
 
     canvas.addEventListener("wheel", onWheel, { passive: false });
