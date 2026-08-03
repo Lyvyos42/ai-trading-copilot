@@ -191,8 +191,8 @@ export default function PortfolioPage() {
                             {pos.direction}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{formatPrice(pos.entry_price)}</td>
-                        <td className="py-3 px-3 font-mono text-xs">{formatPrice(pos.current_price)}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{formatPrice(pos.entry_price, pos.ticker)}</td>
+                        <td className="py-3 px-3 font-mono text-xs">{formatPrice(pos.current_price, pos.ticker)}</td>
                         <td className="py-3 px-3 text-xs text-muted-foreground font-mono">{pos.quantity}</td>
                         <td className={cn("py-3 px-3 font-mono text-xs font-bold", profit ? "text-bull" : "text-bear")}>
                           {formatPnl(pos.unrealized_pnl)}
@@ -200,8 +200,8 @@ export default function PortfolioPage() {
                         <td className={cn("py-3 px-3 text-xs font-mono font-semibold", profit ? "text-bull" : "text-bear")}>
                           {formatPct(pos.unrealized_pnl_pct)}
                         </td>
-                        <td className="py-3 px-3 font-mono text-xs text-bear/70">{formatPrice(pos.stop_loss)}</td>
-                        <td className="py-3 px-3 font-mono text-xs text-bull/70">{formatPrice(pos.take_profit_1)}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-bear/70">{formatPrice(pos.stop_loss, pos.ticker)}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-bull/70">{formatPrice(pos.take_profit_1, pos.ticker)}</td>
                         <td className="py-3 px-3 text-[11px] text-muted-foreground font-mono">{timeAgo(pos.opened_at)}</td>
                         <td className="py-3 px-3">
                           <button

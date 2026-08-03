@@ -578,7 +578,7 @@ async def get_ohlcv(
                     ts_ms, o, h, l, c = row
                     day_ts = int(ts_ms // 1000 // 86400 * 86400)
                     if day_ts not in day_map:
-                        day_map[day_ts] = {"time": day_ts, "open": o, "high": h, "low": l, "close": c}
+                        day_map[day_ts] = {"time": day_ts, "open": o, "high": h, "low": l, "close": c, "volume": 0}
                     else:
                         existing = day_map[day_ts]
                         existing["high"]  = max(existing["high"], h)
@@ -609,6 +609,7 @@ async def get_ohlcv(
                     "high":  round(float(row["High"]), 4),
                     "low":   round(float(row["Low"]), 4),
                     "close": round(float(row["Close"]), 4),
+                    "volume": int(row.get("Volume", 0)),
                 })
             return candles
 
@@ -713,6 +714,7 @@ async def get_ohlcv(
             c = round(o * (1 + change), 4 if is_forex else 2)
             h = round(max(o, c) * (1 + abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
             l = round(min(o, c) * (1 - abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
-            candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c})
+            vol = int(rng.uniform(5e5, 8e6) if not is_forex else rng.uniform(1e4, 5e5))
+            candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c, "volume": vol})
             price = c
         return {"ticker": ticker, "candles": candles}

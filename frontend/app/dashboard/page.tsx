@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { RefreshCw, TrendingUp, Activity, Zap, DollarSign } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
+import { OrderFlowChart } from "@/components/OrderFlowChart";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
 import { ScannerPanel } from "@/components/ScannerPanel";
@@ -46,6 +47,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     const saved = typeof window !== "undefined" && localStorage.getItem("dashboard_profile");
     return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
   });
+  const [chartMode, setChartMode] = useState<"tradingview" | "orderflow">("tradingview");
 
   const { isLoggedIn } = useAuth();
 
@@ -222,6 +224,27 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               })}
             </div>
 
+            <div className="flex items-center gap-1 border-l border-border/30 pl-2 ml-1">
+              <button
+                onClick={() => setChartMode("tradingview")}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[11px] font-mono font-bold border transition-colors",
+                  chartMode === "tradingview"
+                    ? "bg-primary/10 border-primary/50 text-primary"
+                    : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
+                )}
+              >TV</button>
+              <button
+                onClick={() => setChartMode("orderflow")}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[11px] font-mono font-bold border transition-colors",
+                  chartMode === "orderflow"
+                    ? "bg-primary/10 border-primary/50 text-primary"
+                    : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
+                )}
+              >ORDER FLOW</button>
+            </div>
+
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={() => {
@@ -253,7 +276,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
             <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "300px" }}>
-              <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
+              {chartMode === "tradingview" ? (
+                <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
+              ) : (
+                <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
+              )}
             </div>
           </div>
         </div>

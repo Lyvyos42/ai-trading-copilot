@@ -5,8 +5,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(price);
+export function formatPrice(price: number, ticker?: string): string {
+  const abs = Math.abs(price);
+  let decimals = 2;
+  if (abs < 0.001) decimals = 6;
+  else if (abs < 0.1) decimals = 5;
+  else if (abs < 10) decimals = 5;
+  else if (abs < 100) decimals = 3;
+  else decimals = 2;
+
+  if (ticker) {
+    const t = ticker.toUpperCase().replace(/[/\-=X]/g, "");
+    const jpyPairs = ["USDJPY","EURJPY","GBPJPY","CADJPY","CHFJPY","AUDJPY","NZDJPY"];
+    if (jpyPairs.includes(t)) decimals = 3;
+    else if (t.length === 6 && !t.startsWith("XA") && !t.startsWith("US5") && !t.startsWith("US3")) {
+      decimals = 5;
+    }
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(price);
 }
 
 export function formatPct(pct: number, decimals = 1): string {

@@ -308,8 +308,11 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
 
     # 1. TradingView (real-time, covers FX/metals/indices/crypto/commodities)
     data = None
+    data_source = "mock"
     try:
         data = await _fetch_tvdatafeed(ticker, asset_class)
+        if data:
+            data_source = "tradingview"
     except Exception:
         pass
 
@@ -317,18 +320,22 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     if not data:
         try:
             data = await _fetch_yfinance(yf_sym, asset_class)
-            data["ticker"] = ticker  # keep display symbol in response
+            data["ticker"] = ticker
+            data_source = "yfinance"
         except Exception:
             pass
 
     # 3. Mock fallback
     if not data:
         data = _mock_market_data(ticker, asset_class)
+        data_source = "mock"
 
-    # Inject the live REST price as the close — overrides any stale bar value.
-    # Agents read data["close"] as current_price, so this is the critical fix.
+    # Inject the live REST price as the close ONLY when TradingView wasn't the
+    # source. TradingView returns real-time bar data that's already accurate.
+    # Yahoo REST can return stale futures prices (e.g. GC=F contract roll)
+    # that corrupt the real-time TradingView price.
     live_price = await live_price_task
-    if live_price and live_price > 0:
+    if live_price and live_price > 0 and data_source != "tradingview":
         dec = data.get("price_decimals") or _price_decimals(live_price)
         data["close"] = round(live_price, dec)
         if data.get("closes"):
@@ -516,9 +523,9 @@ _KNOWN_PRICES: dict[str, float] = {
     "APT-USD":7.5,    "OP-USD":1.0,  "ARB-USD":0.42, "SUI-USD":2.8,
     "SHIB-USD":0.0000135,"PEPE-USD":0.0000085,"WIF-USD":1.5,
     # ── FX Majors & Crosses (yfinance =X format) ──────────────────────────────
-    "EURUSD=X":1.085,"GBPUSD=X":1.295,"USDJPY=X":148.5,"AUDUSD=X":0.635,
-    "USDCAD=X":1.355,"USDCHF=X":0.895,"NZDUSD=X":0.583,
-    "EURGBP=X":0.855,"EURJPY=X":161.0,"GBPJPY=X":192.0,"EURCHF=X":0.955,
+    "EURUSD=X":1.153,"GBPUSD=X":1.345,"USDJPY=X":146.5,"AUDUSD=X":0.660,
+    "USDCAD=X":1.380,"USDCHF=X":0.855,"NZDUSD=X":0.600,
+    "EURGBP=X":0.858,"EURJPY=X":169.0,"GBPJPY=X":197.0,"EURCHF=X":0.985,
     "EURAUD=X":1.715,"EURCAD=X":1.565,"EURNZD=X":1.860,"GBPAUD=X":2.040,
     "GBPCAD=X":1.830,"GBPCHF=X":1.140,"GBPNZD=X":2.215,"AUDJPY=X":94.5,
     "AUDCAD=X":0.860,"AUDCHF=X":0.568,"AUDNZD=X":1.090,"CADJPY=X":109.5,
@@ -530,13 +537,13 @@ _KNOWN_PRICES: dict[str, float] = {
     "USDCNH=X":7.25, "USDINR=X":84.5,"USDBRL=X":5.85, "USDPLN=X":3.98,
     "USDHUF=X":360.0,"USDCZK=X":23.5,"USDTHB=X":33.5, "USDKRW=X":1360.0,
     # FX display aliases (TV-style, resolved to =X by _TICKER_ALIAS)
-    "EURUSD":1.085, "GBPUSD":1.295, "USDJPY":148.5, "AUDUSD":0.635,
-    "USDCAD":1.355, "USDCHF":0.895, "NZDUSD":0.583, "EURGBP":0.855,
-    "EURJPY":161.0, "GBPJPY":192.0, "EURCHF":0.955,
+    "EURUSD":1.153, "GBPUSD":1.345, "USDJPY":146.5, "AUDUSD":0.660,
+    "USDCAD":1.380, "USDCHF":0.855, "NZDUSD":0.600, "EURGBP":0.858,
+    "EURJPY":169.0, "GBPJPY":197.0, "EURCHF":0.985,
     # ── Spot Metals (TV display names, resolved to futures) ───────────────────
-    "XAUUSD":3100.0,"XAGUSD":34.5,  "XPTUSD":990.0, "XPDUSD":950.0,
+    "XAUUSD":4050.0,"XAGUSD":32.5,  "XPTUSD":1050.0, "XPDUSD":1000.0,
     # ── Commodities Futures ───────────────────────────────────────────────────
-    "GC=F":  3100.0,"SI=F":  34.5,  "HG=F":   4.55, "PL=F":  990.0, "PA=F":  950.0,
+    "GC=F":  4050.0,"SI=F":  32.5,  "HG=F":   4.55, "PL=F":  1050.0, "PA=F":  1000.0,
     "CL=F":   68.0, "BZ=F":  72.0,  "NG=F":    4.2, "RB=F":   2.15, "HO=F":   2.45,
     "ZC=F":  480.0, "ZW=F":  555.0, "ZS=F":   975.0,"KC=F":  380.0, "CT=F":   82.0,
     "CC=F": 9100.0, "SB=F":  18.5,  "OJ=F":  340.0,

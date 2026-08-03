@@ -132,17 +132,17 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
           {liveEntry > 0 && (
             <span className="text-[13px] font-mono text-muted-foreground">
               {isActive && signal.current_price ? "PRICE" : "ENTRY"}{" "}
-              <span className="text-foreground font-semibold">{formatPrice(liveEntry)}</span>
+              <span className="text-foreground font-semibold">{formatPrice(liveEntry, signal.ticker)}</span>
             </span>
           )}
           {signal.research_target && (
             <span className="text-[13px] font-mono text-muted-foreground">
-              TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target)}</span>
+              TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target, signal.ticker)}</span>
             </span>
           )}
           {signal.invalidation_level && (
             <span className="text-[13px] font-mono text-muted-foreground">
-              INVAL <span className="text-bear font-semibold">{formatPrice(signal.invalidation_level)}</span>
+              INVAL <span className="text-bear font-semibold">{formatPrice(signal.invalidation_level, signal.ticker)}</span>
             </span>
           )}
           {rrRatio > 0 && (
@@ -305,7 +305,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <Target className="h-3 w-3 text-primary" /> {isActive && signal.current_price ? "MARKET PRICE" : "ENTRY PRICE"}
             </div>
             <div className="text-xs font-mono font-bold text-foreground">
-              {formatPrice(liveEntry)}
+              {formatPrice(liveEntry, signal.ticker)}
             </div>
             <div className="text-[13px] font-mono text-primary/70 mt-0.5">
               {isActive && signal.current_price ? "LIVE" : (signal.timeframe || "1D") + " window"}
@@ -316,7 +316,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
             </div>
             <div className="text-xs font-mono font-bold text-bull">
-              {target ? formatPrice(target) : "—"}
+              {target ? formatPrice(target, signal.ticker) : "—"}
             </div>
             {target && liveEntry > 0 && (
               <div className="text-[13px] font-mono text-bull/70 mt-0.5">
@@ -329,7 +329,7 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
               <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
             </div>
             <div className="text-xs font-mono font-bold text-bear">
-              {inval ? formatPrice(inval) : "—"}
+              {inval ? formatPrice(inval, signal.ticker) : "—"}
             </div>
             {inval && liveEntry > 0 && (
               <div className="text-[13px] font-mono text-bear/70 mt-0.5">

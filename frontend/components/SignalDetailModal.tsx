@@ -79,13 +79,13 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
           <div className="data-cell">
             <span className="data-cell-label flex items-center gap-1"><ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET</span>
             <span className="data-cell-value text-bull">
-              {signal.research_target ? formatPrice(signal.research_target) : formatPrice(signal.take_profit_1)}
+              {signal.research_target ? formatPrice(signal.research_target, signal.ticker) : formatPrice(signal.take_profit_1, signal.ticker)}
             </span>
           </div>
           <div className="data-cell">
             <span className="data-cell-label flex items-center gap-1"><ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION</span>
             <span className="data-cell-value text-bear">
-              {signal.invalidation_level ? formatPrice(signal.invalidation_level) : formatPrice(signal.stop_loss)}
+              {signal.invalidation_level ? formatPrice(signal.invalidation_level, signal.ticker) : formatPrice(signal.stop_loss, signal.ticker)}
             </span>
           </div>
           <div className="data-cell">
