@@ -626,7 +626,72 @@ async def get_ohlcv(
 
         return {"ticker": ticker, "candles": candles}
 
-    except Exception:
+    except Exception as yf_err:
+        import logging
+        logging.warning(f"yfinance OHLCV failed for {ticker}: {yf_err}")
+
+    # ── 3. Yahoo Finance REST Chart API (fallback before mock) ───────────────
+    try:
+        import urllib.request as _urlreq
+        import urllib.parse as _urlpar
+        import json as _json
+        from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _REST_ALIAS
+
+        yf_ticker = resolve_ticker(ticker)
+        rest_sym = _REST_ALIAS.get(yf_ticker, yf_ticker)
+
+        _INTERVAL_MAP = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "60m", "4h": "60m", "1d": "1d", "1wk": "1wk"}
+        _RANGE_MAP = {"1d": "1d", "5d": "5d", "1mo": "1mo", "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y"}
+        rest_interval = _INTERVAL_MAP.get(interval, "1d")
+        rest_range = _RANGE_MAP.get(period, "6mo")
+
+        def _rest_ohlcv():
+            safe = _urlpar.quote(rest_sym, safe="=^.")
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}?interval={rest_interval}&range={rest_range}"
+            req = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with _urlreq.urlopen(req, timeout=15) as r:
+                data = _json.loads(r.read())
+            result = data["chart"]["result"][0]
+            timestamps = result["timestamp"]
+            quotes = result["indicators"]["quote"][0]
+            candles = []
+            for i, ts in enumerate(timestamps):
+                o = quotes["open"][i]
+                h = quotes["high"][i]
+                l = quotes["low"][i]
+                c = quotes["close"][i]
+                v = quotes.get("volume", [None] * len(timestamps))[i]
+                if o is None or c is None:
+                    continue
+                candles.append({
+                    "time": int(ts),
+                    "open": round(float(o), 4),
+                    "high": round(float(h), 4),
+                    "low": round(float(l), 4),
+                    "close": round(float(c), 4),
+                    "volume": int(v) if v else 0,
+                })
+            if not candles:
+                raise ValueError("no candles from REST")
+            return candles
+
+        candles = await asyncio.to_thread(_rest_ohlcv)
+
+        if candles:
+            live = await _fetch_rest_spot_price(rest_sym)
+            if live and live > 0:
+                candles[-1]["close"] = round(live, 4)
+                candles[-1]["high"] = round(max(candles[-1]["high"], live), 4)
+                candles[-1]["low"] = round(min(candles[-1]["low"], live), 4)
+
+        return {"ticker": ticker, "candles": candles}
+
+    except Exception as rest_err:
+        import logging
+        logging.warning(f"Yahoo REST OHLCV also failed for {ticker}: {rest_err}")
+
+    # ── 4. Mock fallback ─────────────────────────────────────────────────────
+    try:
         # Deterministic mock fallback with realistic price ranges per asset type
         _MOCK_BASES = {
             # Crypto
@@ -728,3 +793,5 @@ async def get_ohlcv(
             candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c, "volume": vol})
             price = c
         return {"ticker": ticker, "candles": candles}
+    except Exception:
+        return {"ticker": ticker, "candles": []}
