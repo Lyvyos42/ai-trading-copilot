@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal, GeoOctahedron, GeoCylinder, GeoCube, GeoSphere, GeoIcosahedron, GeoTorus, GeoPrism, GeoDodecahedron, GeoTetrahedron, GeoDiamond } from "@/components/icons/GeoIcons";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -343,6 +344,89 @@ export default function HomePage() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── IEB Product Showcase ──────────────────────────────────────────── */}
+      <section
+        className="max-w-7xl mx-auto px-6 py-20"
+        style={{ borderTop: "1px solid hsl(var(--border))" }}
+      >
+        <div className="mb-12">
+          <p
+            className="text-[13px] font-bold tracking-[0.18em] mb-3"
+            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+          >
+            ECOSYSTEM
+          </p>
+          <h2
+            className="font-bold max-w-lg mb-3"
+            style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
+          >
+            Institutional Edge Brain — Real-Time Order Flow Intelligence
+          </h2>
+          <p
+            className="text-sm leading-relaxed max-w-2xl"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            Desktop-grade institutional analytics. Live market structure, order flow probability,
+            meta-cognition modules, L2 book, tape, volume profile — 12 real-time analysis cards
+            powered by the same AI engine.
+          </p>
+        </div>
+
+        <div
+          className="panel panel-ao overflow-hidden"
+          style={{
+            borderColor: "hsl(var(--primary) / 0.25)",
+          }}
+        >
+          <div
+            className="relative w-full"
+            style={{ aspectRatio: "16 / 9" }}
+          >
+            <Image
+              src="/images/ieb-dashboard.png"
+              alt="Institutional Edge Brain — Full Dashboard with Market Metrics, Order Flow Chart, Trade Signal, Confluence, Key Levels, EMA Stack, Volume Profile, L2 Book, and Meta-Cognition Modules"
+              fill
+              className="object-cover object-top"
+              priority
+            />
+          </div>
+          <div
+            className="flex items-center justify-between p-4"
+            style={{
+              borderTop: "1px solid hsl(var(--border))",
+              background: "hsl(var(--surface-1))",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: "hsl(var(--bull))", animation: "pulse-live 1.6s ease-in-out infinite" }}
+              />
+              <span
+                className="text-[11px] font-bold tracking-[0.12em]"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+              >
+                INSTITUTIONAL EDGE BRAIN — LIVE
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span
+                className="text-[10px] tracking-[0.1em]"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+              >
+                12 META-COGNITION MODULES
+              </span>
+              <span
+                className="text-[10px] tracking-[0.1em]"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+              >
+                REAL-TIME ORDER FLOW
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
