@@ -157,6 +157,38 @@ async def mark_read(
     return {"ok": True}
 
 
+# ── POST auto/trigger ─────────────────────────────────────────────────────────
+
+@router.post("/auto/trigger")
+async def trigger_auto_scan(
+    db:   AsyncSession = Depends(get_db),
+    user: dict         = Depends(get_current_user),
+):
+    """Manually trigger an auto-scan for the current user (testing/on-demand)."""
+    user_id = _require_premium(user)
+
+    result = await db.execute(
+        select(ScannerConfig).where(ScannerConfig.user_id == user_id)
+    )
+    cfg = result.scalar_one_or_none()
+
+    if not cfg or not cfg.symbols:
+        raise HTTPException(
+            status_code=400,
+            detail="No scanner config found. Save a config with symbols first.",
+        )
+
+    from app.services.auto_scanner import run_auto_scan_for_user
+
+    results = await run_auto_scan_for_user(user_id, cfg.symbols)
+
+    return {
+        "symbols_scanned": len(cfg.symbols),
+        "signals_generated": len(results),
+        "signals": results,
+    }
+
+
 def _alert_to_dict(a: MarketAlert) -> dict:
     return {
         "id":          a.id,

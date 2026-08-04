@@ -5,6 +5,7 @@ import { RefreshCw, TrendingUp, Activity, Zap, DollarSign } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
+import { SignalOverlay } from "@/components/SignalOverlay";
 import { AgentStatusPanel } from "@/components/AgentStatus";
 import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
 import { ScannerPanel } from "@/components/ScannerPanel";
@@ -275,11 +276,14 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
-            <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: "300px" }}>
+            <div className="flex-1 min-h-0 overflow-hidden relative" style={{ minHeight: "300px" }}>
               {chartMode === "tradingview" ? (
                 <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
               ) : (
                 <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
+              )}
+              {chartMode === "tradingview" && (
+                <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
               )}
             </div>
           </div>
@@ -322,12 +326,17 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 key={signal.signal_id}
                 onClick={() => { setSelectedSignal(signal); setActiveTicker(signal.ticker); }}
                 className={cn(
-                  "cursor-pointer border-b border-border/50 transition-colors",
+                  "cursor-pointer border-b border-border/50 transition-colors relative",
                   selectedSignal?.signal_id === signal.signal_id
                     ? "bg-primary/5 border-l-2 border-l-primary"
                     : "hover:bg-white/[0.02]"
                 )}
               >
+                {signal.signal_mode === "AUTO_SCAN" && (
+                  <span className="absolute top-1.5 right-2 text-[7px] font-mono font-bold text-info bg-info/10 border border-info/20 px-1 rounded z-10">
+                    AUTO
+                  </span>
+                )}
                 <SignalCard
                   signal={signal}
                   compact

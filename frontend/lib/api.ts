@@ -117,6 +117,7 @@ export interface Signal {
   conviction_tier?: string | null;
   timestamp: string;
   expiry_time: string;
+  signal_mode?: string | null;
   pipeline_latency_ms?: number;
   agent_detail?: Record<string, unknown>;
 }

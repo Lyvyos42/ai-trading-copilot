@@ -446,6 +446,7 @@ async def generate_signal(
         bull_case=final.get("bull_case"),
         bear_case=final.get("bear_case"),
         conviction_tier=final.get("conviction_tier"),
+        signal_mode=final.get("signal_mode", "AI"),
     )
 
     # Save to DB — non-blocking: return signal even if DB write fails
@@ -777,11 +778,13 @@ def _signal_to_dict(signal: Signal, state: dict | None = None, current_price: fl
         "conviction_tier": getattr(signal, "conviction_tier", None),
         "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
         "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,
+        "signal_mode": getattr(signal, "signal_mode", None) or "AI",
     }
     if state:
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")
         d["agent_detail"] = _build_agent_detail(state)
-        d["signal_mode"] = state.get("final_signal", {}).get("signal_mode", "AI")
+        # Pipeline state overrides DB default when available
+        d["signal_mode"] = state.get("final_signal", {}).get("signal_mode", d["signal_mode"])
     return d
 
 

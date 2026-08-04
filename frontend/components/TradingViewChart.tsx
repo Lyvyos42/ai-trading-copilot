@@ -167,9 +167,11 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     return () => {
       container.innerHTML = "";
     };
-  // Recreate the widget when the TICKER or INTERVAL changes.
+  // Recreate the widget only when the TICKER changes.
+  // Interval is read from intervalRef at mount time; the TV widget has its own
+  // interval selector, so changing interval alone doesn't need a full recreate.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker, interval]);
+  }, [ticker]);
 
   return (
     <div

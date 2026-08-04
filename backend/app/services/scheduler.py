@@ -27,6 +27,14 @@ async def _scanner_job():
         log.error("scheduler_scanner_failed", error=str(exc))
 
 
+async def _auto_scan_job():
+    try:
+        from app.services.auto_scanner import auto_scan_job
+        await auto_scan_job()
+    except Exception as exc:
+        log.error("scheduler_auto_scan_failed", error=str(exc))
+
+
 def start_scheduler():
     global _scheduler
     _scheduler = AsyncIOScheduler(timezone="UTC")
@@ -46,8 +54,16 @@ def start_scheduler():
         replace_existing=True,
         max_instances=1,
     )
+    _scheduler.add_job(
+        _auto_scan_job,
+        trigger=IntervalTrigger(minutes=5),
+        id="auto_scanner",
+        name="Technical Analysis Auto-Scanner",
+        replace_existing=True,
+        max_instances=1,
+    )
     _scheduler.start()
-    log.info("scheduler_started", jobs=["news_scraper", "agent_scanner"], interval_minutes=5)
+    log.info("scheduler_started", jobs=["news_scraper", "agent_scanner", "auto_scanner"], interval_minutes=5)
 
 
 def stop_scheduler():
