@@ -21,7 +21,15 @@ from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
-from app.data.market_data import resolve_ticker, _fetch_rest_spot_price
+from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _fetch_tv_ta_spot
+
+
+async def _get_spot_price(ticker: str) -> float | None:
+    """Get spot price: TradingView scanner first, Yahoo REST fallback."""
+    price = await _fetch_tv_ta_spot(ticker)
+    if price and price > 0:
+        return price
+    return await _fetch_rest_spot_price(resolve_ticker(ticker))
 
 router = APIRouter(prefix="/api/v1/signals", tags=["signals"])
 
@@ -381,7 +389,7 @@ async def generate_signal(
 
     # Fetch live spot price so the signal always uses the current market price,
     # not whatever stale close fetch_market_data may have returned.
-    live_spot = await _fetch_rest_spot_price(resolve_ticker(ticker))
+    live_spot = await _get_spot_price(ticker)
     if live_spot and live_spot > 0:
         final["entry_price"] = live_spot
         final["current_price"] = live_spot
@@ -590,7 +598,7 @@ async def get_signal(
 
     cp = None
     if signal.status == "ACTIVE":
-        cp = await _fetch_rest_spot_price(resolve_ticker(signal.ticker))
+        cp = await _get_spot_price(signal.ticker)
     return _signal_to_dict(signal, current_price=cp if isinstance(cp, (int, float)) and cp > 0 else None)
 
 
@@ -612,7 +620,7 @@ async def list_signals(
     active_tickers = list({s.ticker for s in signals if s.status == "ACTIVE"})
     price_map: dict[str, float] = {}
     if active_tickers:
-        tasks = [_fetch_rest_spot_price(resolve_ticker(t)) for t in active_tickers]
+        tasks = [_get_spot_price(t) for t in active_tickers]
         prices = await asyncio.gather(*tasks, return_exceptions=True)
         for ticker, price in zip(active_tickers, prices):
             if isinstance(price, (int, float)) and price > 0:
