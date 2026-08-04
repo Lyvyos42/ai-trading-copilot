@@ -26,14 +26,18 @@ interface HeatmapData {
 }
 
 const HEAT_STOPS = [
-  { t: 0.00, r: 4,   g: 12,  b: 26,  a: 0.00 },
-  { t: 0.06, r: 7,   g: 24,  b: 50,  a: 0.30 },
-  { t: 0.18, r: 11,  g: 46,  b: 88,  a: 0.50 },
-  { t: 0.36, r: 8,   g: 82,  b: 140, a: 0.68 },
-  { t: 0.55, r: 0,   g: 128, b: 195, a: 0.82 },
-  { t: 0.75, r: 0,   g: 182, b: 228, a: 0.94 },
-  { t: 0.90, r: 70,  g: 218, b: 248, a: 1.00 },
-  { t: 1.00, r: 205, g: 242, b: 255, a: 1.00 },
+  { t: 0.00, r: 0,   g: 2,   b: 12,  a: 0.03 },
+  { t: 0.06, r: 2,   g: 8,   b: 35,  a: 0.15 },
+  { t: 0.14, r: 6,   g: 18,  b: 65,  a: 0.30 },
+  { t: 0.24, r: 10,  g: 40,  b: 110, a: 0.45 },
+  { t: 0.34, r: 8,   g: 75,  b: 160, a: 0.55 },
+  { t: 0.44, r: 0,   g: 130, b: 190, a: 0.62 },
+  { t: 0.54, r: 0,   g: 180, b: 200, a: 0.68 },
+  { t: 0.64, r: 60,  g: 200, b: 160, a: 0.72 },
+  { t: 0.74, r: 200, g: 210, b: 40,  a: 0.78 },
+  { t: 0.84, r: 255, g: 160, b: 0,   a: 0.85 },
+  { t: 0.93, r: 255, g: 70,  b: 15,  a: 0.90 },
+  { t: 1.00, r: 255, g: 30,  b: 10,  a: 0.95 },
 ];
 
 const BULL_RGB: [number, number, number] = [16, 185, 129];
@@ -105,6 +109,13 @@ function getDecimals(price: number, ticker: string): number {
   if (price > 1) return 2;
   if (price > 0.01) return 4;
   return 6;
+}
+
+function lerp(current: number, target: number, speed: number): number {
+  if (current === 0) return target;
+  const diff = target - current;
+  if (Math.abs(diff) < Math.abs(target) * 0.00001) return target;
+  return current + diff * speed;
 }
 
 function drawSphere(
@@ -307,6 +318,14 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
     lastHeatKey: "",
     ticker: "",
     interval: "",
+    // Smooth animation state
+    displayPrice: 0,
+    displayHigh: 0,
+    displayLow: 0,
+    displayCandles: [] as Candle[],
+    lerpSpeed: 0.12,
+    lastHeatHi: 0,
+    lastHeatLo: 0,
   });
 
   useEffect(() => {
@@ -331,7 +350,27 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
           }));
           const s = state.current;
           s.levels = computeSRLevels(candles);
-          if (isRefresh && s.candles.length > 0) {
+
+          // Detect symbol change via price range jump
+          const prevHi = s.lastHeatHi;
+          const prevLo = s.lastHeatLo;
+          let newHi = -Infinity, newLo = Infinity;
+          candles.forEach(c => { if (c.high > newHi) newHi = c.high; if (c.low < newLo) newLo = c.low; });
+          const oldRange = (prevHi - prevLo) || 1;
+          const symbolChanged = prevHi > 0 && (Math.abs(newHi - prevHi) > oldRange * 2);
+
+          if (symbolChanged) {
+            s.displayPrice = 0;
+            s.displayHigh = 0;
+            s.displayLow = 0;
+            s.displayCandles = [];
+            s.heatmap = null;
+            s.priceOffset = 0;
+          }
+          s.lastHeatHi = newHi;
+          s.lastHeatLo = newLo;
+
+          if (isRefresh && s.candles.length > 0 && !symbolChanged) {
             const prevLen = s.candles.length;
             s.candles = candles;
             s.lastHeatKey = "";
@@ -406,7 +445,40 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      const allCandles = s.candles;
+      // Smooth animation: lerp price and last 3 candles
+      const sp = s.lerpSpeed;
+      if (s.candles.length > 0) {
+        const lastClose = s.candles[s.candles.length - 1].close;
+        s.displayPrice = s.displayPrice === 0 ? lastClose : lerp(s.displayPrice, lastClose, sp);
+
+        while (s.displayCandles.length < s.candles.length) {
+          const src = s.candles[s.displayCandles.length];
+          s.displayCandles.push({ ...src });
+        }
+        if (s.displayCandles.length > s.candles.length) {
+          s.displayCandles = s.displayCandles.slice(0, s.candles.length);
+        }
+        const lerpCount = Math.min(3, s.candles.length);
+        for (let i = s.candles.length - lerpCount; i < s.candles.length; i++) {
+          const dc = s.displayCandles[i];
+          const tc = s.candles[i];
+          dc.open = lerp(dc.open, tc.open, sp);
+          dc.high = lerp(dc.high, tc.high, sp * 1.5);
+          dc.low = lerp(dc.low, tc.low, sp * 1.5);
+          dc.close = lerp(dc.close, tc.close, sp);
+          dc.volume = lerp(dc.volume, tc.volume, sp * 0.5);
+          dc.time = tc.time;
+        }
+        for (let i = 0; i < s.candles.length - lerpCount; i++) {
+          const dc = s.displayCandles[i];
+          const tc = s.candles[i];
+          dc.open = tc.open; dc.high = tc.high; dc.low = tc.low;
+          dc.close = tc.close; dc.volume = tc.volume; dc.time = tc.time;
+        }
+      }
+
+      const allCandles = s.displayCandles.length === s.candles.length
+        ? s.displayCandles : s.candles;
       if (!allCandles || allCandles.length < 2) {
         ctx.fillStyle = "rgba(201,168,76,0.4)";
         ctx.font = "11px JetBrains Mono, monospace";
@@ -463,47 +535,75 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       priceHigh += vOff;
       priceLow += vOff;
 
+      // Smooth viewport bounds — snap on large jumps, lerp on small adjustments
+      const targetRange = priceHigh - priceLow;
+      const displayRange = s.displayHigh - s.displayLow;
+      const rangeJump = displayRange > 0 ? Math.abs(targetRange - displayRange) / displayRange : 999;
+      const centerJump = displayRange > 0 ? Math.abs((priceHigh + priceLow) - (s.displayHigh + s.displayLow)) / displayRange : 999;
+
+      if (s.displayHigh === 0 || rangeJump > 0.5 || centerJump > 0.5) {
+        s.displayHigh = priceHigh;
+        s.displayLow = priceLow;
+      } else {
+        s.displayHigh = lerp(s.displayHigh, priceHigh, sp);
+        s.displayLow = lerp(s.displayLow, priceLow, sp);
+      }
+      priceHigh = s.displayHigh;
+      priceLow = s.displayLow;
+
       const totalRange = priceHigh - priceLow;
       s.lastVisibleRange = totalRange;
 
       const priceToY = (p: number) => priceY + (1 - (p - priceLow) / totalRange) * priceH;
       const idxToX = (i: number) => chartX + i * candleW + candleW / 2;
 
-      const currentPrice = visibleCandles[visibleCandles.length - 1].close;
+      // Patch last candle with lerped display price
+      if (s.displayPrice > 0 && visibleCandles.length > 0) {
+        const last = visibleCandles[visibleCandles.length - 1];
+        last.close = s.displayPrice;
+        if (s.displayPrice > last.high) last.high = s.displayPrice;
+        if (s.displayPrice < last.low) last.low = s.displayPrice;
+      }
+
+      const currentPrice = s.displayPrice || visibleCandles[visibleCandles.length - 1].close;
       const dec = getDecimals(currentPrice, s.ticker);
 
       // === LAYER 1: Blue liquidity heatmap ===
       const hm = s.heatmap;
-      if (hm && hm.max > 0) {
+      if (hm && hm.max > 0 && n >= 15 && candleW < 30) {
         const rows = hm.rows;
         const cols = hm.cols;
-        const cellW = candleW;
-        const cellH = Math.max(priceH / rows, 1);
+        const cellW = Math.min(candleW, 20);
+        const cellH = Math.max(Math.min(priceH / rows, 8), 1);
 
         ctx.save();
-        ctx.globalCompositeOperation = "lighter";
+        ctx.globalCompositeOperation = "source-over";
+
         for (let row = 0; row < rows; row++) {
           const price = hm.lo + (row + 0.5) * hm.step;
           const y = priceToY(price);
           if (y < priceY - cellH || y > priceY + priceH + cellH) continue;
 
-          for (let col = 0; col < cols; col++) {
+          // Only draw columns within the current viewport
+          for (let vi = 0; vi < n; vi++) {
+            const col = vs + vi;
+            if (col >= cols) break;
             const v = hm.grid[row * cols + col];
             const norm = v / hm.max;
-            if (norm < 0.015) continue;
+            if (norm < 0.005) continue;
             ctx.fillStyle = heatColor(norm, 1.25);
-            const x = chartX + col * cellW;
+            const x = chartX + vi * cellW;
             ctx.fillRect(x, y - cellH / 2, cellW + 0.8, cellH + 0.8);
           }
 
           const rowIntensity = hm.rowProfile[row] / hm.rowMax;
-          if (rowIntensity > 0.38) {
-            const glowAlpha = (rowIntensity - 0.38) / 0.62;
+          if (rowIntensity > 0.22) {
+            const glowAlpha = (rowIntensity - 0.22) / 0.78;
             ctx.save();
-            ctx.shadowColor = "rgba(40,205,235,0.8)";
+            ctx.shadowColor = "rgba(0,160,220,0.5)";
             ctx.shadowBlur = 14;
-            ctx.fillStyle = heatColor(0.85 + rowIntensity * 0.15, glowAlpha * 0.75);
-            ctx.fillRect(chartX, y - cellH * 1.4, chartW, cellH * 2.8);
+            ctx.fillStyle = heatColor(0.70 + rowIntensity * 0.30, glowAlpha * 0.6);
+            ctx.fillRect(chartX, y - cellH * 1.6, chartW, cellH * 3.2);
             ctx.restore();
           }
         }

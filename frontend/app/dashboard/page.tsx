@@ -282,7 +282,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               ) : (
                 <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
               )}
-              {chartMode === "tradingview" && (
+              {chartMode === "tradingview" && selectedSignal?.signal_mode !== "AUTO_SCAN" && (
                 <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
               )}
             </div>
