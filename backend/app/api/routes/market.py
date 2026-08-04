@@ -548,6 +548,15 @@ _COINGECKO_IDS = {
 }
 
 
+import time as _time
+
+_ohlcv_cache: dict[str, tuple[dict, float]] = {}
+_OHLCV_TTL: dict[str, int] = {
+    "1m": 8, "5m": 12, "15m": 25, "30m": 25,
+    "1h": 55, "4h": 110, "1d": 280, "1wk": 550,
+}
+
+
 @router.get("/ohlcv/{ticker}")
 async def get_ohlcv(
     ticker: str,
@@ -555,6 +564,14 @@ async def get_ohlcv(
     interval: str = Query(default="1d", regex="^(1m|5m|15m|30m|1h|4h|1d|1wk)$"),
 ):
     """Return OHLCV candle data for the chart."""
+    cache_key = f"{ticker}:{interval}:{period}"
+    cached = _ohlcv_cache.get(cache_key)
+    if cached and (_time.time() - cached[1]) < _OHLCV_TTL.get(interval, 60):
+        return cached[0]
+
+    def _cache_and_return(result):
+        _ohlcv_cache[cache_key] = (result, _time.time())
+        return result
 
     # ── 1. CoinGecko (primary source for crypto) ──────────────────────────────
     if ticker in _COINGECKO_IDS:
@@ -586,7 +603,7 @@ async def get_ohlcv(
                         existing["close"] = c  # last update wins for close
 
                 candles = sorted(day_map.values(), key=lambda x: x["time"])
-                return {"ticker": ticker, "candles": candles}
+                return _cache_and_return({"ticker": ticker, "candles": candles})
         except Exception:
             pass  # fall through to yfinance
 
@@ -648,7 +665,7 @@ async def get_ohlcv(
                 candles[-1]["high"] = round(max(candles[-1]["high"], spot), 4)
                 candles[-1]["low"] = round(min(candles[-1]["low"], spot), 4)
 
-        return {"ticker": ticker, "candles": candles}
+        return _cache_and_return({"ticker": ticker, "candles": candles})
 
     except Exception as yf_err:
         import logging
@@ -720,7 +737,7 @@ async def get_ohlcv(
                         c["low"]   = round(c["low"] + offset, 4)
                         c["close"] = round(c["close"] + offset, 4)
 
-        return {"ticker": ticker, "candles": candles}
+        return _cache_and_return({"ticker": ticker, "candles": candles})
 
     except Exception as rest_err:
         import logging
@@ -828,6 +845,6 @@ async def get_ohlcv(
             vol = int(rng.uniform(5e5, 8e6) if not is_forex else rng.uniform(1e4, 5e5))
             candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c, "volume": vol})
             price = c
-        return {"ticker": ticker, "candles": candles}
+        return _cache_and_return({"ticker": ticker, "candles": candles})
     except Exception:
         return {"ticker": ticker, "candles": []}

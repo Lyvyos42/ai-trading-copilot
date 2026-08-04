@@ -371,9 +371,10 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     the current market price rather than a stale historical bar close.
     """
     yf_sym = resolve_ticker(ticker)
+    upper = ticker.upper()
 
-    # Start live-price fetch concurrently — tradingview_ta for FX/metals (true
-    # spot), Yahoo REST as fallback for stocks/indices.
+    # Start live-price fetch concurrently — TradingView scanner for FX/metals
+    # (true spot), Yahoo REST as fallback for stocks/indices.
     live_price_task = asyncio.create_task(_fetch_tv_ta_spot(ticker))
     rest_price_task = asyncio.create_task(_fetch_rest_spot_price(yf_sym))
 
@@ -387,7 +388,7 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     except Exception:
         pass
 
-    # 2. yfinance (15-min delayed, good for stocks/ETFs + fundamentals)
+    # 2. yfinance — try resolved ticker, then futures equivalent for metals
     if not data:
         try:
             data = await _fetch_yfinance(yf_sym, asset_class)
@@ -396,19 +397,45 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
         except Exception:
             pass
 
+    if not data:
+        futures_sym = _SPOT_TO_FUTURES.get(upper)
+        if futures_sym:
+            try:
+                data = await _fetch_yfinance(futures_sym, asset_class)
+                data["ticker"] = ticker
+                data_source = "yfinance-futures"
+            except Exception:
+                pass
+
     # 3. Mock fallback
     if not data:
         data = _mock_market_data(ticker, asset_class)
         data_source = "mock"
 
-    # Inject live spot price — prefer tradingview_ta (true spot for FX/metals),
-    # fall back to Yahoo REST for stocks/indices.
+    # Inject live spot price — prefer TradingView scanner (true spot for
+    # FX/metals), fall back to Yahoo REST for stocks/indices.
     live_price = await live_price_task
     if not live_price or live_price <= 0:
         live_price = await rest_price_task
+
     if live_price and live_price > 0:
         bar_close = data.get("close", 0) or 0
-        if bar_close <= 0 or abs(live_price - bar_close) / max(bar_close, 1e-9) < 0.10:
+        # For futures-backed data, apply spot-offset to ALL price fields
+        if data_source == "yfinance-futures" and bar_close > 0:
+            offset = live_price - bar_close
+            if abs(offset) / max(bar_close, 1e-9) < 0.05:
+                dec = data.get("price_decimals") or _price_decimals(live_price)
+                data["close"] = round(live_price, dec)
+                data["open"] = round(data.get("open", 0) + offset, dec)
+                if data.get("closes"):
+                    data["closes"] = [round(c + offset, dec) for c in data["closes"]]
+                if data.get("opens"):
+                    data["opens"] = [round(o + offset, dec) for o in data["opens"]]
+                if data.get("highs"):
+                    data["highs"] = [round(h + offset, dec) for h in data["highs"]]
+                if data.get("lows"):
+                    data["lows"] = [round(l + offset, dec) for l in data["lows"]]
+        elif bar_close <= 0 or abs(live_price - bar_close) / max(bar_close, 1e-9) < 0.10:
             dec = data.get("price_decimals") or _price_decimals(live_price)
             data["close"] = round(live_price, dec)
             if data.get("closes"):
