@@ -239,15 +239,25 @@ function buildHeatmap(candles: Candle[]): HeatmapData | null {
   return { grid, rows, cols, max: cellMax || 1, rowProfile, rowMax, hi, lo, step };
 }
 
+const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
+
+const REFRESH_MS: Record<string, number> = {
+  "1m": 10_000, "5m": 15_000, "15m": 30_000, "30m": 30_000,
+  "1h": 60_000, "4h": 120_000, "1d": 300_000, "1wk": 600_000,
+};
+
 interface OrderFlowChartProps {
   ticker: string;
   interval?: string;
   fillContainer?: boolean;
 }
 
-export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: OrderFlowChartProps) {
+export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fillContainer }: OrderFlowChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
+  const [localInterval, setLocalInterval] = useState(externalInterval);
+  useEffect(() => { setLocalInterval(externalInterval); }, [externalInterval]);
+  const interval = localInterval;
 
   const state = useRef({
     candles: [] as Candle[],
@@ -310,7 +320,8 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
     }
 
     fetchData();
-    refreshTimer = setInterval(() => fetchData(true), 60_000);
+    const refreshMs = REFRESH_MS[interval] || 60_000;
+    refreshTimer = setInterval(() => fetchData(true), refreshMs);
 
     return () => {
       cancelled = true;
@@ -758,6 +769,37 @@ export function OrderFlowChart({ ticker, interval = "1d", fillContainer }: Order
       className={fillContainer ? "w-full h-full relative" : "w-full relative rounded overflow-hidden border border-border/50"}
       style={{ minHeight: fillContainer ? "400px" : "380px" }}
     >
+      {/* Timeframe selector */}
+      <div className="absolute top-2 left-2 z-20 flex items-center gap-0.5">
+        {TIMEFRAMES.map((tf) => (
+          <button
+            key={tf}
+            onClick={() => setLocalInterval(tf)}
+            style={{
+              padding: "2px 7px",
+              borderRadius: 3,
+              fontSize: 10,
+              fontFamily: "JetBrains Mono, monospace",
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              cursor: "pointer",
+              border: interval === tf
+                ? "1px solid rgba(201,168,76,0.6)"
+                : "1px solid rgba(201,168,76,0.15)",
+              background: interval === tf
+                ? "rgba(201,168,76,0.15)"
+                : "rgba(6,11,22,0.7)",
+              color: interval === tf
+                ? "rgba(229,213,160,1)"
+                : "rgba(201,168,76,0.45)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            {tf.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: "rgba(6,11,22,0.85)" }}>
           <div className="flex items-center gap-2 text-[14px] font-mono" style={{ color: "rgba(201,168,76,0.6)" }}>

@@ -694,15 +694,14 @@ async def get_ohlcv(
         from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _REST_ALIAS
 
         yf_ticker = resolve_ticker(ticker)
-        rest_sym = _REST_ALIAS.get(yf_ticker, yf_ticker)
 
         _INTERVAL_MAP = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "60m", "4h": "60m", "1d": "1d", "1wk": "1wk"}
         _RANGE_MAP = {"1d": "1d", "5d": "5d", "1mo": "1mo", "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y"}
         rest_interval = _INTERVAL_MAP.get(interval, "1d")
         rest_range = _RANGE_MAP.get(period, "6mo")
 
-        def _rest_ohlcv():
-            safe = _urlpar.quote(rest_sym, safe="=^.")
+        def _try_rest_chart(sym):
+            safe = _urlpar.quote(sym, safe="=^.")
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}?interval={rest_interval}&range={rest_range}"
             req = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with _urlreq.urlopen(req, timeout=15) as r:
@@ -731,10 +730,19 @@ async def get_ohlcv(
                 raise ValueError("no candles from REST")
             return candles
 
+        def _rest_ohlcv():
+            try:
+                return _try_rest_chart(yf_ticker)
+            except Exception:
+                alias = _REST_ALIAS.get(yf_ticker)
+                if alias:
+                    return _try_rest_chart(alias)
+                raise
+
         candles = await asyncio.to_thread(_rest_ohlcv)
 
         if candles:
-            live = await _fetch_rest_spot_price(rest_sym)
+            live = await _fetch_rest_spot_price(yf_ticker)
             if live and live > 0:
                 candles[-1]["close"] = round(live, 4)
                 candles[-1]["high"] = round(max(candles[-1]["high"], live), 4)

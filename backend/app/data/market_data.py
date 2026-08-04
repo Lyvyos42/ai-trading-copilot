@@ -264,21 +264,16 @@ async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
 async def _fetch_rest_spot_price(yf_sym: str) -> float | None:
     """Fetch live regularMarketPrice from Yahoo Finance Chart REST API.
 
-    Uses safe="=^." so tickers like GC=F, ^GSPC, DX-Y.NYB keep their
-    literal characters in the URL path and are not percent-encoded.
-    Applies _REST_ALIAS so that =X tickers that 404 (e.g. XAUUSD=X) are
-    automatically mapped to their working equivalent (e.g. GC=F).
-    Always returns the current live market price regardless of bar/contract data.
+    Tries the original =X ticker first (true spot price), then falls back to
+    the _REST_ALIAS futures contract only if the spot ticker 404s.
     """
     import urllib.request as _urlreq
     import urllib.parse   as _urlpar
     import json           as _json
 
-    rest_sym = _REST_ALIAS.get(yf_sym, yf_sym)
-
-    def _sync() -> float | None:
+    def _try_symbol(sym: str) -> float | None:
         try:
-            safe = _urlpar.quote(rest_sym, safe="=^.")
+            safe = _urlpar.quote(sym, safe="=^.")
             url  = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
                     f"?interval=1m&range=1d")
             req  = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -288,6 +283,15 @@ async def _fetch_rest_spot_price(yf_sym: str) -> float | None:
                 return p if p > 0 else None
         except Exception:
             return None
+
+    def _sync() -> float | None:
+        price = _try_symbol(yf_sym)
+        if price is not None:
+            return price
+        alias = _REST_ALIAS.get(yf_sym)
+        if alias:
+            return _try_symbol(alias)
+        return None
 
     return await asyncio.to_thread(_sync)
 
