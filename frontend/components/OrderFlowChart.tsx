@@ -239,6 +239,32 @@ function buildHeatmap(candles: Candle[]): HeatmapData | null {
   return { grid, rows, cols, max: cellMax || 1, rowProfile, rowMax, hi, lo, step };
 }
 
+interface SRLevels {
+  support: number[];
+  resistance: number[];
+  pivot: number;
+}
+
+function computeSRLevels(candles: Candle[]): SRLevels | null {
+  if (candles.length < 10) return null;
+  const recent = candles.slice(-Math.min(candles.length, 100));
+  let hi = -Infinity, lo = Infinity;
+  const lastClose = recent[recent.length - 1].close;
+  recent.forEach(c => { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; });
+  const pivot = (hi + lo + lastClose) / 3;
+  const r1 = 2 * pivot - lo;
+  const s1 = 2 * pivot - hi;
+  const r2 = pivot + (hi - lo);
+  const s2 = pivot - (hi - lo);
+  const r3 = hi + 2 * (pivot - lo);
+  const s3 = lo - 2 * (hi - pivot);
+  return {
+    resistance: [r1, r2, r3].filter(r => r > lastClose),
+    support: [s1, s2, s3].filter(s => s < lastClose),
+    pivot,
+  };
+}
+
 const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
 
 const REFRESH_MS: Record<string, number> = {
@@ -263,12 +289,19 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
     candles: [] as Candle[],
     viewStart: 0,
     viewEnd: 0,
+    rightPadding: 0,
+    priceOffset: 0,
+    lastVisibleRange: 0,
+    levels: null as SRLevels | null,
     mouseX: -1,
     mouseY: -1,
     isDragging: false,
     dragStartX: 0,
+    dragStartY: 0,
     dragViewStart: 0,
     dragViewEnd: 0,
+    dragStartPriceOffset: 0,
+    dragStartPad: 0,
     animTime: 0,
     heatmap: null as HeatmapData | null,
     lastHeatKey: "",
@@ -297,22 +330,28 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
             volume: c.volume ?? 0,
           }));
           const s = state.current;
+          s.levels = computeSRLevels(candles);
           if (isRefresh && s.candles.length > 0) {
-            // On refresh: update price data but preserve zoom/pan position
+            const prevLen = s.candles.length;
             s.candles = candles;
             s.lastHeatKey = "";
-            // Clamp view if data length changed
-            if (s.viewEnd > candles.length) {
-              const range = s.viewEnd - s.viewStart;
-              s.viewEnd = candles.length;
-              s.viewStart = Math.max(0, candles.length - range);
+            if (candles.length > prevLen) {
+              s.viewStart += candles.length - prevLen;
+            }
+            const visCount = s.viewEnd - s.viewStart + s.rightPadding;
+            const dataSlots = visCount - s.rightPadding;
+            if (s.viewStart + dataSlots > candles.length) {
+              s.viewStart = Math.max(0, candles.length - dataSlots);
             }
           } else {
             s.candles = candles;
             s.ticker = ticker;
             s.interval = interval;
+            const visCount = Math.min(DEFAULT_VISIBLE, candles.length);
+            s.rightPadding = Math.floor(visCount * 0.35);
             s.viewEnd = candles.length;
-            s.viewStart = Math.max(0, candles.length - DEFAULT_VISIBLE);
+            s.viewStart = Math.max(0, candles.length - (visCount - s.rightPadding));
+            s.priceOffset = 0;
             s.lastHeatKey = "";
           }
           setLoading(false);
@@ -376,8 +415,10 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         return;
       }
 
+      const rPad = Math.min(s.rightPadding || 0, Math.floor((s.viewEnd - s.viewStart + (s.rightPadding || 0)) * 0.6));
+      const totalSlots = (s.viewEnd - s.viewStart) + rPad;
       const vs = Math.max(0, Math.floor(s.viewStart));
-      const ve = Math.min(allCandles.length, Math.ceil(s.viewEnd));
+      const ve = Math.min(allCandles.length, vs + (totalSlots - rPad));
       const visibleCandles = allCandles.slice(vs, ve);
       if (visibleCandles.length < 2) return;
 
@@ -398,7 +439,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       const volY = padd.top + priceH + gapH;
 
       const n = visibleCandles.length;
-      const candleW = chartW / n;
+      const candleW = chartW / totalSlots;
 
       let priceHigh = -Infinity, priceLow = Infinity, maxVol = 0;
       visibleCandles.forEach(c => {
@@ -407,11 +448,23 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         if (c.volume > maxVol) maxVol = c.volume;
       });
 
+      const levels = s.levels;
+      if (levels) {
+        levels.resistance.forEach(r => { if (r > priceHigh) priceHigh = r; });
+        levels.support.forEach(sv => { if (sv < priceLow) priceLow = sv; });
+      }
+
       const priceRange = priceHigh - priceLow || 1;
       const pricePad = priceRange * 0.08;
       priceHigh += pricePad;
       priceLow -= pricePad;
+
+      const vOff = s.priceOffset || 0;
+      priceHigh += vOff;
+      priceLow += vOff;
+
       const totalRange = priceHigh - priceLow;
+      s.lastVisibleRange = totalRange;
 
       const priceToY = (p: number) => priceY + (1 - (p - priceLow) / totalRange) * priceH;
       const idxToX = (i: number) => chartX + i * candleW + candleW / 2;
@@ -424,7 +477,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       if (hm && hm.max > 0) {
         const rows = hm.rows;
         const cols = hm.cols;
-        const cellW = chartW / cols;
+        const cellW = candleW;
         const cellH = Math.max(priceH / rows, 1);
 
         ctx.save();
@@ -457,7 +510,65 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         ctx.restore();
       }
 
-      // === LAYER 2: Price axis grid ===
+      // === LAYER 2: S/R levels ===
+      if (levels) {
+        levels.resistance.forEach((r, i) => {
+          const y = priceToY(r);
+          if (y < priceY - 5 || y > priceY + priceH + 5) return;
+          const alpha = Math.max(0.5, 0.9 - i * 0.15);
+          const isOrange = i % 2 === 1;
+          const coreRGB = isOrange ? "255,140,26" : "255,70,56";
+          const glowRGB = isOrange ? "255,160,60" : "255,90,70";
+          ctx.save();
+          ctx.shadowColor = `rgba(${glowRGB},0.9)`;
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
+          ctx.fillRect(chartX, y - 1.5, chartW, 3);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(255,205,180,${Math.min(1, alpha + 0.15)})`;
+          ctx.fillRect(chartX, y - 0.6, chartW, 1.2);
+          ctx.restore();
+          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
+          ctx.font = "bold 8px JetBrains Mono, monospace";
+          ctx.textAlign = "left";
+          ctx.fillText(`R${i + 1}`, chartX + 4, y - 4);
+        });
+        levels.support.forEach((sv, i) => {
+          const y = priceToY(sv);
+          if (y < priceY - 5 || y > priceY + priceH + 5) return;
+          const alpha = Math.max(0.5, 0.9 - i * 0.15);
+          const isYellow = i % 2 === 1;
+          const coreRGB = isYellow ? "250,210,20" : "245,160,11";
+          const glowRGB = isYellow ? "255,225,80" : "250,180,60";
+          ctx.save();
+          ctx.shadowColor = `rgba(${glowRGB},0.9)`;
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
+          ctx.fillRect(chartX, y - 1.5, chartW, 3);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(255,240,190,${Math.min(1, alpha + 0.15)})`;
+          ctx.fillRect(chartX, y - 0.6, chartW, 1.2);
+          ctx.restore();
+          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
+          ctx.font = "bold 8px JetBrains Mono, monospace";
+          ctx.textAlign = "left";
+          ctx.fillText(`S${i + 1}`, chartX + 4, y - 4);
+        });
+        if (levels.pivot) {
+          const y = priceToY(levels.pivot);
+          if (y >= priceY && y <= priceY + priceH) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(201,168,76,0.4)";
+            ctx.setLineDash([4, 3]);
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(chartX, y); ctx.lineTo(chartX + chartW, y); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+          }
+        }
+      }
+
+      // === LAYER 3: Price axis grid ===
       const gridStep = niceStep(totalRange, 6);
       const gridStart = Math.ceil(priceLow / gridStep) * gridStep;
       ctx.textAlign = "right";
@@ -477,7 +588,12 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       }
 
       // === LAYER 4: Order flow beads ===
-      const baseR = Math.max(Math.min(candleW * 0.55, 7), 2.5);
+      const baseR = Math.max(Math.min(candleW * 0.55, 9), 2.5);
+
+      // Compute avg candle range for "big move" detection
+      let avgRange = 0;
+      visibleCandles.forEach(c => { avgRange += c.high - c.low; });
+      avgRange /= visibleCandles.length || 1;
 
       ctx.save();
       ctx.beginPath();
@@ -501,40 +617,45 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         const candleRange = c.high - c.low;
         if (candleRange <= 0) return;
 
+        // Scale factor: bigger bubbles for high volume + big range candles
+        const moveRatio = avgRange > 0 ? candleRange / avgRange : 1;
+        const intensity = Math.min(2.2, 0.6 + volNorm * 0.8 + Math.max(0, moveRatio - 1) * 0.6);
+
         const bodyHi = Math.max(c.open, c.close);
         const bodyLo = Math.min(c.open, c.close);
         const bodyPx = priceToY(bodyLo) - priceToY(bodyHi);
+        const scaledR = baseR * intensity;
 
         if (c.high > bodyHi + candleRange * 0.04) {
-          const wickSteps = Math.max(Math.round((priceToY(bodyHi) - priceToY(c.high)) / (baseR * 2.5)), 1);
+          const wickSteps = Math.max(Math.round((priceToY(bodyHi) - priceToY(c.high)) / (scaledR * 2.2)), 1);
           for (let w = 0; w <= wickSteps; w++) {
             const t = wickSteps > 0 ? w / wickSteps : 0;
             const price = c.high + t * (bodyHi - c.high);
             const fade = 0.18 + t * 0.15;
-            drawSphere(ctx, x, priceToY(price), baseR * 0.35, BEAR_RGB, fade);
+            drawSphere(ctx, x, priceToY(price), scaledR * 0.4, BEAR_RGB, fade);
           }
         }
 
         if (c.low < bodyLo - candleRange * 0.04) {
-          const wickSteps = Math.max(Math.round((priceToY(c.low) - priceToY(bodyLo)) / (baseR * 2.5)), 1);
+          const wickSteps = Math.max(Math.round((priceToY(c.low) - priceToY(bodyLo)) / (scaledR * 2.2)), 1);
           for (let w = 0; w <= wickSteps; w++) {
             const t = wickSteps > 0 ? w / wickSteps : 0;
             const price = bodyLo - t * (bodyLo - c.low);
             const fade = 0.18 + (1 - t) * 0.15;
-            drawSphere(ctx, x, priceToY(price), baseR * 0.35, BULL_RGB, fade);
+            drawSphere(ctx, x, priceToY(price), scaledR * 0.4, BULL_RGB, fade);
           }
         }
 
-        const numBubbles = Math.max(Math.round(bodyPx / (baseR * 1.8)), 2);
-        const bodySize = 0.45 + volNorm * 0.55;
+        const numBubbles = Math.max(Math.round(bodyPx / (scaledR * 1.6)), 2);
+        const bodySize = 0.5 + volNorm * 0.6 + Math.max(0, moveRatio - 1) * 0.3;
         for (let b = 0; b < numBubbles; b++) {
           const t = numBubbles > 1 ? b / (numBubbles - 1) : 0.5;
           const price = bodyLo + t * (bodyHi - bodyLo);
-          drawSphere(ctx, x, priceToY(price), baseR * bodySize * 0.72, dirRGB, 0.6);
+          drawSphere(ctx, x, priceToY(price), scaledR * bodySize * 0.72, dirRGB, 0.65);
         }
 
         const closeY = priceToY(c.close);
-        const closeR = baseR * (0.85 + volNorm * 0.7);
+        const closeR = scaledR * (0.9 + volNorm * 0.8);
         drawSphere(ctx, x, closeY, closeR, dirRGB, 1);
       });
 
@@ -675,31 +796,33 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       const allLen = s.candles.length;
       if (allLen < 2) return;
 
-      const rect = canvas!.getBoundingClientRect();
-      const mouseXRatio = (e.clientX - rect.left - 4) / (rect.width - 64);
-      const clampedRatio = Math.max(0, Math.min(1, mouseXRatio));
-
-      const currentRange = s.viewEnd - s.viewStart;
+      const dataRange = s.viewEnd - s.viewStart;
+      const visCount = dataRange + s.rightPadding;
       const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
-      let newRange = Math.round(currentRange * zoomFactor);
-      newRange = Math.max(MIN_VISIBLE, Math.min(allLen, newRange));
+      let newVisCount = Math.round(visCount * zoomFactor);
+      newVisCount = Math.max(MIN_VISIBLE, Math.min(allLen + Math.floor(allLen * 0.6), newVisCount));
 
-      const mouseIdx = s.viewStart + clampedRatio * currentRange;
-      let newStart = mouseIdx - clampedRatio * newRange;
-      let newEnd = mouseIdx + (1 - clampedRatio) * newRange;
+      const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
+      s.rightPadding = Math.round(newVisCount * padRatio);
+      const maxPad = Math.floor(newVisCount * 0.6);
+      if (s.rightPadding > maxPad) s.rightPadding = maxPad;
 
-      if (newStart < 0) { newEnd -= newStart; newStart = 0; }
-      if (newEnd > allLen) { newStart -= (newEnd - allLen); newEnd = allLen; }
-      s.viewStart = Math.max(0, Math.round(newStart));
-      s.viewEnd = Math.min(allLen, Math.round(newEnd));
+      const newDataRange = newVisCount - s.rightPadding;
+      if (s.viewStart + newDataRange > allLen) {
+        s.viewStart = Math.max(0, allLen - newDataRange);
+      }
+      s.viewEnd = s.viewStart + newDataRange;
     }
 
     function onMouseDown(e: MouseEvent) {
       e.preventDefault();
       s.isDragging = true;
       s.dragStartX = e.clientX;
+      s.dragStartY = e.clientY;
       s.dragViewStart = s.viewStart;
       s.dragViewEnd = s.viewEnd;
+      s.dragStartPad = s.rightPadding;
+      s.dragStartPriceOffset = s.priceOffset;
       canvas!.style.cursor = "grabbing";
     }
 
@@ -711,18 +834,32 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       if (s.isDragging) {
         const allLen = s.candles.length;
         const chartW = rect.width - 64;
-        const currentRange = s.dragViewEnd - s.dragViewStart;
-        const candleW = chartW / currentRange;
+        const visCount = (s.dragViewEnd - s.dragViewStart) + s.dragStartPad;
+        const candlePx = chartW / visCount;
         const dx = e.clientX - s.dragStartX;
-        const candleShift = Math.round(-dx / candleW);
+        const shift = Math.round(-dx / candlePx);
 
-        let newStart = s.dragViewStart + candleShift;
-        let newEnd = s.dragViewEnd + candleShift;
+        // Horizontal: shift viewStart and rightPadding together
+        let newStart = s.dragViewStart + shift;
+        let newPad = s.dragStartPad - shift;
+        const maxPad = Math.floor(visCount * 0.6);
+        if (newPad < 0) { newStart -= newPad; newPad = 0; }
+        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
+        if (newStart < 0) { newPad += newStart; newStart = 0; }
+        const dataSlots = visCount - newPad;
+        if (newStart + dataSlots > allLen) {
+          newStart = Math.max(0, allLen - dataSlots);
+        }
+        s.viewStart = newStart;
+        s.viewEnd = newStart + dataSlots;
+        s.rightPadding = Math.max(0, newPad);
 
-        if (newStart < 0) { newEnd -= newStart; newStart = 0; }
-        if (newEnd > allLen) { newStart -= (newEnd - allLen); newEnd = allLen; }
-        s.viewStart = Math.max(0, newStart);
-        s.viewEnd = Math.min(allLen, newEnd);
+        // Vertical pan
+        const dy = e.clientY - s.dragStartY;
+        const priceH = (rect.height - 38) * 0.82;
+        if (s.lastVisibleRange && priceH > 0) {
+          s.priceOffset = s.dragStartPriceOffset + (dy / priceH) * s.lastVisibleRange;
+        }
       }
     }
 
@@ -747,8 +884,16 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       }
     }
 
+    function onDblClick() {
+      s.viewEnd = s.candles.length;
+      s.viewStart = Math.max(0, s.candles.length - DEFAULT_VISIBLE);
+      s.rightPadding = 0;
+      s.priceOffset = 0;
+    }
+
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("dblclick", onDblClick);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     canvas.addEventListener("mouseleave", onMouseLeave);
@@ -763,6 +908,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       cancelAnimationFrame(animId);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("mousedown", onMouseDown);
+      canvas.removeEventListener("dblclick", onDblClick);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       canvas.removeEventListener("mouseleave", onMouseLeave);
