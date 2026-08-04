@@ -443,11 +443,54 @@ def _fetch_one(display: str, yf_sym: str):
         "XPTUSD=X": "PL=F",
         "XPDUSD=X": "PA=F",
     }
+
+    # TradingView scanner: spot prices for metals (Yahoo only has futures)
+    _TV_METALS: dict[str, tuple[str, str]] = {
+        "XAUUSD=X": ("OANDA:XAUUSD", "cfd"),
+        "XAGUSD=X": ("TVC:SILVER", "cfd"),
+        "XPTUSD=X": ("TVC:PLATINUM", "cfd"),
+        "XPDUSD=X": ("TVC:PALLADIUM", "cfd"),
+    }
+
+    def _tv_spot(sym: str) -> float | None:
+        entry = _TV_METALS.get(sym)
+        if not entry:
+            return None
+        tv_sym, screener = entry
+        try:
+            body = _json.dumps({
+                "symbols": {"tickers": [tv_sym]},
+                "columns": ["close"],
+            }).encode()
+            req = _urlreq.Request(
+                f"https://scanner.tradingview.com/{screener}/scan",
+                data=body,
+                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            with _urlreq.urlopen(req, timeout=8) as r:
+                data = _json.loads(r.read())
+            rows = data.get("data", [])
+            if rows and rows[0].get("d"):
+                return float(rows[0]["d"][0])
+        except Exception:
+            pass
+        return None
+
     rest_sym = _REST_MAP.get(yf_sym, yf_sym)
 
     try:
-        # 1. Always try REST first — gives live regularMarketPrice
-        result = _rest_quote(rest_sym)
+        # 0. For metals, try TradingView scanner first (Yahoo only has futures prices)
+        tv_price = _tv_spot(yf_sym)
+        if tv_price and tv_price > 0 and lo <= tv_price <= hi:
+            futures_result = _rest_quote(rest_sym)
+            prev = futures_result[1] if futures_result else tv_price * 0.999
+            result = (tv_price, prev)
+        else:
+            result = None
+
+        # 1. If TV didn't work, try REST
+        if result is None:
+            result = _rest_quote(rest_sym)
 
         # 2. If REST failed or price is out of known bounds, fall back
         if result is None or not (lo <= result[0] <= hi):

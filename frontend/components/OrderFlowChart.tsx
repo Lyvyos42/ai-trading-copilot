@@ -279,8 +279,11 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
   useEffect(() => {
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setInterval> | null = null;
+    let fetching = false;
 
     async function fetchData(isRefresh = false) {
+      if (fetching) return;
+      fetching = true;
       if (!isRefresh) setLoading(true);
       const period = INTERVAL_TO_PERIOD[interval] || "6mo";
       try {
@@ -316,6 +319,8 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         }
       } catch {
         if (!cancelled) setLoading(false);
+      } finally {
+        fetching = false;
       }
     }
 
