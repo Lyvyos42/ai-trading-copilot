@@ -29,3 +29,4 @@ chromadb==0.5.23
 openai==1.65.0
 alpaca-py==0.28.0
 stripe==8.0.0
+tradingview-ta==3.2.7

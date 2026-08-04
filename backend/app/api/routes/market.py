@@ -590,68 +590,19 @@ async def get_ohlcv(
         except Exception:
             pass  # fall through to yfinance
 
-    # ── 2. TradingView via tvDatafeed (spot prices for FX/metals/indices) ───
-    try:
-        from app.data.market_data import _TV_EXCHANGE, _get_tv_client
-
-        tv_entry = _TV_EXCHANGE.get(ticker.upper())
-        if not tv_entry:
-            raise KeyError("no TV mapping")
-
-        tv_symbol, exchange = tv_entry
-
-        def _tv_ohlcv():
-            from tvDatafeed import Interval
-
-            _TV_INTERVAL = {
-                "1m": Interval.in_1_minute, "5m": Interval.in_5_minute,
-                "15m": Interval.in_15_minute, "30m": Interval.in_30_minute,
-                "1h": Interval.in_1_hour, "4h": Interval.in_4_hour,
-                "1d": Interval.in_daily, "1wk": Interval.in_weekly,
-            }
-            _PERIOD_MIN = {"1d": 1440, "5d": 7200, "1mo": 43200, "3mo": 129600, "6mo": 259200, "1y": 525600, "2y": 1051200}
-            _INTERVAL_MIN = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1wk": 10080}
-
-            tv_interval = _TV_INTERVAL.get(interval, Interval.in_daily)
-            n_bars = min(_PERIOD_MIN.get(period, 259200) // _INTERVAL_MIN.get(interval, 1440), 5000)
-            n_bars = max(n_bars, 50)
-
-            tv = _get_tv_client()
-            if tv is None:
-                raise RuntimeError("tvDatafeed client unavailable")
-
-            df = tv.get_hist(symbol=tv_symbol, exchange=exchange, interval=tv_interval, n_bars=n_bars)
-            if df is None or df.empty:
-                raise ValueError("empty TV response")
-
-            df.columns = [c.lower() for c in df.columns]
-            candles = []
-            for ts, row in df.iterrows():
-                candles.append({
-                    "time": int(ts.timestamp()),
-                    "open": round(float(row["open"]), 4),
-                    "high": round(float(row["high"]), 4),
-                    "low": round(float(row["low"]), 4),
-                    "close": round(float(row["close"]), 4),
-                    "volume": int(float(row.get("volume", 0))),
-                })
-            if not candles:
-                raise ValueError("no candles from TV")
-            return candles
-
-        candles = await asyncio.to_thread(_tv_ohlcv)
-        return {"ticker": ticker, "candles": candles}
-
-    except Exception as tv_err:
-        import logging
-        logging.warning(f"tvDatafeed OHLCV failed for {ticker}: {tv_err}")
-
-    # ── 3. yfinance ───────────────────────────────────────────────────────────
+    # ── 2. yfinance + tradingview_ta spot-offset (primary for all assets) ────
+    # For metals/energy: yfinance uses futures (GC=F) since Yahoo delisted
+    # spot =X tickers. We fetch the real spot price from tradingview_ta and
+    # apply an offset to align all candle prices with spot (IEB approach).
     try:
         import yfinance as yf
-        from app.data.market_data import resolve_ticker, _fetch_rest_spot_price
+        from app.data.market_data import (
+            resolve_ticker, _SPOT_TO_FUTURES, _fetch_tv_ta_spot,
+        )
 
-        yf_ticker = resolve_ticker(ticker)
+        upper = ticker.upper()
+        futures_sym = _SPOT_TO_FUTURES.get(upper)
+        yf_ticker = futures_sym if futures_sym else resolve_ticker(ticker)
 
         def _sync():
             t = yf.Ticker(yf_ticker)
@@ -672,13 +623,24 @@ async def get_ohlcv(
 
         candles = await asyncio.to_thread(_sync)
 
-        # Patch the last candle's close with the live REST spot price
-        if candles:
-            live = await _fetch_rest_spot_price(yf_ticker)
-            if live and live > 0:
-                candles[-1]["close"] = round(live, 4)
-                candles[-1]["high"] = round(max(candles[-1]["high"], live), 4)
-                candles[-1]["low"] = round(min(candles[-1]["low"], live), 4)
+        # Apply spot-offset for futures-backed symbols
+        if candles and futures_sym:
+            spot = await _fetch_tv_ta_spot(ticker)
+            if spot and spot > 0:
+                last_close = candles[-1]["close"]
+                offset = spot - last_close
+                if abs(offset) < last_close * 0.05:
+                    for c in candles:
+                        c["open"]  = round(c["open"] + offset, 4)
+                        c["high"]  = round(c["high"] + offset, 4)
+                        c["low"]   = round(c["low"] + offset, 4)
+                        c["close"] = round(c["close"] + offset, 4)
+        elif candles:
+            spot = await _fetch_tv_ta_spot(ticker)
+            if spot and spot > 0:
+                candles[-1]["close"] = round(spot, 4)
+                candles[-1]["high"] = round(max(candles[-1]["high"], spot), 4)
+                candles[-1]["low"] = round(min(candles[-1]["low"], spot), 4)
 
         return {"ticker": ticker, "candles": candles}
 
@@ -686,22 +648,30 @@ async def get_ohlcv(
         import logging
         logging.warning(f"yfinance OHLCV failed for {ticker}: {yf_err}")
 
-    # ── 4. Yahoo Finance REST Chart API (fallback before mock) ───────────────
+    # ── 3. Yahoo Finance REST Chart API (fallback before mock) ───────────────
     try:
         import urllib.request as _urlreq
         import urllib.parse as _urlpar
         import json as _json
-        from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _REST_ALIAS
+        from app.data.market_data import (
+            resolve_ticker, _REST_ALIAS, _SPOT_TO_FUTURES, _fetch_tv_ta_spot,
+        )
 
-        yf_ticker = resolve_ticker(ticker)
+        upper = ticker.upper()
+        futures_sym = _SPOT_TO_FUTURES.get(upper)
+        rest_sym = futures_sym if futures_sym else resolve_ticker(ticker)
+        if not futures_sym:
+            alias = _REST_ALIAS.get(rest_sym)
+            if alias:
+                rest_sym = alias
 
         _INTERVAL_MAP = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "60m", "4h": "60m", "1d": "1d", "1wk": "1wk"}
         _RANGE_MAP = {"1d": "1d", "5d": "5d", "1mo": "1mo", "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y"}
         rest_interval = _INTERVAL_MAP.get(interval, "1d")
         rest_range = _RANGE_MAP.get(period, "6mo")
 
-        def _try_rest_chart(sym):
-            safe = _urlpar.quote(sym, safe="=^.")
+        def _rest_ohlcv():
+            safe = _urlpar.quote(rest_sym, safe="=^.")
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}?interval={rest_interval}&range={rest_range}"
             req = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with _urlreq.urlopen(req, timeout=15) as r:
@@ -730,23 +700,19 @@ async def get_ohlcv(
                 raise ValueError("no candles from REST")
             return candles
 
-        def _rest_ohlcv():
-            try:
-                return _try_rest_chart(yf_ticker)
-            except Exception:
-                alias = _REST_ALIAS.get(yf_ticker)
-                if alias:
-                    return _try_rest_chart(alias)
-                raise
-
         candles = await asyncio.to_thread(_rest_ohlcv)
 
-        if candles:
-            live = await _fetch_rest_spot_price(yf_ticker)
-            if live and live > 0:
-                candles[-1]["close"] = round(live, 4)
-                candles[-1]["high"] = round(max(candles[-1]["high"], live), 4)
-                candles[-1]["low"] = round(min(candles[-1]["low"], live), 4)
+        if candles and futures_sym:
+            spot = await _fetch_tv_ta_spot(ticker)
+            if spot and spot > 0:
+                last_close = candles[-1]["close"]
+                offset = spot - last_close
+                if abs(offset) < last_close * 0.05:
+                    for c in candles:
+                        c["open"]  = round(c["open"] + offset, 4)
+                        c["high"]  = round(c["high"] + offset, 4)
+                        c["low"]   = round(c["low"] + offset, 4)
+                        c["close"] = round(c["close"] + offset, 4)
 
         return {"ticker": ticker, "candles": candles}
 
@@ -754,7 +720,7 @@ async def get_ohlcv(
         import logging
         logging.warning(f"Yahoo REST OHLCV also failed for {ticker}: {rest_err}")
 
-    # ── 5. Mock fallback ─────────────────────────────────────────────────────
+    # ── 4. Mock fallback ─────────────────────────────────────────────────────
     try:
         # Deterministic mock fallback with realistic price ranges per asset type
         _MOCK_BASES = {

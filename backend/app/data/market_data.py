@@ -92,6 +92,70 @@ _REST_ALIAS: dict[str, str] = {
     "XPDUSD=X": "PA=F",   # Spot palladium → Palladium Futures
 }
 
+# Symbols where Yahoo =X tickers are broken/delisted — use futures for OHLCV
+# candle shape, then apply spot-offset from tradingview_ta to align prices.
+_SPOT_TO_FUTURES: dict[str, str] = {
+    "XAUUSD": "GC=F", "XAGUSD": "SI=F", "XPTUSD": "PL=F", "XPDUSD": "PA=F",
+}
+
+# tradingview_ta symbol map → (symbol, exchange, screener)
+_TV_TA_MAP: dict[str, tuple[str, str, str]] = {
+    "XAUUSD": ("XAUUSD", "FX_IDC", "forex"),
+    "XAGUSD": ("XAGUSD", "FX_IDC", "forex"),
+    "XPTUSD": ("XPTUSD", "FX_IDC", "forex"),
+    "XPDUSD": ("XPDUSD", "FX_IDC", "forex"),
+    "EURUSD": ("EURUSD", "FX_IDC", "forex"),
+    "GBPUSD": ("GBPUSD", "FX_IDC", "forex"),
+    "USDJPY": ("USDJPY", "FX_IDC", "forex"),
+    "AUDUSD": ("AUDUSD", "FX_IDC", "forex"),
+    "USDCAD": ("USDCAD", "FX_IDC", "forex"),
+    "USDCHF": ("USDCHF", "FX_IDC", "forex"),
+    "NZDUSD": ("NZDUSD", "FX_IDC", "forex"),
+    "EURJPY": ("EURJPY", "FX_IDC", "forex"),
+    "GBPJPY": ("GBPJPY", "FX_IDC", "forex"),
+    "EURGBP": ("EURGBP", "FX_IDC", "forex"),
+}
+
+_tv_ta_cache: dict[str, tuple[float, float]] = {}  # symbol → (price, timestamp)
+
+
+async def _fetch_tv_ta_spot(ticker: str) -> float | None:
+    """Fetch real-time spot price from tradingview_ta (pip package).
+
+    Uses a 60s cache to avoid 429 rate-limiting. Works on Render/Linux.
+    """
+    import time as _time
+
+    upper = ticker.upper().replace("=X", "").replace("-USD", "").replace("=F", "")
+    cached = _tv_ta_cache.get(upper)
+    if cached and (_time.time() - cached[1]) < 60:
+        return cached[0]
+
+    entry = _TV_TA_MAP.get(upper)
+    if not entry:
+        return None
+
+    tv_symbol, exchange, screener = entry
+
+    def _sync() -> float | None:
+        try:
+            from tradingview_ta import TA_Handler, Interval
+            handler = TA_Handler(
+                symbol=tv_symbol, exchange=exchange,
+                screener=screener, interval=Interval.INTERVAL_1_HOUR, timeout=10,
+            )
+            analysis = handler.get_analysis()
+            price = analysis.indicators.get("close", 0)
+            if price and price > 0:
+                _tv_ta_cache[upper] = (price, _time.time())
+                return float(price)
+        except Exception as e:
+            import logging
+            logging.warning(f"tradingview_ta spot failed for {upper}: {e}")
+        return None
+
+    return await asyncio.to_thread(_sync)
+
 
 # Maps display symbols → (TradingView symbol, exchange) for tvDatafeed.
 # Covers FX, metals, indices, energy, commodities, crypto.
@@ -305,10 +369,10 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     """
     yf_sym = resolve_ticker(ticker)
 
-    # Start live-price REST fetch concurrently — independent of OHLCV source.
-    # This is the authoritative current price and overrides whatever close the
-    # historical bar data returns (fixes GC=F/XAUUSD=X contract-roll staleness).
-    live_price_task = asyncio.create_task(_fetch_rest_spot_price(yf_sym))
+    # Start live-price fetch concurrently — tradingview_ta for FX/metals (true
+    # spot), Yahoo REST as fallback for stocks/indices.
+    live_price_task = asyncio.create_task(_fetch_tv_ta_spot(ticker))
+    rest_price_task = asyncio.create_task(_fetch_rest_spot_price(yf_sym))
 
     # 1. TradingView (real-time, covers FX/metals/indices/crypto/commodities)
     data = None
@@ -334,11 +398,11 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
         data = _mock_market_data(ticker, asset_class)
         data_source = "mock"
 
-    # Always inject live REST price as the close — TradingView WebSocket can
-    # also return stale data from disconnections or delayed feeds.
-    # Sanity check: only apply if within 10% of the bar-data close to avoid
-    # corrupting data when the REST API returns a completely wrong instrument.
+    # Inject live spot price — prefer tradingview_ta (true spot for FX/metals),
+    # fall back to Yahoo REST for stocks/indices.
     live_price = await live_price_task
+    if not live_price or live_price <= 0:
+        live_price = await rest_price_task
     if live_price and live_price > 0:
         bar_close = data.get("close", 0) or 0
         if bar_close <= 0 or abs(live_price - bar_close) / max(bar_close, 1e-9) < 0.10:
