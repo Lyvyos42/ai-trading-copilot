@@ -590,7 +590,63 @@ async def get_ohlcv(
         except Exception:
             pass  # fall through to yfinance
 
-    # ── 2. yfinance ───────────────────────────────────────────────────────────
+    # ── 2. TradingView via tvDatafeed (spot prices for FX/metals/indices) ───
+    try:
+        from app.data.market_data import _TV_EXCHANGE, _get_tv_client
+
+        tv_entry = _TV_EXCHANGE.get(ticker.upper())
+        if not tv_entry:
+            raise KeyError("no TV mapping")
+
+        tv_symbol, exchange = tv_entry
+
+        def _tv_ohlcv():
+            from tvDatafeed import Interval
+
+            _TV_INTERVAL = {
+                "1m": Interval.in_1_minute, "5m": Interval.in_5_minute,
+                "15m": Interval.in_15_minute, "30m": Interval.in_30_minute,
+                "1h": Interval.in_1_hour, "4h": Interval.in_4_hour,
+                "1d": Interval.in_daily, "1wk": Interval.in_weekly,
+            }
+            _PERIOD_MIN = {"1d": 1440, "5d": 7200, "1mo": 43200, "3mo": 129600, "6mo": 259200, "1y": 525600, "2y": 1051200}
+            _INTERVAL_MIN = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1wk": 10080}
+
+            tv_interval = _TV_INTERVAL.get(interval, Interval.in_daily)
+            n_bars = min(_PERIOD_MIN.get(period, 259200) // _INTERVAL_MIN.get(interval, 1440), 5000)
+            n_bars = max(n_bars, 50)
+
+            tv = _get_tv_client()
+            if tv is None:
+                raise RuntimeError("tvDatafeed client unavailable")
+
+            df = tv.get_hist(symbol=tv_symbol, exchange=exchange, interval=tv_interval, n_bars=n_bars)
+            if df is None or df.empty:
+                raise ValueError("empty TV response")
+
+            df.columns = [c.lower() for c in df.columns]
+            candles = []
+            for ts, row in df.iterrows():
+                candles.append({
+                    "time": int(ts.timestamp()),
+                    "open": round(float(row["open"]), 4),
+                    "high": round(float(row["high"]), 4),
+                    "low": round(float(row["low"]), 4),
+                    "close": round(float(row["close"]), 4),
+                    "volume": int(float(row.get("volume", 0))),
+                })
+            if not candles:
+                raise ValueError("no candles from TV")
+            return candles
+
+        candles = await asyncio.to_thread(_tv_ohlcv)
+        return {"ticker": ticker, "candles": candles}
+
+    except Exception as tv_err:
+        import logging
+        logging.warning(f"tvDatafeed OHLCV failed for {ticker}: {tv_err}")
+
+    # ── 3. yfinance ───────────────────────────────────────────────────────────
     try:
         import yfinance as yf
         from app.data.market_data import resolve_ticker, _fetch_rest_spot_price
@@ -630,7 +686,7 @@ async def get_ohlcv(
         import logging
         logging.warning(f"yfinance OHLCV failed for {ticker}: {yf_err}")
 
-    # ── 3. Yahoo Finance REST Chart API (fallback before mock) ───────────────
+    # ── 4. Yahoo Finance REST Chart API (fallback before mock) ───────────────
     try:
         import urllib.request as _urlreq
         import urllib.parse as _urlpar
@@ -690,7 +746,7 @@ async def get_ohlcv(
         import logging
         logging.warning(f"Yahoo REST OHLCV also failed for {ticker}: {rest_err}")
 
-    # ── 4. Mock fallback ─────────────────────────────────────────────────────
+    # ── 5. Mock fallback ─────────────────────────────────────────────────────
     try:
         # Deterministic mock fallback with realistic price ranges per asset type
         _MOCK_BASES = {
