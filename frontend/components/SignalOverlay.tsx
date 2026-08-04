@@ -18,7 +18,7 @@ export function SignalOverlay({ signal, ticker }: SignalOverlayProps) {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
-      <div className="absolute top-3 left-3 pointer-events-auto">
+      <div className="absolute bottom-3 left-3 pointer-events-auto">
         <div
           className={cn(
             "flex items-center gap-2 px-3 py-1.5 rounded border backdrop-blur-sm",

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { RefreshCw, TrendingUp, Activity, Zap, DollarSign } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
@@ -49,6 +49,16 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
   });
   const [chartMode, setChartMode] = useState<"tradingview" | "orderflow">("tradingview");
+
+  // Auto-scanner state
+  const [scannerRunning, setScannerRunning] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("");
+  const scannerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scannerIndexRef = useRef(0);
+  const scannerBusyRef = useRef(false);
+
+  const SCAN_SYMBOLS = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "GC=F", "MSFT", "TSLA"];
+  const SCAN_INTERVAL_MS = 90_000; // 90s between each symbol scan
 
   const { isLoggedIn } = useAuth();
 
@@ -123,6 +133,47 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
       setLoading(false);
     }
   }
+
+  // ── Auto-scanner: scan one symbol per tick, rotate through list ──
+  const scanNext = useCallback(async () => {
+    if (scannerBusyRef.current) return;
+    scannerBusyRef.current = true;
+    const sym = SCAN_SYMBOLS[scannerIndexRef.current % SCAN_SYMBOLS.length];
+    setScannerStatus(`Scanning ${sym}…`);
+    try {
+      const signal = await generateSignal(sym, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
+      // Tag as auto-scan
+      signal.signal_mode = "AUTO_SCAN";
+      setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)]);
+    } catch {
+      // Silently skip failed scans
+    } finally {
+      scannerIndexRef.current++;
+      setScannerStatus("");
+      scannerBusyRef.current = false;
+    }
+  }, [activeProfile]);
+
+  function startScanner() {
+    if (scannerRef.current) return;
+    setScannerRunning(true);
+    scannerIndexRef.current = 0;
+    scanNext();
+    scannerRef.current = setInterval(scanNext, SCAN_INTERVAL_MS);
+  }
+
+  function stopScanner() {
+    if (scannerRef.current) {
+      clearInterval(scannerRef.current);
+      scannerRef.current = null;
+    }
+    setScannerRunning(false);
+    setScannerStatus("");
+  }
+
+  useEffect(() => {
+    return () => { if (scannerRef.current) clearInterval(scannerRef.current); };
+  }, []);
 
   const activeSignals = signals.filter((s) => s.status === "ACTIVE").length;
   const activeTickerLocked = signals.some(
@@ -265,6 +316,21 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 {loading ? "ANALYZING… (up to 60s)" : activeTickerLocked ? "SIGNAL ACTIVE — MARK WIN/LOSS" : "RUN AI ANALYSIS"}
               </button>
               <button
+                onClick={() => {
+                  if (!isLoggedIn) { window.location.href = "/login"; return; }
+                  scannerRunning ? stopScanner() : startScanner();
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  scannerRunning
+                    ? "border-bear/50 text-bear hover:bg-bear/10"
+                    : "border-info/50 text-info hover:bg-info/10"
+                )}
+              >
+                <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
+                {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
+              </button>
+              <button
                 onClick={loadData}
                 disabled={loading}
                 className="p-1.5 rounded border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
@@ -293,7 +359,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         <div className="flex flex-col lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-r border-border max-h-48 sm:max-h-64 lg:max-h-none overflow-hidden">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">SIGNAL FEED</span>
-            {loading && (
+            {scannerRunning && scannerStatus && (
+              <div className="ml-auto flex items-center gap-1 text-[13px] font-mono text-info">
+                <Radar className="h-2.5 w-2.5 animate-spin" />
+                {scannerStatus.replace("…", "")}
+              </div>
+            )}
+            {loading && !scannerRunning && (
               <div className="ml-auto flex items-center gap-1 text-[13px] font-mono text-primary">
                 <Activity className="h-2.5 w-2.5 animate-spin" />
                 RUNNING
