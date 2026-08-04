@@ -590,12 +590,12 @@ async def get_ohlcv(
         except Exception:
             pass  # fall through to yfinance
 
-    # ── 2. yfinance + tradingview_ta spot-offset (primary for all assets) ────
-    # For metals/energy: yfinance uses futures (GC=F) since Yahoo delisted
-    # spot =X tickers. We fetch the real spot price from tradingview_ta and
-    # apply an offset to align all candle prices with spot (IEB approach).
+    # ── 2. yfinance + TradingView scanner spot-offset ───────────────────────
+    # For metals: yfinance uses futures (GC=F) since Yahoo delisted spot =X.
+    # We fetch real spot from TradingView scanner API and apply offset.
     try:
         import yfinance as yf
+        import logging
         from app.data.market_data import (
             resolve_ticker, _SPOT_TO_FUTURES, _fetch_tv_ta_spot,
         )
@@ -603,6 +603,7 @@ async def get_ohlcv(
         upper = ticker.upper()
         futures_sym = _SPOT_TO_FUTURES.get(upper)
         yf_ticker = futures_sym if futures_sym else resolve_ticker(ticker)
+        logging.info(f"OHLCV step2: {ticker} → yf_ticker={yf_ticker}, futures={futures_sym}")
 
         def _sync():
             t = yf.Ticker(yf_ticker)
@@ -622,19 +623,24 @@ async def get_ohlcv(
             return candles
 
         candles = await asyncio.to_thread(_sync)
+        logging.info(f"OHLCV step2: got {len(candles)} candles, last_close={candles[-1]['close'] if candles else 'N/A'}")
 
         # Apply spot-offset for futures-backed symbols
         if candles and futures_sym:
             spot = await _fetch_tv_ta_spot(ticker)
+            logging.info(f"OHLCV step2: TV scanner spot for {ticker} = {spot}")
             if spot and spot > 0:
                 last_close = candles[-1]["close"]
                 offset = spot - last_close
-                if abs(offset) < last_close * 0.05:
+                pct = abs(offset) / max(last_close, 1e-9)
+                logging.info(f"OHLCV step2: offset={offset:.4f}, pct={pct:.4f}")
+                if pct < 0.05:
                     for c in candles:
                         c["open"]  = round(c["open"] + offset, 4)
                         c["high"]  = round(c["high"] + offset, 4)
                         c["low"]   = round(c["low"] + offset, 4)
                         c["close"] = round(c["close"] + offset, 4)
+                    logging.info(f"OHLCV step2: applied offset, new last_close={candles[-1]['close']}")
         elif candles:
             spot = await _fetch_tv_ta_spot(ticker)
             if spot and spot > 0:

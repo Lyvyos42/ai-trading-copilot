@@ -93,65 +93,68 @@ _REST_ALIAS: dict[str, str] = {
 }
 
 # Symbols where Yahoo =X tickers are broken/delisted — use futures for OHLCV
-# candle shape, then apply spot-offset from tradingview_ta to align prices.
+# candle shape, then apply spot-offset from TradingView spot price.
 _SPOT_TO_FUTURES: dict[str, str] = {
     "XAUUSD": "GC=F", "XAGUSD": "SI=F", "XPTUSD": "PL=F", "XPDUSD": "PA=F",
 }
 
-# tradingview_ta symbol map → (symbol, exchange, screener)
-_TV_TA_MAP: dict[str, tuple[str, str, str]] = {
-    "XAUUSD": ("XAUUSD", "FX_IDC", "forex"),
-    "XAGUSD": ("XAGUSD", "FX_IDC", "forex"),
-    "XPTUSD": ("XPTUSD", "FX_IDC", "forex"),
-    "XPDUSD": ("XPDUSD", "FX_IDC", "forex"),
-    "EURUSD": ("EURUSD", "FX_IDC", "forex"),
-    "GBPUSD": ("GBPUSD", "FX_IDC", "forex"),
-    "USDJPY": ("USDJPY", "FX_IDC", "forex"),
-    "AUDUSD": ("AUDUSD", "FX_IDC", "forex"),
-    "USDCAD": ("USDCAD", "FX_IDC", "forex"),
-    "USDCHF": ("USDCHF", "FX_IDC", "forex"),
-    "NZDUSD": ("NZDUSD", "FX_IDC", "forex"),
-    "EURJPY": ("EURJPY", "FX_IDC", "forex"),
-    "GBPJPY": ("GBPJPY", "FX_IDC", "forex"),
-    "EURGBP": ("EURGBP", "FX_IDC", "forex"),
+# TradingView scanner API → ("EXCHANGE:SYMBOL", screener)
+# Metals use "cfd" screener, FX uses "forex" screener.
+_TV_SCAN_SYMBOL: dict[str, tuple[str, str]] = {
+    "XAUUSD": ("OANDA:XAUUSD", "cfd"),   "XAGUSD": ("TVC:SILVER", "cfd"),
+    "XPTUSD": ("TVC:PLATINUM", "cfd"),   "XPDUSD": ("TVC:PALLADIUM", "cfd"),
+    "EURUSD": ("FX_IDC:EURUSD", "forex"), "GBPUSD": ("FX_IDC:GBPUSD", "forex"),
+    "USDJPY": ("FX_IDC:USDJPY", "forex"), "AUDUSD": ("FX_IDC:AUDUSD", "forex"),
+    "USDCAD": ("FX_IDC:USDCAD", "forex"), "USDCHF": ("FX_IDC:USDCHF", "forex"),
+    "NZDUSD": ("FX_IDC:NZDUSD", "forex"), "EURJPY": ("FX_IDC:EURJPY", "forex"),
+    "GBPJPY": ("FX_IDC:GBPJPY", "forex"), "EURGBP": ("FX_IDC:EURGBP", "forex"),
 }
 
-_tv_ta_cache: dict[str, tuple[float, float]] = {}  # symbol → (price, timestamp)
+_tv_spot_cache: dict[str, tuple[float, float]] = {}  # symbol → (price, timestamp)
 
 
 async def _fetch_tv_ta_spot(ticker: str) -> float | None:
-    """Fetch real-time spot price from tradingview_ta (pip package).
+    """Fetch real-time spot price directly from TradingView's scanner API.
 
-    Uses a 60s cache to avoid 429 rate-limiting. Works on Render/Linux.
+    No pip package needed — just a simple HTTP POST to the public scanner
+    endpoint. Uses a 60s cache. Same API that tradingview_ta uses internally.
     """
     import time as _time
+    import json as _json
+    import urllib.request as _urlreq
 
     upper = ticker.upper().replace("=X", "").replace("-USD", "").replace("=F", "")
-    cached = _tv_ta_cache.get(upper)
+    cached = _tv_spot_cache.get(upper)
     if cached and (_time.time() - cached[1]) < 60:
         return cached[0]
 
-    entry = _TV_TA_MAP.get(upper)
+    entry = _TV_SCAN_SYMBOL.get(upper)
     if not entry:
         return None
-
-    tv_symbol, exchange, screener = entry
+    tv_sym, screener = entry
 
     def _sync() -> float | None:
         try:
-            from tradingview_ta import TA_Handler, Interval
-            handler = TA_Handler(
-                symbol=tv_symbol, exchange=exchange,
-                screener=screener, interval=Interval.INTERVAL_1_HOUR, timeout=10,
+            body = _json.dumps({
+                "symbols": {"tickers": [tv_sym]},
+                "columns": ["close", "open", "high", "low"],
+            }).encode()
+            req = _urlreq.Request(
+                f"https://scanner.tradingview.com/{screener}/scan",
+                data=body,
+                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
             )
-            analysis = handler.get_analysis()
-            price = analysis.indicators.get("close", 0)
-            if price and price > 0:
-                _tv_ta_cache[upper] = (price, _time.time())
-                return float(price)
+            with _urlreq.urlopen(req, timeout=10) as r:
+                data = _json.loads(r.read())
+            rows = data.get("data", [])
+            if rows and rows[0].get("d"):
+                price = float(rows[0]["d"][0])
+                if price > 0:
+                    _tv_spot_cache[upper] = (price, _time.time())
+                    return price
         except Exception as e:
             import logging
-            logging.warning(f"tradingview_ta spot failed for {upper}: {e}")
+            logging.warning(f"TradingView scanner spot failed for {upper}: {e}")
         return None
 
     return await asyncio.to_thread(_sync)
