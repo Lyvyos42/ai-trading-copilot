@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, listSignals, API_URL, type Signal } from "@/lib/api";
+import { generateSignal, listSignals, resolveSignal, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { formatPrice, timeAgo } from "@/lib/utils";
 import {
   IconSignal,
   IconLock,
@@ -203,13 +204,30 @@ export default function SignalsPage() {
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+  const handleResolveSignal = async (signalId: string, outcome: "WIN" | "LOSS") => {
+    try {
+      const updated = await resolveSignal(signalId, outcome);
+      setSignals((prev) => prev.map((s) => s.signal_id === signalId ? { ...s, status: outcome, outcome, resolved_at: updated.resolved_at ?? new Date().toISOString() } : s));
+      window.dispatchEvent(new CustomEvent("signal-resolved"));
+    } catch { /* silent */ }
+  };
 
-      {/* Visitor gate */}
+  const stats = useMemo(() => {
+    const wins = signals.filter((s) => s.status === "WIN").length;
+    const losses = signals.filter((s) => s.status === "LOSS").length;
+    const active = signals.filter((s) => s.status === "ACTIVE").length;
+    const resolved = wins + losses;
+    const winRate = resolved > 0 ? (wins / resolved) * 100 : 0;
+    return { total: signals.length, wins, losses, active, winRate };
+  }, [signals]);
+
+  return (
+    <div className="max-w-[1600px] mx-auto px-4 py-6">
+
+      {/* Visitor gate — full width above the split */}
       {!isLoggedIn && (
         <div
-          className="panel"
+          className="panel mb-4"
           style={{ borderColor: "hsl(var(--primary) / 0.2)" }}
         >
           <div className="panel-header">
@@ -289,359 +307,559 @@ export default function SignalsPage() {
         </div>
       )}
 
-      {/* Generator panel */}
-      <div className="panel panel-active">
-        <div className="panel-header">
-          <IconSignal size={12} color="hsl(var(--primary))" />
-          <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
-          <span className="text-[13px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
-            — 9-Agent LangGraph Pipeline
-          </span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="live-dot" />
-            <span
-              className="text-[8px] font-bold"
-              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
-            >
-              LIVE
-            </span>
-          </div>
-        </div>
-        <div className="p-4 space-y-4">
+      {/* ── 75/25 Split Layout ───────────────────────────────────── */}
+      <div className="flex gap-4 items-start">
 
-          {/* Asset class tabs */}
-          <div className="flex gap-1 flex-wrap">
-            {ASSET_CLASSES.map((ac) => (
-              <button
-                key={ac}
-                onClick={() => setAssetClass(ac)}
-                className="px-3 py-1 text-[13px] font-bold tracking-[0.08em] uppercase transition-colors"
-                style={{
-                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                  border: "1px solid",
-                  borderColor: assetClass === ac ? "hsl(var(--primary) / 0.5)" : "hsl(var(--border-strong))",
-                  borderRadius: "2px",
-                  background: assetClass === ac ? "hsl(var(--primary) / 0.08)" : "transparent",
-                  color: assetClass === ac ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
-                  cursor: "pointer",
-                }}
-              >
-                {ac.replace("_", " ")}
-              </button>
-            ))}
-          </div>
+        {/* LEFT — Signal Generator + Latest Signal (75%) */}
+        <div className="flex-1 min-w-0 space-y-4" style={{ maxWidth: "calc(75% - 8px)" }}>
 
-          {/* Quick tickers */}
-          <div>
-            <span className="terminal-label mb-2 block">
-              QUICK PICK — {assetClass.replace("_", " ").toUpperCase()}
-            </span>
-            <div className="flex gap-1.5 flex-wrap">
-              {(POPULAR_TICKERS[assetClass] || []).map((ticker) => (
+          {/* Generator panel */}
+          <div className="panel panel-active">
+            <div className="panel-header">
+              <IconSignal size={12} color="hsl(var(--primary))" />
+              <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
+              <span className="text-[13px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
+                — 9-Agent LangGraph Pipeline
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <span className="live-dot" />
+                <span
+                  className="text-[8px] font-bold"
+                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
+                >
+                  LIVE
+                </span>
+              </div>
+            </div>
+            <div className="p-4 space-y-4">
+
+              {/* Asset class tabs */}
+              <div className="flex gap-1 flex-wrap">
+                {ASSET_CLASSES.map((ac) => (
+                  <button
+                    key={ac}
+                    onClick={() => setAssetClass(ac)}
+                    className="px-3 py-1 text-[13px] font-bold tracking-[0.08em] uppercase transition-colors"
+                    style={{
+                      fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                      border: "1px solid",
+                      borderColor: assetClass === ac ? "hsl(var(--primary) / 0.5)" : "hsl(var(--border-strong))",
+                      borderRadius: "2px",
+                      background: assetClass === ac ? "hsl(var(--primary) / 0.08)" : "transparent",
+                      color: assetClass === ac ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {ac.replace("_", " ")}
+                  </button>
+                ))}
+              </div>
+
+              {/* Quick tickers */}
+              <div>
+                <span className="terminal-label mb-2 block">
+                  QUICK PICK — {assetClass.replace("_", " ").toUpperCase()}
+                </span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {(POPULAR_TICKERS[assetClass] || []).map((ticker) => (
+                    <button
+                      key={ticker}
+                      onClick={() => {
+                        setAssetClass(TICKER_ASSET_CLASS[assetClass] ?? assetClass);
+                        handleGenerate(ticker);
+                      }}
+                      disabled={loading !== null}
+                      className="px-2.5 py-1 text-[14px] font-bold transition-all"
+                      style={{
+                        fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                        border: "1px solid",
+                        borderColor: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--border-strong))",
+                        borderRadius: "2px",
+                        background: loading === ticker ? "hsl(var(--primary) / 0.12)" : "transparent",
+                        color: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                        cursor: loading !== null ? "not-allowed" : "pointer",
+                        opacity: loading !== null && loading !== ticker ? 0.5 : 1,
+                        animation: loading === ticker ? "pulse-live 1.6s ease-in-out infinite" : "none",
+                      }}
+                    >
+                      {loading === ticker ? "···" : ticker.replace("=X","").replace("-USD","").replace("=F","")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom ticker */}
+              <form onSubmit={handleCustomSubmit} className="flex gap-2 items-center">
+                <span className="terminal-label shrink-0">CUSTOM TICKER</span>
+                <div className="relative">
+                  <span
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[14px] font-bold"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
+                  >
+                    &rsaquo;
+                  </span>
+                  <input
+                    type="text"
+                    value={customTicker}
+                    onChange={(e) => setCustomTicker(e.target.value.toUpperCase())}
+                    placeholder="e.g. COIN, RIVN, NQ=F"
+                    className="input-terminal pl-6 w-52"
+                  />
+                </div>
                 <button
-                  key={ticker}
-                  onClick={() => {
-                    setAssetClass(TICKER_ASSET_CLASS[assetClass] ?? assetClass);
-                    handleGenerate(ticker);
-                  }}
-                  disabled={loading !== null}
-                  className="px-2.5 py-1 text-[14px] font-bold transition-all"
+                  type="submit"
+                  disabled={!customTicker.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[14px] font-bold tracking-[0.08em] transition-colors"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                    border: "1px solid",
-                    borderColor: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--border-strong))",
+                    border: "1px solid hsl(var(--primary) / 0.4)",
                     borderRadius: "2px",
-                    background: loading === ticker ? "hsl(var(--primary) / 0.12)" : "transparent",
-                    color: loading === ticker ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
-                    cursor: loading !== null ? "not-allowed" : "pointer",
-                    opacity: loading !== null && loading !== ticker ? 0.5 : 1,
-                    animation: loading === ticker ? "pulse-live 1.6s ease-in-out infinite" : "none",
+                    background: "hsl(var(--primary) / 0.08)",
+                    color: "hsl(var(--primary))",
+                    cursor: !customTicker.trim() ? "not-allowed" : "pointer",
+                    opacity: !customTicker.trim() ? 0.4 : 1,
                   }}
                 >
-                  {loading === ticker ? "···" : ticker.replace("=X","").replace("-USD","").replace("=F","")}
+                  <IconSignal size={11} color="currentColor" />
+                  ANALYZE
                 </button>
-              ))}
+              </form>
+
+              {/* Error */}
+              {error && (
+                <div
+                  className="flex items-center gap-3 px-3 py-2 text-[14px]"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    color: "hsl(var(--bear))",
+                    background: "hsl(var(--bear) / 0.05)",
+                    border: "1px solid hsl(var(--bear) / 0.2)",
+                    borderRadius: "2px",
+                  }}
+                >
+                  <span className="flex-1">ERR — {error}</span>
+                  {lastTickerRef.current && (
+                    <button
+                      onClick={() => handleGenerate(lastTickerRef.current)}
+                      className="shrink-0 px-2 py-0.5 font-bold border transition-colors"
+                      style={{
+                        borderColor: "hsl(var(--bear) / 0.4)",
+                        borderRadius: "2px",
+                        background: "transparent",
+                        color: "hsl(var(--bear))",
+                        cursor: "pointer",
+                        fontSize: "9px",
+                        letterSpacing: "0.1em",
+                      }}
+                    >
+                      RETRY
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Custom ticker */}
-          <form onSubmit={handleCustomSubmit} className="flex gap-2 items-center">
-            <span className="terminal-label shrink-0">CUSTOM TICKER</span>
-            <div className="relative">
-              <span
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[14px] font-bold"
-                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
-              >
-                &rsaquo;
-              </span>
-              <input
-                type="text"
-                value={customTicker}
-                onChange={(e) => setCustomTicker(e.target.value.toUpperCase())}
-                placeholder="e.g. COIN, RIVN, NQ=F"
-                className="input-terminal pl-6 w-52"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!customTicker.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[14px] font-bold tracking-[0.08em] transition-colors"
-              style={{
-                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                border: "1px solid hsl(var(--primary) / 0.4)",
-                borderRadius: "2px",
-                background: "hsl(var(--primary) / 0.08)",
-                color: "hsl(var(--primary))",
-                cursor: !customTicker.trim() ? "not-allowed" : "pointer",
-                opacity: !customTicker.trim() ? 0.4 : 1,
-              }}
-            >
-              <IconSignal size={11} color="currentColor" />
-              ANALYZE
-            </button>
-          </form>
-
-          {/* Error */}
-          {error && (
+          {/* Pipeline running indicator */}
+          {loading && (
             <div
-              className="flex items-center gap-3 px-3 py-2 text-[14px]"
-              style={{
-                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                color: "hsl(var(--bear))",
-                background: "hsl(var(--bear) / 0.05)",
-                border: "1px solid hsl(var(--bear) / 0.2)",
-                borderRadius: "2px",
-              }}
+              className="panel"
+              style={{ borderColor: waking ? "hsl(var(--warn) / 0.3)" : "hsl(var(--primary) / 0.25)" }}
             >
-              <span className="flex-1">ERR — {error}</span>
-              {lastTickerRef.current && (
+              <div
+                className="panel-header"
+                style={{ background: waking ? "hsl(var(--warn) / 0.04)" : "hsl(var(--primary) / 0.04)" }}
+              >
+                {waking ? (
+                  <>
+                    <div style={{ animation: "agent-pulse 0.8s ease-in-out infinite" }}>
+                      <IconSignal size={12} color="hsl(var(--warn))" />
+                    </div>
+                    <span
+                      className="text-[13px] font-bold tracking-[0.1em] ml-1"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn))" }}
+                    >
+                      WAKING BACKEND
+                    </span>
+                    <span
+                      className="ml-2 text-[13px]"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.7)" }}
+                    >
+                      {loading}
+                    </span>
+                    <span
+                      className="mx-auto text-[13px]"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn) / 0.6)" }}
+                    >
+                      Render cold start — auto-retrying (~26s max)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className="text-[13px] font-bold tracking-[0.1em]"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+                    >
+                      PIPELINE RUNNING
+                    </span>
+                    <span
+                      className="ml-2 text-[13px]"
+                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.8)" }}
+                    >
+                      {loading}
+                    </span>
+                  </>
+                )}
                 <button
-                  onClick={() => handleGenerate(lastTickerRef.current)}
-                  className="shrink-0 px-2 py-0.5 font-bold border transition-colors"
+                  onClick={cancelAnalysis}
+                  className="ml-auto flex items-center gap-1 text-[13px] font-bold px-2 py-0.5 transition-colors"
                   style={{
-                    borderColor: "hsl(var(--bear) / 0.4)",
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    border: "1px solid hsl(var(--border-strong))",
                     borderRadius: "2px",
-                    background: "transparent",
-                    color: "hsl(var(--bear))",
+                    background: "none",
+                    color: "hsl(var(--muted-foreground))",
                     cursor: "pointer",
-                    fontSize: "9px",
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                   }}
                 >
-                  RETRY
+                  <IconX size={10} color="currentColor" />
+                  CANCEL
                 </button>
-              )}
+              </div>
+
+              <div className="p-4 space-y-4">
+
+                {/* 3D agent shapes — animate while pipeline runs */}
+                <div className="flex items-center justify-center gap-3 flex-wrap py-2">
+                  {PIPELINE_AGENTS.map(({ name, Geo, color }, i) => {
+                    const isCurrentStage = i === Math.min(pipelineStage, 5);
+                    const isPastStage = i < pipelineStage;
+                    return (
+                      <div key={name} className="flex flex-col items-center gap-1.5">
+                        <div
+                          className="flex items-center justify-center"
+                          style={{
+                            width: 40,
+                            height: 40,
+                            background: isPastStage ? `${color}15` : isCurrentStage ? `${color}10` : "transparent",
+                            border: `1px solid ${isPastStage ? color + "40" : isCurrentStage ? color + "30" : "hsl(var(--border))"}`,
+                            borderRadius: "3px",
+                            transition: "all 400ms ease",
+                            opacity: isPastStage ? 0.5 : isCurrentStage ? 1 : 0.25,
+                          }}
+                        >
+                          <div style={{ animation: isCurrentStage ? "agent-pulse 0.8s ease-in-out infinite" : `rotate-idle-octahedron 14s linear infinite`, transformStyle: "preserve-3d" }}>
+                            <Geo size={26} color={color} strokeWidth={1} active={isCurrentStage} />
+                          </div>
+                        </div>
+                        <span
+                          className="text-[8px] font-bold"
+                          style={{
+                            fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                            color: isCurrentStage ? color : isPastStage ? `${color}80` : "hsl(var(--muted-foreground) / 0.3)",
+                          }}
+                        >
+                          {name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Stage progress — text indicators */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                  {PIPELINE_STAGES.map((s, i) => {
+                    const done   = i < pipelineStage;
+                    const active = i === pipelineStage;
+                    const { Icon } = s;
+                    return (
+                      <div key={s.label} className="flex items-center gap-1">
+                        <div
+                          className="flex items-center gap-1.5 px-2 py-1 relative overflow-hidden"
+                          style={{
+                            border: "1px solid",
+                            borderColor: done
+                              ? "hsl(var(--primary) / 0.35)"
+                              : active
+                              ? "hsl(var(--primary) / 0.25)"
+                              : "hsl(var(--border))",
+                            borderRadius: "2px",
+                            background: done
+                              ? "hsl(var(--primary) / 0.08)"
+                              : active
+                              ? "hsl(var(--primary) / 0.04)"
+                              : "transparent",
+                            transition: "all 300ms ease",
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: done ? "hsl(var(--primary))" : active ? "hsl(var(--primary) / 0.7)" : "hsl(var(--muted-foreground) / 0.3)",
+                              display: "flex",
+                              alignItems: "center",
+                              animation: active ? "agent-pulse 0.8s ease-in-out infinite" : "none",
+                            }}
+                          >
+                            <Icon />
+                          </span>
+                          <span
+                            className="text-[8px] font-bold tracking-[0.08em] whitespace-nowrap"
+                            style={{
+                              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                              color: done
+                                ? "hsl(var(--primary))"
+                                : active
+                                ? "hsl(var(--primary) / 0.8)"
+                                : "hsl(var(--muted-foreground) / 0.3)",
+                            }}
+                          >
+                            {s.label}
+                          </span>
+                          {done && (
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="hsl(var(--primary))" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="1.5,4 3,5.5 6.5,2" />
+                            </svg>
+                          )}
+                          {/* Active stage fill animation */}
+                          {active && (
+                            <div
+                              className="absolute bottom-0 left-0 h-[1px]"
+                              style={{
+                                background: "hsl(var(--primary))",
+                                animation: "stage-fill 4s linear forwards",
+                              }}
+                            />
+                          )}
+                        </div>
+                        {i < PIPELINE_STAGES.length - 1 && (
+                          <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="shrink-0">
+                            <line x1="0" y1="4" x2="8" y2="4" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" />
+                            <polyline points="5,1.5 8.5,4 5,6.5" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Latest Signal output — only the most recent signal as full card */}
+          {signals.length === 0 && !loading ? (
+            <div className="panel">
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="hsl(var(--primary) / 0.15)" strokeWidth="1">
+                  <polygon points="20,3 35,13.5 29,30 11,30 5,13.5" />
+                  <line x1="20" y1="3" x2="20" y2="30" />
+                  <line x1="35" y1="13.5" x2="5" y2="13.5" />
+                </svg>
+                <span className="terminal-label">NO SIGNALS YET — SELECT A TICKER ABOVE</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {signals.slice(0, 1).map((signal) => (
+                <SignalCard key={signal.signal_id} signal={signal} onResolve={(id, outcome) => handleResolveSignal(id, outcome)} />
+              ))}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Pipeline running indicator */}
-      {loading && (
-        <div
-          className="panel"
-          style={{ borderColor: waking ? "hsl(var(--warn) / 0.3)" : "hsl(var(--primary) / 0.25)" }}
-        >
-          <div
-            className="panel-header"
-            style={{ background: waking ? "hsl(var(--warn) / 0.04)" : "hsl(var(--primary) / 0.04)" }}
-          >
-            {waking ? (
-              <>
-                <div style={{ animation: "agent-pulse 0.8s ease-in-out infinite" }}>
-                  <IconSignal size={12} color="hsl(var(--warn))" />
-                </div>
-                <span
-                  className="text-[13px] font-bold tracking-[0.1em] ml-1"
-                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn))" }}
-                >
-                  WAKING BACKEND
-                </span>
-                <span
-                  className="ml-2 text-[13px]"
-                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.7)" }}
-                >
-                  {loading}
-                </span>
-                <span
-                  className="mx-auto text-[13px]"
-                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--warn) / 0.6)" }}
-                >
-                  Render cold start — auto-retrying (~26s max)
-                </span>
-              </>
-            ) : (
-              <>
-                <span
-                  className="text-[13px] font-bold tracking-[0.1em]"
-                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
-                >
-                  PIPELINE RUNNING
-                </span>
-                <span
-                  className="ml-2 text-[13px]"
-                  style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground) / 0.8)" }}
-                >
-                  {loading}
-                </span>
-              </>
-            )}
-            <button
-              onClick={cancelAnalysis}
-              className="ml-auto flex items-center gap-1 text-[13px] font-bold px-2 py-0.5 transition-colors"
-              style={{
-                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                border: "1px solid hsl(var(--border-strong))",
-                borderRadius: "2px",
-                background: "none",
-                color: "hsl(var(--muted-foreground))",
-                cursor: "pointer",
-                letterSpacing: "0.08em",
-              }}
+        {/* RIGHT — Signal History Sidebar (25%) */}
+        <div className="w-[25%] shrink-0 sticky top-4">
+          <div className="panel" style={{ borderColor: "hsl(var(--primary) / 0.15)" }}>
+            <div className="panel-header">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="hsl(var(--primary))" strokeWidth="1.2" strokeLinecap="round">
+                <circle cx="6" cy="6" r="4.5" />
+                <polyline points="6,3.5 6,6 8,7.5" />
+              </svg>
+              <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal History</span>
+              <span
+                className="ml-auto text-[8px] font-bold"
+                style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+              >
+                {signals.length} TOTAL
+              </span>
+            </div>
+
+            {/* Stats bar */}
+            <div
+              className="grid grid-cols-4 gap-0 border-b"
+              style={{ borderColor: "hsl(var(--border))" }}
             >
-              <IconX size={10} color="currentColor" />
-              CANCEL
-            </button>
-          </div>
+              {[
+                { label: "ACTIVE", value: stats.active, color: "hsl(var(--primary))" },
+                { label: "WINS", value: stats.wins, color: "hsl(var(--bull))" },
+                { label: "LOSSES", value: stats.losses, color: "hsl(var(--bear))" },
+                { label: "WIN %", value: `${stats.winRate.toFixed(0)}%`, color: stats.winRate >= 50 ? "hsl(var(--bull))" : "hsl(var(--bear))" },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="text-center py-2 border-r last:border-r-0"
+                  style={{ borderColor: "hsl(var(--border))" }}
+                >
+                  <div
+                    className="text-[8px] font-bold tracking-[0.1em]"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+                  >
+                    {s.label}
+                  </div>
+                  <div
+                    className="text-[14px] font-bold mt-0.5"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: s.color }}
+                  >
+                    {s.value}
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <div className="p-4 space-y-4">
+            {/* Win rate progress bar */}
+            {(stats.wins + stats.losses) > 0 && (
+              <div className="px-3 pt-2 pb-1">
+                <div className="flex rounded overflow-hidden h-1.5">
+                  <div className="transition-all" style={{ width: `${stats.winRate}%`, background: "hsl(var(--bull) / 0.7)" }} />
+                  <div className="transition-all" style={{ width: `${100 - stats.winRate}%`, background: "hsl(var(--bear) / 0.7)" }} />
+                </div>
+              </div>
+            )}
 
-            {/* 3D agent shapes — animate while pipeline runs */}
-            <div className="flex items-center justify-center gap-3 flex-wrap py-2">
-              {PIPELINE_AGENTS.map(({ name, Geo, color }, i) => {
-                const isCurrentStage = i === Math.min(pipelineStage, 5);
-                const isPastStage = i < pipelineStage;
-                return (
-                  <div key={name} className="flex flex-col items-center gap-1.5">
+            {/* Signal list */}
+            <div
+              className="overflow-y-auto"
+              style={{ maxHeight: "calc(100vh - 220px)" }}
+            >
+              {signals.length === 0 ? (
+                <div className="py-8 text-center">
+                  <span
+                    className="text-[10px]"
+                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
+                  >
+                    NO HISTORY
+                  </span>
+                </div>
+              ) : (
+                signals.map((sig, idx) => {
+                  const isBull = (sig.bullish_pct ?? sig.confidence_score ?? 50) > (sig.bearish_pct ?? (100 - (sig.confidence_score ?? 50)));
+                  const pct = isBull
+                    ? (sig.bullish_pct ?? sig.confidence_score ?? 50)
+                    : (sig.bearish_pct ?? (100 - (sig.confidence_score ?? 50)));
+                  const isResolved = sig.status === "WIN" || sig.status === "LOSS";
+                  return (
                     <div
-                      className="flex items-center justify-center"
+                      key={sig.signal_id}
+                      className="px-3 py-2 transition-colors"
                       style={{
-                        width: 40,
-                        height: 40,
-                        background: isPastStage ? `${color}15` : isCurrentStage ? `${color}10` : "transparent",
-                        border: `1px solid ${isPastStage ? color + "40" : isCurrentStage ? color + "30" : "hsl(var(--border))"}`,
-                        borderRadius: "3px",
-                        transition: "all 400ms ease",
-                        opacity: isPastStage ? 0.5 : isCurrentStage ? 1 : 0.25,
+                        borderBottom: idx < signals.length - 1 ? "1px solid hsl(var(--border) / 0.5)" : "none",
+                        background: idx === 0 ? "hsl(var(--primary) / 0.03)" : "transparent",
                       }}
                     >
-                      <div style={{ animation: isCurrentStage ? "agent-pulse 0.8s ease-in-out infinite" : `rotate-idle-octahedron 14s linear infinite`, transformStyle: "preserve-3d" }}>
-                        <Geo size={26} color={color} strokeWidth={1} active={isCurrentStage} />
+                      {/* Row 1: Direction + Ticker + Outcome */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="text-[10px] font-bold px-1 rounded"
+                            style={{
+                              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                              background: isBull ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
+                              color: isBull ? "hsl(var(--bull))" : "hsl(var(--bear))",
+                            }}
+                          >
+                            {isBull ? "▲" : "▼"}
+                          </span>
+                          <span
+                            className="text-[11px] font-bold"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
+                          >
+                            {sig.ticker}
+                          </span>
+                          <span
+                            className="text-[8px]"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: isBull ? "hsl(var(--bull) / 0.8)" : "hsl(var(--bear) / 0.8)" }}
+                          >
+                            {Math.round(pct)}%
+                          </span>
+                        </div>
+                        {isResolved ? (
+                          <span
+                            className="text-[8px] font-bold px-1.5 py-0.5 rounded"
+                            style={{
+                              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                              background: sig.status === "WIN" ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
+                              border: `1px solid ${sig.status === "WIN" ? "hsl(var(--bull) / 0.3)" : "hsl(var(--bear) / 0.3)"}`,
+                              color: sig.status === "WIN" ? "hsl(var(--bull))" : "hsl(var(--bear))",
+                            }}
+                          >
+                            {sig.status}
+                          </span>
+                        ) : (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleResolveSignal(sig.signal_id, "WIN")}
+                              className="text-[7px] font-bold px-1.5 py-0.5 rounded transition-colors"
+                              style={{
+                                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                                background: "hsl(var(--bull) / 0.08)",
+                                border: "1px solid hsl(var(--bull) / 0.25)",
+                                color: "hsl(var(--bull))",
+                                cursor: "pointer",
+                              }}
+                            >
+                              WIN
+                            </button>
+                            <button
+                              onClick={() => handleResolveSignal(sig.signal_id, "LOSS")}
+                              className="text-[7px] font-bold px-1.5 py-0.5 rounded transition-colors"
+                              style={{
+                                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                                background: "hsl(var(--bear) / 0.08)",
+                                border: "1px solid hsl(var(--bear) / 0.25)",
+                                color: "hsl(var(--bear))",
+                                cursor: "pointer",
+                              }}
+                            >
+                              LOSS
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Row 2: Entry price + R:R + Time */}
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="flex items-center gap-2">
+                          {sig.entry_price > 0 && (
+                            <span
+                              className="text-[9px]"
+                              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
+                            >
+                              {formatPrice(sig.entry_price, sig.ticker)}
+                            </span>
+                          )}
+                          {sig.risk_reward_ratio && sig.risk_reward_ratio > 0 && (
+                            <span
+                              className="text-[8px]"
+                              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary) / 0.7)" }}
+                            >
+                              {Math.min(sig.risk_reward_ratio, 10).toFixed(1)}:1
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className="text-[8px]"
+                          style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
+                        >
+                          {timeAgo(sig.timestamp)}
+                        </span>
                       </div>
                     </div>
-                    <span
-                      className="text-[8px] font-bold"
-                      style={{
-                        fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                        color: isCurrentStage ? color : isPastStage ? `${color}80` : "hsl(var(--muted-foreground) / 0.3)",
-                      }}
-                    >
-                      {name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Stage progress — text indicators */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1">
-              {PIPELINE_STAGES.map((s, i) => {
-                const done   = i < pipelineStage;
-                const active = i === pipelineStage;
-                const { Icon } = s;
-                return (
-                  <div key={s.label} className="flex items-center gap-1">
-                    <div
-                      className="flex items-center gap-1.5 px-2 py-1 relative overflow-hidden"
-                      style={{
-                        border: "1px solid",
-                        borderColor: done
-                          ? "hsl(var(--primary) / 0.35)"
-                          : active
-                          ? "hsl(var(--primary) / 0.25)"
-                          : "hsl(var(--border))",
-                        borderRadius: "2px",
-                        background: done
-                          ? "hsl(var(--primary) / 0.08)"
-                          : active
-                          ? "hsl(var(--primary) / 0.04)"
-                          : "transparent",
-                        transition: "all 300ms ease",
-                      }}
-                    >
-                      <span
-                        style={{
-                          color: done ? "hsl(var(--primary))" : active ? "hsl(var(--primary) / 0.7)" : "hsl(var(--muted-foreground) / 0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          animation: active ? "agent-pulse 0.8s ease-in-out infinite" : "none",
-                        }}
-                      >
-                        <Icon />
-                      </span>
-                      <span
-                        className="text-[8px] font-bold tracking-[0.08em] whitespace-nowrap"
-                        style={{
-                          fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                          color: done
-                            ? "hsl(var(--primary))"
-                            : active
-                            ? "hsl(var(--primary) / 0.8)"
-                            : "hsl(var(--muted-foreground) / 0.3)",
-                        }}
-                      >
-                        {s.label}
-                      </span>
-                      {done && (
-                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="hsl(var(--primary))" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="1.5,4 3,5.5 6.5,2" />
-                        </svg>
-                      )}
-                      {/* Active stage fill animation */}
-                      {active && (
-                        <div
-                          className="absolute bottom-0 left-0 h-[1px]"
-                          style={{
-                            background: "hsl(var(--primary))",
-                            animation: "stage-fill 4s linear forwards",
-                          }}
-                        />
-                      )}
-                    </div>
-                    {i < PIPELINE_STAGES.length - 1 && (
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="shrink-0">
-                        <line x1="0" y1="4" x2="8" y2="4" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" />
-                        <polyline points="5,1.5 8.5,4 5,6.5" stroke={done ? "hsl(var(--primary) / 0.4)" : "hsl(var(--border-strong))"} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                      </svg>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
-      )}
-
-      {/* Signal output */}
-      {signals.length === 0 && !loading ? (
-        <div className="panel">
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            {/* Empty state — icosahedron wireframe */}
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="hsl(var(--primary) / 0.15)" strokeWidth="1">
-              <polygon points="20,3 35,13.5 29,30 11,30 5,13.5" />
-              <line x1="20" y1="3" x2="20" y2="30" />
-              <line x1="35" y1="13.5" x2="5" y2="13.5" />
-            </svg>
-            <span className="terminal-label">NO SIGNALS YET — SELECT A TICKER ABOVE</span>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {signals.map((signal) => (
-            <SignalCard key={signal.signal_id} signal={signal} />
-          ))}
-        </div>
-      )}
+      </div>
 
       <UpgradeModal
         isOpen={upgradeOpen}
