@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar } from "lucide-react";
+import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar, Settings, X, Plus } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
@@ -53,12 +53,24 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   // Auto-scanner state
   const [scannerRunning, setScannerRunning] = useState(false);
   const [scannerStatus, setScannerStatus] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanSymbols, setScanSymbols] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("scanner_symbols");
+      if (saved) try { return JSON.parse(saved); } catch {}
+    }
+    return ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "GC=F", "MSFT", "TSLA"];
+  });
+  const [scanNewSymbol, setScanNewSymbol] = useState("");
   const scannerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scannerIndexRef = useRef(0);
   const scannerBusyRef = useRef(false);
 
-  const SCAN_SYMBOLS = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "GC=F", "MSFT", "TSLA"];
-  const SCAN_INTERVAL_MS = 90_000; // 90s between each symbol scan
+  const SCAN_INTERVAL_MS = 90_000;
+
+  useEffect(() => {
+    localStorage.setItem("scanner_symbols", JSON.stringify(scanSymbols));
+  }, [scanSymbols]);
 
   const { isLoggedIn } = useAuth();
 
@@ -135,14 +147,18 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   }
 
   // ── Auto-scanner: scan one symbol per tick, rotate through list ──
+  const scanSymbolsRef = useRef(scanSymbols);
+  useEffect(() => { scanSymbolsRef.current = scanSymbols; }, [scanSymbols]);
+
   const scanNext = useCallback(async () => {
     if (scannerBusyRef.current) return;
+    const syms = scanSymbolsRef.current;
+    if (syms.length === 0) return;
     scannerBusyRef.current = true;
-    const sym = SCAN_SYMBOLS[scannerIndexRef.current % SCAN_SYMBOLS.length];
+    const sym = syms[scannerIndexRef.current % syms.length];
     setScannerStatus(`Scanning ${sym}…`);
     try {
       const signal = await generateSignal(sym, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
-      // Tag as auto-scan
       signal.signal_mode = "AUTO_SCAN";
       setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)]);
     } catch {
@@ -315,21 +331,36 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
                 {loading ? "ANALYZING… (up to 60s)" : activeTickerLocked ? "SIGNAL ACTIVE — MARK WIN/LOSS" : "RUN AI ANALYSIS"}
               </button>
-              <button
-                onClick={() => {
-                  if (!isLoggedIn) { window.location.href = "/login"; return; }
-                  scannerRunning ? stopScanner() : startScanner();
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
-                  scannerRunning
-                    ? "border-bear/50 text-bear hover:bg-bear/10"
-                    : "border-info/50 text-info hover:bg-info/10"
-                )}
-              >
-                <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
-                {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
-              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    if (!isLoggedIn) { window.location.href = "/login"; return; }
+                    scannerRunning ? stopScanner() : startScanner();
+                  }}
+                  disabled={scanSymbols.length === 0}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1 rounded-l text-[14px] font-mono font-bold border transition-colors",
+                    scannerRunning
+                      ? "border-bear/50 text-bear hover:bg-bear/10"
+                      : "border-info/50 text-info hover:bg-info/10",
+                    scanSymbols.length === 0 && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
+                  {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
+                </button>
+                <button
+                  onClick={() => setScannerOpen(o => !o)}
+                  className={cn(
+                    "p-1.5 rounded-r border border-l-0 transition-colors",
+                    scannerOpen
+                      ? "bg-info/10 border-info/50 text-info"
+                      : "border-border/50 text-muted-foreground hover:text-info hover:border-info/30"
+                  )}
+                >
+                  <Settings className="h-3 w-3" />
+                </button>
+              </div>
               <button
                 onClick={loadData}
                 disabled={loading}
@@ -339,6 +370,66 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               </button>
             </div>
           </div>
+
+          {/* Scanner config panel */}
+          {scannerOpen && (
+            <div className="px-3 py-2 border-b border-border bg-[hsl(0_0%_4%)] shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Radar className="h-3 w-3 text-info" />
+                <span className="text-[11px] font-mono font-bold text-foreground tracking-wider">SCANNER SYMBOLS</span>
+                <span className="text-[10px] font-mono text-muted-foreground">({scanSymbols.length})</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {scanSymbols.map(sym => (
+                  <span
+                    key={sym}
+                    className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded border border-info/20 bg-info/5 text-info"
+                  >
+                    {sym}
+                    <button
+                      onClick={() => setScanSymbols(prev => prev.filter(s => s !== sym))}
+                      className="hover:text-bear transition-colors"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {scanSymbols.length === 0 && (
+                  <span className="text-[11px] font-mono text-muted-foreground/50 italic">No symbols — add some to scan</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={scanNewSymbol}
+                  onChange={e => setScanNewSymbol(e.target.value.toUpperCase())}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      const s = scanNewSymbol.trim();
+                      if (s && !scanSymbols.includes(s)) {
+                        setScanSymbols(prev => [...prev, s]);
+                        setScanNewSymbol("");
+                      }
+                    }
+                  }}
+                  placeholder="Add symbol (e.g. NVDA, EURUSD=X)"
+                  className="flex-1 max-w-xs text-[11px] font-mono bg-muted/20 border border-border/50 rounded px-2 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-info/40"
+                />
+                <button
+                  onClick={() => {
+                    const s = scanNewSymbol.trim();
+                    if (s && !scanSymbols.includes(s)) {
+                      setScanSymbols(prev => [...prev, s]);
+                      setScanNewSymbol("");
+                    }
+                  }}
+                  disabled={!scanNewSymbol.trim()}
+                  className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border border-info/30 text-info hover:bg-info/10 transition-colors disabled:opacity-40"
+                >
+                  <Plus className="h-3 w-3" /> ADD
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Chart area */}
           <div className="flex-1 flex flex-col min-h-0 relative">
