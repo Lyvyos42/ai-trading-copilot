@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar, Settings, X, Plus } from "lucide-react";
+import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar, Settings, X } from "lucide-react";
 import { SignalCard } from "@/components/SignalCard";
 import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
@@ -29,9 +29,24 @@ const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> =
 
 const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
 
+const SCANNER_SYMBOL_OPTIONS = [
+  "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META", "AMD", "NFLX", "JPM",
+  "BTC-USD", "ETH-USD", "SOL-USD",
+  "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCHF=X", "USDCAD=X", "NZDUSD=X",
+  "XAUUSD", "XAGUSD",
+  "US500", "US30", "USTEC",
+  "GC=F", "SI=F", "CL=F",
+];
+
 
 export default function DashboardPage() {
-  const [signals, setSignals]               = useState<Signal[]>([]);
+  const [signals, setSignals]               = useState<Signal[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dashboard_signals");
+      if (saved) try { return JSON.parse(saved); } catch {}
+    }
+    return [];
+  });
   const [agents, setAgents]                 = useState<AgentStatus[]>([]);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [loading, setLoading]               = useState(false);
@@ -61,7 +76,6 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     }
     return ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "GC=F", "MSFT", "TSLA"];
   });
-  const [scanNewSymbol, setScanNewSymbol] = useState("");
   const scannerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scannerIndexRef = useRef(0);
   const scannerBusyRef = useRef(false);
@@ -71,6 +85,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   useEffect(() => {
     localStorage.setItem("scanner_symbols", JSON.stringify(scanSymbols));
   }, [scanSymbols]);
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_signals", JSON.stringify(signals));
+  }, [signals]);
+
+  const signalsRef = useRef(signals);
+  useEffect(() => { signalsRef.current = signals; }, [signals]);
 
   const { isLoggedIn } = useAuth();
 
@@ -109,15 +130,23 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
-      // Deduplicate: keep only the most recent signal per ticker
-      const seen = new Set<string>();
-      const deduped = sigs.value.filter(s => {
-        if (seen.has(s.ticker)) return false;
-        seen.add(s.ticker);
-        return true;
+      setSignals(prev => {
+        const localById = new Map(prev.map(s => [s.signal_id, s]));
+        const merged = sigs.value.map(s => {
+          const local = localById.get(s.signal_id);
+          return local ? { ...s, signal_mode: local.signal_mode } : s;
+        });
+        prev.forEach(s => {
+          if (!merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
+        });
+        const seen = new Set<string>();
+        return merged.filter(s => {
+          if (seen.has(s.ticker)) return false;
+          seen.add(s.ticker);
+          return true;
+        });
       });
-      setSignals(deduped);
-      if (deduped.length > 0 && !selectedSignal) setSelectedSignal(deduped[0]);
+      if (sigs.value.length > 0 && !selectedSignal) setSelectedSignal(sigs.value[0]);
     }
     if (agentData.status === "fulfilled") setAgents(agentData.value.agents);
   }
@@ -129,8 +158,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setActiveTicker(t);
     try {
       const signal = await generateSignal(t, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
-      // Deduplicate: replace existing signal for same ticker, keep latest
-      setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)]);
+      setSignals((prev) => {
+        const hasActive = prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE");
+        if (hasActive) return prev;
+        return [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)];
+      });
       setSelectedSignal(signal);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Analysis failed";
@@ -156,11 +188,24 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     if (syms.length === 0) return;
     scannerBusyRef.current = true;
     const sym = syms[scannerIndexRef.current % syms.length];
+
+    const hasActive = signalsRef.current.some(s => s.ticker === sym && s.status === "ACTIVE");
+    if (hasActive) {
+      setScannerStatus(`${sym} locked — skipping`);
+      scannerIndexRef.current++;
+      scannerBusyRef.current = false;
+      setTimeout(() => setScannerStatus(""), 2000);
+      return;
+    }
+
     setScannerStatus(`Scanning ${sym}…`);
     try {
       const signal = await generateSignal(sym, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
       signal.signal_mode = "AUTO_SCAN";
-      setSignals((prev) => [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)]);
+      setSignals((prev) => {
+        if (prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE")) return prev;
+        return [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)];
+      });
     } catch {
       // Silently skip failed scans
     } finally {
@@ -313,7 +358,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               >ORDER FLOW</button>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => {
                   if (!isLoggedIn) { window.location.href = "/login"; return; }
@@ -322,14 +367,14 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 }}
                 disabled={loading || activeTickerLocked}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
                   loading || activeTickerLocked
                     ? "border-border/40 text-muted-foreground/50 cursor-not-allowed"
                     : "border-primary/50 text-primary hover:bg-primary/10"
                 )}
               >
                 <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "ANALYZING… (up to 60s)" : activeTickerLocked ? "SIGNAL ACTIVE — MARK WIN/LOSS" : "RUN AI ANALYSIS"}
+                {loading ? "ANALYZING…" : activeTickerLocked ? "SIGNAL ACTIVE" : "RUN AI ANALYSIS"}
               </button>
               <button
                 onClick={() => {
@@ -338,7 +383,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 }}
                 disabled={scanSymbols.length === 0}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
                   scannerRunning
                     ? "border-bear/50 text-bear hover:bg-bear/10"
                     : "border-info/50 text-info hover:bg-info/10",
@@ -351,7 +396,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               <button
                 onClick={() => setScannerOpen(o => !o)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
                   scannerOpen
                     ? "bg-info/10 border-info/50 text-info"
                     : "border-border/50 text-muted-foreground hover:text-info hover:border-info/30"
@@ -378,7 +423,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 <span className="text-[11px] font-mono font-bold text-foreground tracking-wider">SCANNER SYMBOLS</span>
                 <span className="text-[10px] font-mono text-muted-foreground">({scanSymbols.length})</span>
               </div>
-              <div className="flex flex-wrap gap-1 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {scanSymbols.map(sym => (
                   <span
                     key={sym}
@@ -396,36 +441,19 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 {scanSymbols.length === 0 && (
                   <span className="text-[11px] font-mono text-muted-foreground/50 italic">No symbols — add some to scan</span>
                 )}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={scanNewSymbol}
-                  onChange={e => setScanNewSymbol(e.target.value.toUpperCase())}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      const s = scanNewSymbol.trim();
-                      if (s && !scanSymbols.includes(s)) {
-                        setScanSymbols(prev => [...prev, s]);
-                        setScanNewSymbol("");
-                      }
-                    }
+                <select
+                  value=""
+                  onChange={e => {
+                    const s = e.target.value;
+                    if (s && !scanSymbols.includes(s)) setScanSymbols(prev => [...prev, s]);
                   }}
-                  placeholder="Add symbol (e.g. NVDA, EURUSD=X)"
-                  className="flex-1 max-w-xs text-[11px] font-mono bg-muted/20 border border-border/50 rounded px-2 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-info/40"
-                />
-                <button
-                  onClick={() => {
-                    const s = scanNewSymbol.trim();
-                    if (s && !scanSymbols.includes(s)) {
-                      setScanSymbols(prev => [...prev, s]);
-                      setScanNewSymbol("");
-                    }
-                  }}
-                  disabled={!scanNewSymbol.trim()}
-                  className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border border-info/30 text-info hover:bg-info/10 transition-colors disabled:opacity-40"
+                  className="text-[11px] font-mono bg-muted/20 border border-info/30 rounded px-2 py-1 text-info focus:outline-none focus:border-info/50 cursor-pointer"
                 >
-                  <Plus className="h-3 w-3" /> ADD
-                </button>
+                  <option value="" disabled>+ Add symbol</option>
+                  {SCANNER_SYMBOL_OPTIONS.filter(s => !scanSymbols.includes(s)).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
             </div>
           )}
@@ -503,8 +531,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                   signal={signal}
                   compact
                   onExecute={() => setTradeOpened(true)}
-                  onResolve={(id) => {
-                    setSignals(prev => prev.filter(s => s.signal_id !== id));
+                  onResolve={(id, outcome) => {
+                    setSignals(prev => prev.map(s =>
+                      s.signal_id === id ? { ...s, status: outcome } : s
+                    ));
                     if (selectedSignal?.signal_id === id) setSelectedSignal(null);
                   }}
                 />

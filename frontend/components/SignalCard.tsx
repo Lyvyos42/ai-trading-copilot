@@ -58,11 +58,22 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
   const isActive = signal.status === "ACTIVE";
   const hasLivePrice = isActive && signal.current_price && signal.current_price > 0;
   const liveEntry = hasLivePrice ? signal.current_price! : signal.entry_price;
-  const target = signal.research_target || signal.take_profit_1;
-  const inval  = signal.invalidation_level || signal.stop_loss;
-  const rrRatio = (liveEntry && inval && target)
+  let target = signal.research_target || signal.take_profit_1;
+  let inval  = signal.invalidation_level || signal.stop_loss;
+  if (target && inval && liveEntry > 0) {
+    if (isBullish && target < liveEntry && inval > liveEntry) {
+      [target, inval] = [inval, target];
+    } else if (!isBullish && target > liveEntry && inval < liveEntry) {
+      [target, inval] = [inval, target];
+    }
+    const maxDrift = liveEntry * 0.15;
+    if (Math.abs(target - liveEntry) > maxDrift) target = 0;
+    if (Math.abs(inval - liveEntry) > maxDrift) inval = 0;
+  }
+  const rawRR = (liveEntry && inval && target)
     ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
     : (signal.risk_reward_ratio ?? 0);
+  const rrRatio = Math.min(rawRR, 10);
 
   const handleExecute = async (e: React.MouseEvent) => {
     e.stopPropagation();
