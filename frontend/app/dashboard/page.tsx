@@ -30,12 +30,35 @@ const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> =
 const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
 
 const SCANNER_SYMBOL_OPTIONS = [
+  // Stocks — US Large Cap
   "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META", "AMD", "NFLX", "JPM",
-  "BTC-USD", "ETH-USD", "SOL-USD",
+  "V", "MA", "DIS", "INTC", "PYPL", "BA", "CRM", "UBER", "COIN", "PLTR",
+  "SNOW", "SQ", "SHOP", "ROKU", "RIVN", "LCID", "NIO", "BABA", "PDD", "JD",
+  "WMT", "COST", "HD", "LOW", "TGT", "MCD", "SBUX", "NKE", "KO", "PEP",
+  "XOM", "CVX", "COP", "OXY", "SLB",
+  "LLY", "UNH", "JNJ", "PFE", "ABBV", "MRK", "BMY", "GILD",
+  "GS", "MS", "C", "BAC", "WFC", "BLK", "SCHW",
+  // Crypto
+  "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ADA-USD", "DOGE-USD", "AVAX-USD",
+  "DOT-USD", "MATIC-USD", "LINK-USD", "UNI-USD", "AAVE-USD", "LTC-USD", "ATOM-USD",
+  // Forex
   "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCHF=X", "USDCAD=X", "NZDUSD=X",
+  "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "CADJPY=X", "CHFJPY=X",
+  "EURCHF=X", "EURAUD=X", "EURCAD=X", "EURNZD=X", "GBPAUD=X", "GBPCAD=X", "GBPNZD=X",
+  "AUDCAD=X", "AUDNZD=X", "NZDCAD=X", "NZDCHF=X", "USDSGD=X", "USDHKD=X",
+  "USDMXN=X", "USDZAR=X", "USDTRY=X", "USDPLN=X", "USDSEK=X", "USDNOK=X",
+  // Metals & Commodities
   "XAUUSD", "XAGUSD",
+  "GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "PL=F", "PA=F",
+  "ZC=F", "ZW=F", "ZS=F", "KC=F", "SB=F", "CC=F", "CT=F",
+  // Indices
   "US500", "US30", "USTEC",
-  "GC=F", "SI=F", "CL=F",
+  "^GSPC", "^DJI", "^IXIC", "^RUT", "^VIX",
+  "^FTSE", "^GDAXI", "^FCHI", "^N225", "^HSI", "^STOXX50E",
+  // ETFs
+  "SPY", "QQQ", "IWM", "DIA", "GLD", "SLV", "USO", "TLT", "HYG", "XLF",
+  "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE", "XLC", "XLY",
+  "ARKK", "ARKW", "ARKG", "SOXL", "TQQQ", "SQQQ", "UVXY",
 ];
 
 
@@ -447,12 +470,39 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     const s = e.target.value;
                     if (s && !scanSymbols.includes(s)) setScanSymbols(prev => [...prev, s]);
                   }}
-                  className="text-[11px] font-mono bg-muted/20 border border-info/30 rounded px-2 py-1 text-info focus:outline-none focus:border-info/50 cursor-pointer"
+                  className="text-[11px] font-mono bg-[hsl(0_0%_8%)] border border-info/40 rounded px-2 py-1 text-info focus:outline-none focus:border-info/60 cursor-pointer [&>option]:bg-[hsl(0_0%_10%)] [&>option]:text-foreground [&>optgroup]:bg-[hsl(0_0%_10%)] [&>optgroup]:text-info [&>optgroup]:font-bold"
                 >
                   <option value="" disabled>+ Add symbol</option>
-                  {SCANNER_SYMBOL_OPTIONS.filter(s => !scanSymbols.includes(s)).map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  <optgroup label="Stocks">
+                    {SCANNER_SYMBOL_OPTIONS.slice(0, 45).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Crypto">
+                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.endsWith("-USD")).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Forex">
+                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.endsWith("=X")).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Metals & Commodities">
+                    {SCANNER_SYMBOL_OPTIONS.filter(s => s === "XAUUSD" || s === "XAGUSD" || (s.endsWith("=F") && !["SPY","QQQ"].includes(s))).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Indices">
+                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.startsWith("^") || ["US500","US30","USTEC"].includes(s)).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="ETFs">
+                    {SCANNER_SYMBOL_OPTIONS.filter(s => ["SPY","QQQ","IWM","DIA","GLD","SLV","USO","TLT","HYG","XLF","XLE","XLK","XLV","XLI","XLP","XLU","XLB","XLRE","XLC","XLY","ARKK","ARKW","ARKG","SOXL","TQQQ","SQQQ","UVXY"].includes(s)).filter(s => !scanSymbols.includes(s)).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
