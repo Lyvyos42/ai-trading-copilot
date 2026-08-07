@@ -331,36 +331,35 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                 <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
                 {loading ? "ANALYZING… (up to 60s)" : activeTickerLocked ? "SIGNAL ACTIVE — MARK WIN/LOSS" : "RUN AI ANALYSIS"}
               </button>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => {
-                    if (!isLoggedIn) { window.location.href = "/login"; return; }
-                    scannerRunning ? stopScanner() : startScanner();
-                  }}
-                  disabled={scanSymbols.length === 0}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1 rounded-l text-[14px] font-mono font-bold border transition-colors",
-                    scannerRunning
-                      ? "border-bear/50 text-bear hover:bg-bear/10"
-                      : "border-info/50 text-info hover:bg-info/10",
-                    scanSymbols.length === 0 && "opacity-40 cursor-not-allowed"
-                  )}
-                >
-                  <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
-                  {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
-                </button>
-                <button
-                  onClick={() => setScannerOpen(o => !o)}
-                  className={cn(
-                    "p-1.5 rounded-r border border-l-0 transition-colors",
-                    scannerOpen
-                      ? "bg-info/10 border-info/50 text-info"
-                      : "border-border/50 text-muted-foreground hover:text-info hover:border-info/30"
-                  )}
-                >
-                  <Settings className="h-3 w-3" />
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  if (!isLoggedIn) { window.location.href = "/login"; return; }
+                  scannerRunning ? stopScanner() : startScanner();
+                }}
+                disabled={scanSymbols.length === 0}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  scannerRunning
+                    ? "border-bear/50 text-bear hover:bg-bear/10"
+                    : "border-info/50 text-info hover:bg-info/10",
+                  scanSymbols.length === 0 && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
+                {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
+              </button>
+              <button
+                onClick={() => setScannerOpen(o => !o)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded text-[14px] font-mono font-bold border transition-colors",
+                  scannerOpen
+                    ? "bg-info/10 border-info/50 text-info"
+                    : "border-border/50 text-muted-foreground hover:text-info hover:border-info/30"
+                )}
+              >
+                <Settings className="h-3 w-3" />
+                SYMBOLS
+              </button>
               <button
                 onClick={loadData}
                 disabled={loading}
