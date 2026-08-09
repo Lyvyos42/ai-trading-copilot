@@ -87,6 +87,25 @@ function heatColor(t: number, alphaMul = 1): string {
   return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
+function heatColorRGBA(t: number, alphaMul = 1): [number, number, number, number] {
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  let lo = HEAT_STOPS[0], hi = HEAT_STOPS[HEAT_STOPS.length - 1];
+  for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
+    if (t >= HEAT_STOPS[i].t && t <= HEAT_STOPS[i + 1].t) {
+      lo = HEAT_STOPS[i];
+      hi = HEAT_STOPS[i + 1];
+      break;
+    }
+  }
+  const span = (hi.t - lo.t) || 1;
+  const local = (t - lo.t) / span;
+  const r = Math.round(lo.r + (hi.r - lo.r) * local);
+  const g = Math.round(lo.g + (hi.g - lo.g) * local);
+  const b = Math.round(lo.b + (hi.b - lo.b) * local);
+  const a = Math.min(255, Math.max(0, Math.round((lo.a + (hi.a - lo.a) * local) * alphaMul * 255)));
+  return [r, g, b, a];
+}
+
 function niceStep(range: number, targetLines: number): number {
   const rough = range / targetLines;
   const pow = Math.pow(10, Math.floor(Math.log10(rough)));
@@ -326,6 +345,10 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
     lerpSpeed: 0.12,
     lastHeatHi: 0,
     lastHeatLo: 0,
+    heatCanvas: null as HTMLCanvasElement | null,
+    momentumVx: 0,
+    momentumVy: 0,
+    dragHistory: [] as Array<{ x: number; y: number; t: number }>,
   });
 
   useEffect(() => {
@@ -436,6 +459,43 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       s.animTime += 0.016;
+
+      // Apply momentum (inertia scrolling)
+      if (!s.isDragging && (Math.abs(s.momentumVx) > 2 || Math.abs(s.momentumVy) > 2)) {
+        const mChartW = W - 64;
+        const mTotalSlots = (s.viewEnd - s.viewStart) + (s.rightPadding || 0);
+        const mCandlePx = mTotalSlots > 0 ? mChartW / mTotalSlots : 1;
+        const friction = 0.93;
+        const dt = 0.016;
+        const allLen = s.candles.length;
+
+        const candleShift = Math.round(-s.momentumVx * dt / mCandlePx);
+        if (candleShift !== 0) {
+          let newStart = s.viewStart + candleShift;
+          let newPad = s.rightPadding - candleShift;
+          const maxPad = Math.floor(mTotalSlots * 0.6);
+          if (newPad < 0) { newStart -= newPad; newPad = 0; }
+          if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
+          if (newStart < 0) { newPad += newStart; newStart = 0; }
+          const dataSlots = mTotalSlots - newPad;
+          if (newStart + dataSlots > allLen) {
+            newStart = Math.max(0, allLen - dataSlots);
+          }
+          s.viewStart = newStart;
+          s.viewEnd = newStart + dataSlots;
+          s.rightPadding = Math.max(0, newPad);
+        }
+
+        const mPriceH = (H - 38) * 0.82;
+        if (s.lastVisibleRange > 0 && mPriceH > 0) {
+          s.priceOffset += (s.momentumVy * dt / mPriceH) * s.lastVisibleRange;
+        }
+
+        s.momentumVx *= friction;
+        s.momentumVy *= friction;
+        if (Math.abs(s.momentumVx) < 2) s.momentumVx = 0;
+        if (Math.abs(s.momentumVy) < 2) s.momentumVy = 0;
+      }
 
       // Background
       const bg = ctx.createLinearGradient(0, 0, 0, H);
@@ -568,46 +628,71 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       const currentPrice = s.displayPrice || visibleCandles[visibleCandles.length - 1].close;
       const dec = getDecimals(currentPrice, s.ticker);
 
-      // === LAYER 1: Blue liquidity heatmap ===
+      // === LAYER 1: Blue liquidity heatmap (ImageData rendering) ===
       const hm = s.heatmap;
-      if (hm && hm.max > 0 && n >= 15 && candleW < 30) {
-        const rows = hm.rows;
-        const cols = hm.cols;
-        const cellW = Math.min(candleW, 20);
-        const cellH = Math.max(Math.min(priceH / rows, 8), 1);
+      if (hm && hm.max > 0 && n >= 2) {
+        const hRows = hm.rows;
+        const hCols = hm.cols;
+
+        if (!s.heatCanvas) {
+          s.heatCanvas = document.createElement("canvas");
+        }
+        const oc = s.heatCanvas;
+        if (oc.width !== hCols || oc.height !== hRows) {
+          oc.width = hCols;
+          oc.height = hRows;
+        }
+        const octx = oc.getContext("2d", { willReadFrequently: true })!;
+        const imgData = octx.createImageData(hCols, hRows);
+        const pixels = imgData.data;
+
+        for (let row = 0; row < hRows; row++) {
+          const imgRow = hRows - 1 - row;
+          for (let col = 0; col < hCols; col++) {
+            const v = hm.grid[row * hCols + col];
+            const norm = v / hm.max;
+            if (norm < 0.003) continue;
+            const [r, g, b, a] = heatColorRGBA(norm, 1.4);
+            const idx = (imgRow * hCols + col) * 4;
+            pixels[idx] = r;
+            pixels[idx + 1] = g;
+            pixels[idx + 2] = b;
+            pixels[idx + 3] = a;
+          }
+        }
+        octx.putImageData(imgData, 0, 0);
 
         ctx.save();
-        ctx.globalCompositeOperation = "source-over";
+        ctx.beginPath();
+        ctx.rect(chartX, priceY, chartW, priceH);
+        ctx.clip();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
 
-        for (let row = 0; row < rows; row++) {
-          const price = hm.lo + (row + 0.5) * hm.step;
-          const y = priceToY(price);
-          if (y < priceY - cellH || y > priceY + priceH + cellH) continue;
+        const hmTopY = priceToY(hm.hi);
+        const hmBotY = priceToY(hm.lo);
+        const hmScreenH = hmBotY - hmTopY;
+        const dataW = n * candleW;
+        ctx.drawImage(oc, 0, 0, hCols, hRows, chartX, hmTopY, dataW, hmScreenH);
+        ctx.restore();
 
-          // Only draw columns within the current viewport
-          for (let vi = 0; vi < n; vi++) {
-            const col = vs + vi;
-            if (col >= cols) break;
-            const v = hm.grid[row * cols + col];
-            const norm = v / hm.max;
-            if (norm < 0.005) continue;
-            ctx.fillStyle = heatColor(norm, 1.25);
-            const x = chartX + vi * cellW;
-            ctx.fillRect(x, y - cellH / 2, cellW + 0.8, cellH + 0.8);
-          }
-
+        // Glow overlay for high-intensity price levels
+        const cellH = Math.max(priceH / hRows, 1);
+        for (let row = 0; row < hRows; row++) {
           const rowIntensity = hm.rowProfile[row] / hm.rowMax;
-          if (rowIntensity > 0.22) {
-            const glowAlpha = (rowIntensity - 0.22) / 0.78;
+          if (rowIntensity > 0.25) {
+            const price = hm.lo + (row + 0.5) * hm.step;
+            const y = priceToY(price);
+            if (y < priceY - cellH || y > priceY + priceH + cellH) continue;
+            const glowAlpha = (rowIntensity - 0.25) / 0.75;
             ctx.save();
-            ctx.shadowColor = "rgba(0,160,220,0.5)";
-            ctx.shadowBlur = 14;
-            ctx.fillStyle = heatColor(0.70 + rowIntensity * 0.30, glowAlpha * 0.6);
-            ctx.fillRect(chartX, y - cellH * 1.6, chartW, cellH * 3.2);
+            ctx.shadowColor = "rgba(0,160,220,0.6)";
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = heatColor(0.65 + rowIntensity * 0.35, glowAlpha * 0.45);
+            ctx.fillRect(chartX, y - cellH * 1.2, chartW, cellH * 2.4);
             ctx.restore();
           }
         }
-        ctx.restore();
       }
 
       // === LAYER 2: S/R levels ===
@@ -896,22 +981,38 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       const allLen = s.candles.length;
       if (allLen < 2) return;
 
+      const rect = canvas!.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const chartLeft = 4;
+      const chartRight = 60;
+      const cW = rect.width - chartLeft - chartRight;
+
       const dataRange = s.viewEnd - s.viewStart;
       const visCount = dataRange + s.rightPadding;
-      const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
+      const mouseRatio = Math.max(0, Math.min(1, (mouseX - chartLeft) / cW));
+      const mouseSlot = s.viewStart + mouseRatio * visCount;
+
+      const zoomFactor = e.deltaY > 0 ? 1.1 : 0.91;
       let newVisCount = Math.round(visCount * zoomFactor);
       newVisCount = Math.max(MIN_VISIBLE, Math.min(allLen + Math.floor(allLen * 0.6), newVisCount));
 
+      let newViewStart = Math.round(mouseSlot - mouseRatio * newVisCount);
       const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
-      s.rightPadding = Math.round(newVisCount * padRatio);
+      let newPad = Math.round(newVisCount * padRatio);
       const maxPad = Math.floor(newVisCount * 0.6);
-      if (s.rightPadding > maxPad) s.rightPadding = maxPad;
+      if (newPad > maxPad) newPad = maxPad;
 
-      const newDataRange = newVisCount - s.rightPadding;
-      if (s.viewStart + newDataRange > allLen) {
-        s.viewStart = Math.max(0, allLen - newDataRange);
+      const newDataRange = newVisCount - newPad;
+      if (newViewStart < 0) newViewStart = 0;
+      if (newViewStart + newDataRange > allLen) {
+        newViewStart = Math.max(0, allLen - newDataRange);
       }
-      s.viewEnd = s.viewStart + newDataRange;
+
+      s.viewStart = newViewStart;
+      s.viewEnd = newViewStart + newDataRange;
+      s.rightPadding = newPad;
+      s.momentumVx = 0;
+      s.momentumVy = 0;
     }
 
     function onMouseDown(e: MouseEvent) {
@@ -923,6 +1024,9 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       s.dragViewEnd = s.viewEnd;
       s.dragStartPad = s.rightPadding;
       s.dragStartPriceOffset = s.priceOffset;
+      s.momentumVx = 0;
+      s.momentumVy = 0;
+      s.dragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
       canvas!.style.cursor = "grabbing";
     }
 
@@ -933,13 +1037,12 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
 
       if (s.isDragging) {
         const allLen = s.candles.length;
-        const chartW = rect.width - 64;
+        const cW = rect.width - 64;
         const visCount = (s.dragViewEnd - s.dragViewStart) + s.dragStartPad;
-        const candlePx = chartW / visCount;
+        const candlePx = cW / visCount;
         const dx = e.clientX - s.dragStartX;
         const shift = Math.round(-dx / candlePx);
 
-        // Horizontal: shift viewStart and rightPadding together
         let newStart = s.dragViewStart + shift;
         let newPad = s.dragStartPad - shift;
         const maxPad = Math.floor(visCount * 0.6);
@@ -954,17 +1057,32 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         s.viewEnd = newStart + dataSlots;
         s.rightPadding = Math.max(0, newPad);
 
-        // Vertical pan
         const dy = e.clientY - s.dragStartY;
-        const priceH = (rect.height - 38) * 0.82;
-        if (s.lastVisibleRange && priceH > 0) {
-          s.priceOffset = s.dragStartPriceOffset + (dy / priceH) * s.lastVisibleRange;
+        const pH = (rect.height - 38) * 0.82;
+        if (s.lastVisibleRange && pH > 0) {
+          s.priceOffset = s.dragStartPriceOffset + (dy / pH) * s.lastVisibleRange;
         }
+
+        s.dragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+        if (s.dragHistory.length > 6) s.dragHistory.shift();
       }
     }
 
     function onMouseUp() {
+      if (s.isDragging && s.dragHistory.length >= 2) {
+        const last = s.dragHistory[s.dragHistory.length - 1];
+        const prev = s.dragHistory[Math.max(0, s.dragHistory.length - 3)];
+        const dt = (last.t - prev.t) / 1000;
+        if (dt > 0 && dt < 0.15) {
+          s.momentumVx = (last.x - prev.x) / dt;
+          s.momentumVy = (last.y - prev.y) / dt;
+        } else {
+          s.momentumVx = 0;
+          s.momentumVy = 0;
+        }
+      }
       s.isDragging = false;
+      s.dragHistory = [];
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
         const inside = s.mouseX >= 0 && s.mouseX <= rect.width && s.mouseY >= 0 && s.mouseY <= rect.height;
@@ -991,12 +1109,140 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       s.priceOffset = 0;
     }
 
+    function onKeyDown(e: KeyboardEvent) {
+      const allLen = s.candles.length;
+      if (allLen < 2) return;
+      const visCount = (s.viewEnd - s.viewStart) + s.rightPadding;
+      const step = Math.max(1, Math.round(visCount * 0.05));
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        let newStart = s.viewStart - step;
+        let newPad = s.rightPadding + step;
+        const maxPad = Math.floor(visCount * 0.6);
+        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
+        if (newStart < 0) { newPad += newStart; newStart = 0; }
+        s.viewStart = newStart;
+        s.viewEnd = newStart + (visCount - newPad);
+        s.rightPadding = Math.max(0, newPad);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        let newStart = s.viewStart + step;
+        let newPad = s.rightPadding - step;
+        if (newPad < 0) { newStart -= newPad; newPad = 0; }
+        const dataSlots = visCount - newPad;
+        if (newStart + dataSlots > allLen) {
+          newStart = Math.max(0, allLen - dataSlots);
+        }
+        s.viewStart = newStart;
+        s.viewEnd = newStart + dataSlots;
+        s.rightPadding = Math.max(0, newPad);
+      } else if (e.key === "ArrowUp" || e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        const zf = 0.91;
+        let nv = Math.round(visCount * zf);
+        nv = Math.max(MIN_VISIBLE, nv);
+        const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
+        s.rightPadding = Math.min(Math.round(nv * padRatio), Math.floor(nv * 0.6));
+        const nd = nv - s.rightPadding;
+        if (s.viewStart + nd > allLen) s.viewStart = Math.max(0, allLen - nd);
+        s.viewEnd = s.viewStart + nd;
+      } else if (e.key === "ArrowDown" || e.key === "-") {
+        e.preventDefault();
+        const zf = 1.1;
+        let nv = Math.round(visCount * zf);
+        nv = Math.min(allLen + Math.floor(allLen * 0.6), nv);
+        const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
+        s.rightPadding = Math.min(Math.round(nv * padRatio), Math.floor(nv * 0.6));
+        const nd = nv - s.rightPadding;
+        if (s.viewStart + nd > allLen) s.viewStart = Math.max(0, allLen - nd);
+        s.viewEnd = s.viewStart + nd;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        s.viewEnd = allLen;
+        s.viewStart = Math.max(0, allLen - DEFAULT_VISIBLE);
+        s.rightPadding = 0;
+        s.priceOffset = 0;
+      }
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        s.isDragging = true;
+        s.dragStartX = t.clientX;
+        s.dragStartY = t.clientY;
+        s.dragViewStart = s.viewStart;
+        s.dragViewEnd = s.viewEnd;
+        s.dragStartPad = s.rightPadding;
+        s.dragStartPriceOffset = s.priceOffset;
+        s.momentumVx = 0;
+        s.momentumVy = 0;
+        s.dragHistory = [{ x: t.clientX, y: t.clientY, t: performance.now() }];
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      e.preventDefault();
+      if (e.touches.length === 1 && s.isDragging) {
+        const t = e.touches[0];
+        const rect = canvas!.getBoundingClientRect();
+        const allLen = s.candles.length;
+        const cW = rect.width - 64;
+        const visCount = (s.dragViewEnd - s.dragViewStart) + s.dragStartPad;
+        const candlePx = cW / visCount;
+        const dx = t.clientX - s.dragStartX;
+        const shift = Math.round(-dx / candlePx);
+
+        let newStart = s.dragViewStart + shift;
+        let newPad = s.dragStartPad - shift;
+        const maxPad = Math.floor(visCount * 0.6);
+        if (newPad < 0) { newStart -= newPad; newPad = 0; }
+        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
+        if (newStart < 0) { newPad += newStart; newStart = 0; }
+        const dataSlots = visCount - newPad;
+        if (newStart + dataSlots > allLen) {
+          newStart = Math.max(0, allLen - dataSlots);
+        }
+        s.viewStart = newStart;
+        s.viewEnd = newStart + dataSlots;
+        s.rightPadding = Math.max(0, newPad);
+
+        const dy = t.clientY - s.dragStartY;
+        const pH = (rect.height - 38) * 0.82;
+        if (s.lastVisibleRange && pH > 0) {
+          s.priceOffset = s.dragStartPriceOffset + (dy / pH) * s.lastVisibleRange;
+        }
+
+        s.dragHistory.push({ x: t.clientX, y: t.clientY, t: performance.now() });
+        if (s.dragHistory.length > 6) s.dragHistory.shift();
+      }
+    }
+
+    function onTouchEnd() {
+      if (s.isDragging && s.dragHistory.length >= 2) {
+        const last = s.dragHistory[s.dragHistory.length - 1];
+        const prev = s.dragHistory[Math.max(0, s.dragHistory.length - 3)];
+        const dt = (last.t - prev.t) / 1000;
+        if (dt > 0 && dt < 0.15) {
+          s.momentumVx = (last.x - prev.x) / dt;
+          s.momentumVy = (last.y - prev.y) / dt;
+        }
+      }
+      s.isDragging = false;
+      s.dragHistory = [];
+    }
+
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("mousedown", onMouseDown);
     canvas.addEventListener("dblclick", onDblClick);
+    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     canvas.addEventListener("mouseleave", onMouseLeave);
+    window.addEventListener("keydown", onKeyDown);
 
     function animate() {
       render();
@@ -1009,16 +1255,21 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("dblclick", onDblClick);
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       canvas.removeEventListener("mouseleave", onMouseLeave);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
   return (
     <div
       className={fillContainer ? "w-full h-full relative" : "w-full relative rounded overflow-hidden border border-border/50"}
-      style={{ minHeight: fillContainer ? "400px" : "380px" }}
+      style={{ minHeight: fillContainer ? "400px" : "380px", outline: "none" }}
+      tabIndex={0}
     >
       {/* Timeframe selector */}
       <div className="absolute top-2 left-2 z-20 flex items-center gap-0.5">
