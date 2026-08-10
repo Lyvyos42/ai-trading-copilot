@@ -147,16 +147,16 @@ export function SignalCard({ signal, onExecute, onResolve, onDismiss, compact }:
               <span className="text-foreground font-semibold">{formatPrice(liveEntry, signal.ticker)}</span>
             </span>
           )}
-          {signal.research_target && (
+          {target ? (
             <span className="text-[13px] font-mono text-muted-foreground">
-              TARGET <span className="text-bull font-semibold">{formatPrice(signal.research_target, signal.ticker)}</span>
+              TARGET <span className="text-bull font-semibold">{formatPrice(target, signal.ticker)}</span>
             </span>
-          )}
-          {signal.invalidation_level && (
+          ) : null}
+          {inval ? (
             <span className="text-[13px] font-mono text-muted-foreground">
-              INVAL <span className="text-bear font-semibold">{formatPrice(signal.invalidation_level, signal.ticker)}</span>
+              INVAL <span className="text-bear font-semibold">{formatPrice(inval, signal.ticker)}</span>
             </span>
-          )}
+          ) : null}
           {rrRatio > 0 && (
             <span className="text-[13px] font-mono text-muted-foreground">
               R:R <span className="text-foreground font-semibold">{typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1</span>
