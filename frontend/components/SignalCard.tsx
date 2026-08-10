@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
 import { type Signal, executePosition, resolveSignal } from "@/lib/api";
 import { formatPrice, timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -30,10 +30,11 @@ interface SignalCardProps {
   signal: Signal;
   onExecute?: (id: string) => void;
   onResolve?: (id: string, outcome: "WIN" | "LOSS") => void;
+  onDismiss?: (id: string) => void;
   compact?: boolean;
 }
 
-export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCardProps) {
+export function SignalCard({ signal, onExecute, onResolve, onDismiss, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
@@ -224,6 +225,15 @@ export function SignalCard({ signal, onExecute, onResolve, compact }: SignalCard
                 LOSS
               </button>
             </>
+          )}
+          {onDismiss && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDismiss(signal.signal_id); }}
+              className="text-[8px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear hover:border-bear/30 transition-colors"
+              title="Dismiss signal"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
           )}
           <div className="ml-auto flex items-center gap-1.5">
             {resolveError && <span className="text-[8px] font-mono text-bear truncate">{resolveError}</span>}

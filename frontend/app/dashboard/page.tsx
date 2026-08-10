@@ -66,7 +66,10 @@ export default function DashboardPage() {
   const [signals, setSignals]               = useState<Signal[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_signals");
-      if (saved) try { return JSON.parse(saved); } catch {}
+      if (saved) try {
+        const parsed: Signal[] = JSON.parse(saved);
+        return parsed.filter(s => s.status === "ACTIVE");
+      } catch {}
     }
     return [];
   });
@@ -153,14 +156,15 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
+      const activeOnly = sigs.value.filter(s => s.status === "ACTIVE");
       setSignals(prev => {
         const localById = new Map(prev.map(s => [s.signal_id, s]));
-        const merged = sigs.value.map(s => {
+        const merged = activeOnly.map(s => {
           const local = localById.get(s.signal_id);
           return local ? { ...s, signal_mode: local.signal_mode } : s;
         });
         prev.forEach(s => {
-          if (!merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
+          if (s.status === "ACTIVE" && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
         });
         const seen = new Set<string>();
         return merged.filter(s => {
@@ -169,7 +173,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           return true;
         });
       });
-      if (sigs.value.length > 0 && !selectedSignal) setSelectedSignal(sigs.value[0]);
+      if (activeOnly.length > 0 && !selectedSignal) setSelectedSignal(activeOnly[0]);
     }
     if (agentData.status === "fulfilled") setAgents(agentData.value.agents);
   }
@@ -585,6 +589,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
                     setSignals(prev => prev.map(s =>
                       s.signal_id === id ? { ...s, status: outcome } : s
                     ));
+                    if (selectedSignal?.signal_id === id) setSelectedSignal(null);
+                    setTimeout(() => {
+                      setSignals(prev => prev.filter(s => s.signal_id !== id));
+                    }, 2000);
+                  }}
+                  onDismiss={(id) => {
+                    setSignals(prev => prev.filter(s => s.signal_id !== id));
                     if (selectedSignal?.signal_id === id) setSelectedSignal(null);
                   }}
                 />
