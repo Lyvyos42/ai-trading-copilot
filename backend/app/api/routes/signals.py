@@ -627,6 +627,54 @@ async def list_signals(
             if isinstance(price, (int, float)) and price > 0:
                 price_map[ticker] = price
 
+    # Auto-resolve signals when price hits SL or TP
+    for s in signals:
+        if s.status != "ACTIVE":
+            continue
+        cp = price_map.get(s.ticker)
+        if not cp or cp <= 0:
+            continue
+        # Also auto-expire if past expiry
+        if s.expiry_time and datetime.utcnow() > s.expiry_time:
+            s.status = "EXPIRED"
+            s.outcome = "EXPIRED"
+            s.resolved_at = datetime.utcnow()
+            s.exit_price = cp
+            continue
+        is_long = s.direction.upper() in ("LONG", "BULLISH", "BUY")
+        hit_sl = False
+        hit_tp = False
+        if is_long:
+            if s.stop_loss and cp <= s.stop_loss:
+                hit_sl = True
+            if s.take_profit_1 and cp >= s.take_profit_1:
+                hit_tp = True
+        else:
+            if s.stop_loss and cp >= s.stop_loss:
+                hit_sl = True
+            if s.take_profit_1 and cp <= s.take_profit_1:
+                hit_tp = True
+        if hit_sl:
+            s.status = "LOSS"
+            s.outcome = "LOSS"
+            s.resolved_at = datetime.utcnow()
+            s.exit_price = cp
+            if s.entry_price and s.entry_price > 0:
+                s.pnl_pct = round(((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1), 2)
+        elif hit_tp:
+            s.status = "WIN"
+            s.outcome = "WIN"
+            s.resolved_at = datetime.utcnow()
+            s.exit_price = cp
+            if s.entry_price and s.entry_price > 0:
+                s.pnl_pct = round(((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1), 2)
+
+    # Commit any auto-resolved signals
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
     return [_signal_to_dict(s, current_price=price_map.get(s.ticker)) for s in signals]
 
 

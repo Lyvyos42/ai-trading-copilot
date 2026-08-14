@@ -891,3 +891,185 @@ async def get_ohlcv(
         return _cache_and_return({"ticker": ticker, "candles": candles})
     except Exception:
         return {"ticker": ticker, "candles": []}
+
+
+# ── 3D Microstructure Surface endpoints ──────────────────────────────────────
+import math
+import numpy as np
+from collections import defaultdict as _ddict
+
+_surface_cache: dict[str, tuple[dict, float]] = {}
+_SURFACE_TTL = 3  # seconds
+
+
+async def _get_ohlcv_for_surface(ticker: str, period: str = "5d", interval: str = "5m"):
+    cached = _ohlcv_cache.get(f"{ticker}:{interval}:{period}")
+    if cached and (_time.time() - cached[1]) < 30:
+        return cached[0].get("candles", [])
+    result = await get_ohlcv(ticker, period=period, interval=interval)
+    return result.get("candles", [])
+
+
+def _build_depth_surface(candles: list[dict], n_levels: int = 20, n_rows: int = 20) -> dict:
+    if not candles or len(candles) < 5:
+        return {"grid": [], "levels": [], "meta": {}}
+
+    recent = candles[-n_rows * 3:] if len(candles) > n_rows * 3 else candles
+    closes = [c["close"] for c in recent if c.get("close")]
+    volumes = [c.get("volume", 1) for c in recent]
+    if not closes:
+        return {"grid": [], "levels": [], "meta": {}}
+
+    mid = closes[-1]
+    price_range = max(closes) - min(closes)
+    if price_range <= 0:
+        price_range = mid * 0.02
+
+    half_range = price_range * 0.6
+    price_min = mid - half_range
+    price_max = mid + half_range
+    step = (price_max - price_min) / (n_levels - 1) if n_levels > 1 else 1
+    levels = [round(price_min + i * step, 5) for i in range(n_levels)]
+
+    mid_idx = min(range(len(levels)), key=lambda i: abs(levels[i] - mid))
+
+    grid = []
+    chunk_size = max(1, len(recent) // n_rows)
+    for row_i in range(n_rows):
+        start = row_i * chunk_size
+        chunk = recent[start:start + chunk_size]
+        if not chunk:
+            chunk = [recent[-1]]
+
+        row_vol = sum(c.get("volume", 1) for c in chunk)
+        avg_close = sum(c["close"] for c in chunk) / len(chunk)
+        max_vol = max(volumes) if volumes else 1
+
+        row = []
+        for j, px in enumerate(levels):
+            dist_from_price = abs(px - avg_close) / half_range
+            vol_factor = 1.0 - min(dist_from_price, 1.0)
+            vol_factor = vol_factor ** 1.5
+
+            side_boost = 0.15 if px <= mid else 0.0
+            depth_val = vol_factor * (row_vol / max(max_vol, 1)) + side_boost * vol_factor
+            depth_val = min(1.0, max(0.0, depth_val))
+            row.append(round(depth_val, 4))
+        grid.append(row)
+
+    bid_total = sum(grid[-1][:mid_idx])
+    ask_total = sum(grid[-1][mid_idx:])
+
+    return {
+        "grid": grid,
+        "levels": levels,
+        "mid_price": mid,
+        "bid_total": round(bid_total, 3),
+        "ask_total": round(ask_total, 3),
+        "meta": {
+            "price_min": price_min,
+            "price_max": price_max,
+            "levels": n_levels,
+            "mid": mid,
+            "ts": _time.time(),
+        },
+    }
+
+
+def _build_liquidity_surface(candles: list[dict], n_price_levels: int = 15, n_time_slices: int = 12) -> dict:
+    if not candles or len(candles) < 3:
+        return {"grid": [], "price_levels": [], "meta": {}}
+
+    all_closes = [c["close"] for c in candles if c.get("close")]
+    all_volumes = [c.get("volume", 1) for c in candles]
+    if not all_closes:
+        return {"grid": [], "price_levels": [], "meta": {}}
+
+    price_min = min(all_closes)
+    price_max = max(all_closes)
+    price_range = price_max - price_min
+    if price_range <= 0:
+        price_range = price_min * 0.02
+        price_min -= price_range / 2
+        price_max += price_range / 2
+
+    margin = price_range * 0.1
+    price_min -= margin
+    price_max += margin
+    bucket_width = (price_max - price_min) / n_price_levels
+
+    price_levels = [round(price_min + i * bucket_width, 5) for i in range(n_price_levels)]
+
+    chunk_size = max(1, len(candles) // n_time_slices)
+    grid = []
+    max_volume = 0
+
+    for slice_i in range(n_time_slices):
+        start = slice_i * chunk_size
+        chunk = candles[start:start + chunk_size]
+        if not chunk:
+            chunk = [candles[-1]]
+
+        row = [0.0] * n_price_levels
+        for c in chunk:
+            px = c["close"]
+            vol = c.get("volume", 1)
+            bucket_idx = int((px - price_min) / bucket_width)
+            bucket_idx = max(0, min(bucket_idx, n_price_levels - 1))
+            row[bucket_idx] += vol
+            if bucket_idx > 0:
+                row[bucket_idx - 1] += vol * 0.3
+            if bucket_idx < n_price_levels - 1:
+                row[bucket_idx + 1] += vol * 0.3
+
+        for v in row:
+            if v > max_volume:
+                max_volume = v
+        grid.append(row)
+
+    hotspot_price = price_levels[0]
+    hotspot_vol = 0
+    if grid:
+        last_row = grid[-1]
+        for i, v in enumerate(last_row):
+            if v > hotspot_vol:
+                hotspot_vol = v
+                hotspot_price = price_levels[i]
+
+    return {
+        "grid": grid,
+        "price_levels": price_levels,
+        "max_volume": round(max_volume, 2),
+        "hotspot_price": round(hotspot_price, 5),
+        "meta": {
+            "price_min": price_min,
+            "price_max": price_max,
+            "ts": _time.time(),
+        },
+    }
+
+
+@router.get("/depth-surface/{ticker}")
+async def get_depth_surface(ticker: str):
+    cache_key = f"depth:{ticker}"
+    cached = _surface_cache.get(cache_key)
+    if cached and (_time.time() - cached[1]) < _SURFACE_TTL:
+        return cached[0]
+
+    candles = await _get_ohlcv_for_surface(ticker, period="5d", interval="5m")
+    result = _build_depth_surface(candles, n_levels=20, n_rows=20)
+    _surface_cache[cache_key] = (result, _time.time())
+    return result
+
+
+@router.get("/liquidity-surface/{ticker}")
+async def get_liquidity_surface(ticker: str):
+    cache_key = f"liq:{ticker}"
+    cached = _surface_cache.get(cache_key)
+    if cached and (_time.time() - cached[1]) < _SURFACE_TTL:
+        return cached[0]
+
+    candles = await _get_ohlcv_for_surface(ticker, period="1mo", interval="1h")
+    result = _build_liquidity_surface(candles, n_price_levels=15, n_time_slices=12)
+    _surface_cache[cache_key] = (result, _time.time())
+    return result

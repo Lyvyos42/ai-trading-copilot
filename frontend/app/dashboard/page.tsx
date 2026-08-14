@@ -15,6 +15,16 @@ import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import dynamic from "next/dynamic";
+
+const DepthSurface3D = dynamic(
+  () => import("@/components/Microstructure3D").then(m => m.DepthSurface3D),
+  { ssr: false }
+);
+const LiquiditySurface3D = dynamic(
+  () => import("@/components/Microstructure3D").then(m => m.LiquiditySurface3D),
+  { ssr: false }
+);
 
 // Map profile slug → default chart interval for auto-switching
 const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> = {
@@ -133,6 +143,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   useEffect(() => {
     wakeBackend();
     loadData();
+    // Poll signals every 30s for auto-resolution (SL/TP/expiry)
+    const signalPoll = setInterval(loadData, 30_000);
     // Handle Stripe checkout success redirect
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -143,6 +155,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         setTimeout(() => setCheckoutSuccess(false), 8000);
       }
     }
+    return () => clearInterval(signalPoll);
   }, []);
 
   useEffect(() => {
@@ -156,7 +169,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   async function loadData() {
     const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
-      const activeOnly = sigs.value.filter(s => s.status === "ACTIVE");
+      const allFromApi = sigs.value;
+      const activeOnly = allFromApi.filter(s => s.status === "ACTIVE");
+      // IDs of signals the backend has resolved (WIN/LOSS/EXPIRED)
+      const resolvedIds = new Set(allFromApi.filter(s => s.status !== "ACTIVE").map(s => s.signal_id));
       setSignals(prev => {
         const localById = new Map(prev.map(s => [s.signal_id, s]));
         const merged = activeOnly.map(s => {
@@ -164,7 +180,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           return local ? { ...s, signal_mode: local.signal_mode } : s;
         });
         prev.forEach(s => {
-          if (s.status === "ACTIVE" && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
+          if (s.status === "ACTIVE" && !resolvedIds.has(s.signal_id) && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
         });
         const seen = new Set<string>();
         return merged.filter(s => {
@@ -512,9 +528,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             </div>
           )}
 
-          {/* Chart area */}
+          {/* Chart area — split into chart + 3D surfaces */}
           <div className="flex-1 flex flex-col min-h-0 relative">
-            <div className="flex-1 min-h-0 overflow-hidden relative" style={{ minHeight: "300px" }}>
+            {/* TradingView / Order Flow chart */}
+            <div className="flex-1 min-h-0 overflow-hidden relative" style={{ minHeight: "200px" }}>
               {chartMode === "tradingview" ? (
                 <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
               ) : (
@@ -523,6 +540,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               {chartMode === "tradingview" && selectedSignal?.signal_mode !== "AUTO_SCAN" && (
                 <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
               )}
+            </div>
+            {/* 3D Microstructure surfaces */}
+            <div className="flex shrink-0 border-t border-border" style={{ height: "220px" }}>
+              <DepthSurface3D ticker={activeTicker} className="flex-1 border-r border-border bg-[hsl(0_0%_2%)]" />
+              <LiquiditySurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
             </div>
           </div>
         </div>

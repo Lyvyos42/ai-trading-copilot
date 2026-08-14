@@ -484,7 +484,7 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
                                          ["live_news"] if sentiment_result.get("_live_news") else ["estimated_news"]),
         "macro_analysis":          _wrap("macro", macro_result,
                                          ["live_macro"] if macro_result.get("_live_news") else ["estimated_macro"]),
-        "order_flow_analysis":     _wrap("order_flow", order_flow_result, ["volume", "vwap", "obv"]),
+        "order_flow_analysis":     _wrap("order_flow", order_flow_result, ["volume", "vwap", "obv", "microstructure_3d"]),
         "regime_change_analysis":  _wrap("regime_change", regime_change_result, ["vix", "credit_spreads"]),
         "correlation_analysis":    _wrap("correlation", correlation_result, ["portfolio_corr"]),
     }

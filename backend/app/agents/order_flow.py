@@ -1,7 +1,67 @@
 import json
 import random
+import math
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
+
+
+def _compute_microstructure(closes: list, volumes: list) -> dict:
+    """Derive microstructure metrics from OHLCV for 3D surface integration."""
+    if not closes or len(closes) < 10 or not volumes:
+        return {}
+    recent = closes[-60:]
+    recent_vol = volumes[-60:] if len(volumes) >= 60 else volumes
+
+    mid = recent[-1]
+    price_range = max(recent) - min(recent)
+    if price_range <= 0:
+        return {}
+
+    half_range = price_range * 0.6
+    n_levels = 15
+    price_min = mid - half_range
+    step = (2 * half_range) / (n_levels - 1) if n_levels > 1 else 1
+    levels = [price_min + i * step for i in range(n_levels)]
+
+    bid_depth = 0.0
+    ask_depth = 0.0
+    for i, px in enumerate(levels):
+        dist = abs(px - mid) / half_range
+        weight = max(0, 1.0 - dist) ** 1.5
+        if px <= mid:
+            bid_depth += weight
+        else:
+            ask_depth += weight
+
+    depth_imbalance = (bid_depth - ask_depth) / max(bid_depth + ask_depth, 1e-6)
+
+    vol_profile = [0.0] * n_levels
+    for j, c in enumerate(recent):
+        idx = int((c - price_min) / step) if step > 0 else 0
+        idx = max(0, min(idx, n_levels - 1))
+        vol_profile[idx] += recent_vol[j] if j < len(recent_vol) else 1
+
+    max_vol = max(vol_profile) if vol_profile else 1
+    hotspot_idx = vol_profile.index(max_vol) if max_vol > 0 else len(vol_profile) // 2
+    hotspot_price = levels[hotspot_idx] if hotspot_idx < len(levels) else mid
+
+    first_half = sum(v * levels[i] for i, v in enumerate(vol_profile[:len(vol_profile) // 2]))
+    first_weight = sum(vol_profile[:len(vol_profile) // 2])
+    second_half = sum(v * levels[i] for i, v in enumerate(vol_profile[len(vol_profile) // 2:], len(vol_profile) // 2))
+    second_weight = sum(vol_profile[len(vol_profile) // 2:])
+
+    c1 = first_half / first_weight if first_weight > 0 else mid
+    c2 = second_half / second_weight if second_weight > 0 else mid
+    migration = "UP" if c2 > c1 else ("DOWN" if c2 < c1 else "STABLE")
+
+    return {
+        "depth_imbalance": round(depth_imbalance, 4),
+        "bid_depth_score": round(bid_depth, 4),
+        "ask_depth_score": round(ask_depth, 4),
+        "liquidity_hotspot": round(hotspot_price, 5),
+        "liquidity_migration": migration,
+        "volume_concentration": round(max_vol / max(sum(vol_profile), 1), 4),
+    }
 
 
 SYSTEM_PROMPT = """You are an expert order flow analyst specializing in microstructure signals:
@@ -57,6 +117,18 @@ class OrderFlowAnalyst(BaseAgent):
                     obv -= volumes[i]
             obv_trend = "RISING" if obv > 0 else "FALLING"
 
+        micro = _compute_microstructure(closes, volumes)
+
+        micro_ctx = ""
+        if micro:
+            micro_ctx = f"""
+3D Microstructure Analysis:
+- Depth Imbalance: {micro.get('depth_imbalance', 0):+.4f} ({'BID HEAVY' if micro.get('depth_imbalance', 0) > 0 else 'ASK HEAVY'})
+- Bid Depth Score: {micro.get('bid_depth_score', 0):.3f}, Ask Depth Score: {micro.get('ask_depth_score', 0):.3f}
+- Liquidity Hotspot: {micro.get('liquidity_hotspot', 'N/A')}
+- Liquidity Migration: {micro.get('liquidity_migration', 'STABLE')}
+- Volume Concentration: {micro.get('volume_concentration', 0):.2%}"""
+
         user_msg = f"""{self._strategy_context(state)}Analyze order flow for {ticker}.
 Current price: {close}
 VWAP: {vwap}, deviation: {vwap_dev:+.2f}%
@@ -64,6 +136,7 @@ Volume: {volume:,.0f} (ratio vs 30d avg: {vol_ratio:.2f}x)
 OBV trend: {obv_trend}
 Recent closes: {closes[-10:] if closes else 'N/A'}
 Recent volumes: {volumes[-10:] if volumes else 'N/A'}
+{micro_ctx}
 
 Apply strategies 3.16 (volume-weighted signals) and 3.17 (liquidity momentum).
 Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
@@ -71,13 +144,16 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
         if raw:
             try:
-                return json.loads(raw)
+                result = json.loads(raw)
+                if micro:
+                    result["microstructure"] = micro
+                return result
             except json.JSONDecodeError:
                 pass
 
-        return self._mock_analysis(ticker, market_data, vwap_dev, vol_ratio, obv_trend)
+        return self._mock_analysis(ticker, market_data, vwap_dev, vol_ratio, obv_trend, micro)
 
-    def _mock_analysis(self, ticker: str, market_data: dict, vwap_dev: float, vol_ratio: float, obv_trend: str) -> dict:
+    def _mock_analysis(self, ticker: str, market_data: dict, vwap_dev: float, vol_ratio: float, obv_trend: str, micro: dict | None = None) -> dict:
         seed = sum(ord(c) for c in ticker) + 55
         rng = random.Random(seed)
 
@@ -105,7 +181,23 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
         direction = "LONG" if composite > 0.1 else ("SHORT" if composite < -0.1 else "NEUTRAL")
         confidence = min(88, max(30, 50 + abs(composite) * 40 + rng.uniform(-5, 5)))
 
-        return {
+        # Incorporate microstructure depth imbalance into composite
+        if micro and micro.get("depth_imbalance"):
+            di = micro["depth_imbalance"]
+            composite += di * 0.15
+            smf = max(-1.0, min(1.0, smf + di * 0.1))
+            direction = "LONG" if composite > 0.1 else ("SHORT" if composite < -0.1 else "NEUTRAL")
+            confidence = min(88, max(30, 50 + abs(composite) * 40 + rng.uniform(-5, 5)))
+
+        micro_str = ""
+        if micro:
+            micro_str = (
+                f" Depth imbalance: {micro.get('depth_imbalance', 0):+.3f} "
+                f"({'BID HEAVY' if micro.get('depth_imbalance', 0) > 0 else 'ASK HEAVY'}). "
+                f"Liquidity migration: {micro.get('liquidity_migration', 'STABLE')}."
+            )
+
+        result = {
             "direction": direction,
             "confidence": round(confidence, 1),
             "vpin_score": round(vpin, 3),
@@ -118,6 +210,10 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
                 f"{ticker} order flow: VPIN at {vpin:.2f}, bid/ask imbalance {ba_imbalance:+.2f}. "
                 f"Block trade bias: {block_bias}. Dark pool activity: {dark_pool}. "
                 f"VWAP deviation {vwap_dev:+.2f}%, volume {vol_ratio:.1f}x average. "
-                f"Smart money flow {smf:+.2f}. Strategy 3.16-3.17: {direction} at {confidence:.0f}%."
+                f"Smart money flow {smf:+.2f}.{micro_str} "
+                f"Strategy 3.16-3.17: {direction} at {confidence:.0f}%."
             ),
         }
+        if micro:
+            result["microstructure"] = micro
+        return result
