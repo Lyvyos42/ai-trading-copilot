@@ -97,16 +97,16 @@ class Surface3DEngine {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
     this.target.y = opts.targetY ?? 0.6;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setClearColor(0x080808, 1);
 
-    this.scene.fog = new THREE.Fog(0x050403, 10, 40);
+    this.scene.fog = new THREE.Fog(0x080808, 10, 40);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-    const dir = new THREE.DirectionalLight(0xfff2d8, 0.6);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    const dir = new THREE.DirectionalLight(0xf8f4ec, 0.4);
     dir.position.set(8, 12, 6);
-    const point = new THREE.PointLight(THEME.gold, 0.45, 22, 2);
+    const point = new THREE.PointLight(THEME.gold, 0.2, 22, 2);
     point.position.set(0, 3, 1);
     this.scene.add(ambient, dir, point);
 
@@ -191,10 +191,10 @@ class Surface3DEngine {
   };
 
   addGridFloor(size: number) {
-    const grid = new THREE.GridHelper(size, 24, 0xffffff, 0xffffff);
+    const grid = new THREE.GridHelper(size, 24, 0xd4a240, 0xd4a240);
     grid.position.y = -0.02;
     (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.04;
+    (grid.material as THREE.Material).opacity = 0.025;
     (grid.material as THREE.Material).depthWrite = false;
     this.scene.add(grid);
   }
@@ -453,12 +453,14 @@ export function DepthSurface3D({ ticker, className }: Surface3DProps) {
   }, [ticker, setData]);
 
   return (
-    <div className={`relative ${className ?? ""}`}>
-      <div className="absolute top-1 left-2 z-10 flex items-center gap-2">
-        <span className="text-[9px] font-mono font-bold text-primary/80 tracking-widest">3D ORDER BOOK DEPTH</span>
-        <div ref={infoRef} className="text-[9px] font-mono" />
+    <div className={`flex flex-col bg-background ${className ?? ""}`}>
+      <div className="terminal-header shrink-0">
+        <span className="terminal-label">3D ORDER BOOK DEPTH</span>
+        <div ref={infoRef} className="ml-auto text-[11px] font-mono" />
       </div>
-      <canvas ref={canvasRef} className="w-full h-full" />
+      <div className="relative flex-1 min-h-0">
+        <canvas ref={canvasRef} className="w-full h-full" />
+      </div>
     </div>
   );
 }
@@ -589,12 +591,14 @@ export function LiquiditySurface3D({ ticker, className }: Surface3DProps) {
   }, [ticker, setData]);
 
   return (
-    <div className={`relative ${className ?? ""}`}>
-      <div className="absolute top-1 left-2 z-10 flex items-center gap-2">
-        <span className="text-[9px] font-mono font-bold text-primary/80 tracking-widest">3D LIQUIDITY HEATMAP</span>
-        <div ref={infoRef} className="text-[9px] font-mono" />
+    <div className={`flex flex-col bg-background ${className ?? ""}`}>
+      <div className="terminal-header shrink-0">
+        <span className="terminal-label">3D LIQUIDITY HEATMAP</span>
+        <div ref={infoRef} className="ml-auto text-[11px] font-mono" />
       </div>
-      <canvas ref={canvasRef} className="w-full h-full" />
+      <div className="relative flex-1 min-h-0">
+        <canvas ref={canvasRef} className="w-full h-full" />
+      </div>
     </div>
   );
 }
