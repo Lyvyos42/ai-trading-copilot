@@ -529,7 +529,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           )}
 
           {/* Chart area */}
-          <div className="flex-1 min-h-0 overflow-hidden relative">
+          <div className="min-h-0 overflow-hidden relative" style={{ flex: "1 1 0%", minHeight: 200 }}>
             {chartMode === "tradingview" ? (
               <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
             ) : (
@@ -540,7 +540,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             )}
           </div>
           {/* 3D Microstructure surfaces — side by side below chart */}
-          <div className="hidden lg:flex shrink-0 gap-1 border-t border-border" style={{ height: "200px" }}>
+          <div className="hidden lg:flex gap-1 border-t border-border" style={{ flex: "0 0 22%", minHeight: 160 }}>
             <DepthSurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
             <LiquiditySurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
           </div>
