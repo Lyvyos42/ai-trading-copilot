@@ -540,7 +540,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             )}
           </div>
           {/* 3D Microstructure surfaces — side by side below chart */}
-          <div className="hidden lg:flex gap-1 border-t border-border" style={{ flex: "0 0 22%", minHeight: 160 }}>
+          <div className="hidden lg:flex gap-1 border-t border-border" style={{ flex: "0 0 28%", minHeight: 180, maxHeight: 280 }}>
             <DepthSurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
             <LiquiditySurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
           </div>
