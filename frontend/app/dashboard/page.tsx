@@ -528,24 +528,21 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             </div>
           )}
 
-          {/* Chart area — chart + 3D sidebar */}
-          <div className="flex-1 flex min-h-0 relative">
-            {/* TradingView / Order Flow chart */}
-            <div className="flex-1 min-h-0 overflow-hidden relative">
-              {chartMode === "tradingview" ? (
-                <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
-              ) : (
-                <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
-              )}
-              {chartMode === "tradingview" && selectedSignal?.signal_mode !== "AUTO_SCAN" && (
-                <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
-              )}
-            </div>
-            {/* 3D Microstructure sidebar */}
-            <div className="hidden lg:flex flex-col shrink-0 border-l border-border" style={{ width: "280px" }}>
-              <DepthSurface3D ticker={activeTicker} className="flex-1 border-b border-border bg-[hsl(0_0%_2%)]" />
-              <LiquiditySurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
-            </div>
+          {/* Chart area */}
+          <div className="flex-1 min-h-0 overflow-hidden relative">
+            {chartMode === "tradingview" ? (
+              <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
+            ) : (
+              <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
+            )}
+            {chartMode === "tradingview" && selectedSignal?.signal_mode !== "AUTO_SCAN" && (
+              <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
+            )}
+          </div>
+          {/* 3D Microstructure surfaces — side by side below chart */}
+          <div className="hidden lg:flex shrink-0 gap-1 border-t border-border" style={{ height: "200px" }}>
+            <DepthSurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
+            <LiquiditySurface3D ticker={activeTicker} className="flex-1 bg-[hsl(0_0%_2%)]" />
           </div>
         </div>
 
