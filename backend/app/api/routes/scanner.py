@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import get_current_user, get_optional_user
 from app.db.database import get_db
 from app.models.alert import ScannerConfig, MarketAlert
+from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 alerts_router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
@@ -24,14 +25,19 @@ MAX_SYMBOLS   = 20
 VALID_INTERVALS = {15, 30, 60}
 
 
-def _require_premium(user: dict) -> str:
-    tier = user.get("tier", "free") or "free"
+async def _require_premium(user: dict, db: AsyncSession) -> str:
+    user_id = user.get("sub", "")
+    tier = user.get("tier", "") or ""
+    if tier not in PREMIUM_TIERS:
+        result = await db.execute(select(User).where(User.id == user_id))
+        db_user = result.scalar_one_or_none()
+        tier = db_user.tier if db_user else "free"
     if tier not in PREMIUM_TIERS:
         raise HTTPException(
             status_code=403,
             detail=f"Agent Scanner requires a Pro or Enterprise plan (your tier: {tier}).",
         )
-    return user["sub"]
+    return user_id
 
 
 # ── Config schema ──────────────────────────────────────────────────────────────
@@ -67,7 +73,7 @@ async def get_config(
     db:   AsyncSession = Depends(get_db),
     user: dict         = Depends(get_current_user),
 ):
-    user_id = _require_premium(user)
+    user_id = await _require_premium(user, db)
     result  = await db.execute(select(ScannerConfig).where(ScannerConfig.user_id == user_id))
     cfg     = result.scalar_one_or_none()
     if not cfg:
@@ -88,7 +94,7 @@ async def save_config(
     db:   AsyncSession = Depends(get_db),
     user: dict         = Depends(get_current_user),
 ):
-    user_id = _require_premium(user)
+    user_id = await _require_premium(user, db)
 
     if body.interval_minutes not in VALID_INTERVALS:
         raise HTTPException(status_code=400, detail="interval_minutes must be 15, 30, or 60")
@@ -165,7 +171,7 @@ async def trigger_auto_scan(
     user: dict         = Depends(get_current_user),
 ):
     """Manually trigger an auto-scan for the current user (testing/on-demand)."""
-    user_id = _require_premium(user)
+    user_id = await _require_premium(user, db)
 
     result = await db.execute(
         select(ScannerConfig).where(ScannerConfig.user_id == user_id)

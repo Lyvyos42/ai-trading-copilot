@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import get_current_user
 from app.db.database import get_db
 from app.models.news import NewsArticle
+from app.models.user import User
 
 log = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/news", tags=["news"])
@@ -155,9 +156,14 @@ async def alternative_data():
 
 
 @router.post("/refresh", status_code=202)
-async def trigger_scrape(user: dict = Depends(get_current_user)):
+async def trigger_scrape(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Manually trigger a news scrape (admin only)."""
-    tier = user.get("tier", "free")
+    user_id = user.get("sub", "")
+    tier = user.get("tier", "") or ""
+    if tier != "admin":
+        result = await db.execute(select(User).where(User.id == user_id))
+        db_user = result.scalar_one_or_none()
+        tier = db_user.tier if db_user else "free"
     if tier != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     import asyncio

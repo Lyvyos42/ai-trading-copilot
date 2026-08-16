@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from app.auth.jwt import get_current_user
 from app.data.alpaca_provider import (
     is_configured,
@@ -15,6 +17,7 @@ from app.data.alpaca_provider import (
     get_order_history,
 )
 from app.db.database import get_db
+from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/paper-trading", tags=["paper-trading"])
 
@@ -26,8 +29,13 @@ def _require_alpaca():
         raise HTTPException(status_code=503, detail="Paper trading not configured")
 
 
-def _require_paid(user: dict):
-    tier = user.get("tier", "free")
+async def _require_paid(user: dict, db: AsyncSession):
+    user_id = user.get("sub", "")
+    tier = user.get("tier", "") or ""
+    if tier not in _PAID_TIERS:
+        result = await db.execute(select(User).where(User.id == user_id))
+        db_user = result.scalar_one_or_none()
+        tier = db_user.tier if db_user else "free"
     if tier not in _PAID_TIERS:
         raise HTTPException(status_code=403, detail="Paper trading requires a paid subscription")
 
@@ -41,9 +49,9 @@ class OrderRequest(BaseModel):
 
 
 @router.get("/account")
-async def paper_account(user: dict = Depends(get_current_user)):
+async def paper_account(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     _require_alpaca()
-    _require_paid(user)
+    await _require_paid(user, db)
     account = await get_account()
     if account is None:
         raise HTTPException(status_code=502, detail="Failed to fetch Alpaca account")
@@ -51,9 +59,9 @@ async def paper_account(user: dict = Depends(get_current_user)):
 
 
 @router.post("/orders")
-async def paper_order(req: OrderRequest, user: dict = Depends(get_current_user)):
+async def paper_order(req: OrderRequest, db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     _require_alpaca()
-    _require_paid(user)
+    await _require_paid(user, db)
     if req.side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be 'buy' or 'sell'")
     result = await submit_order(req.symbol, req.qty, req.side, req.order_type, req.time_in_force)
@@ -63,9 +71,9 @@ async def paper_order(req: OrderRequest, user: dict = Depends(get_current_user))
 
 
 @router.get("/positions")
-async def paper_positions(user: dict = Depends(get_current_user)):
+async def paper_positions(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     _require_alpaca()
-    _require_paid(user)
+    await _require_paid(user, db)
     positions = await get_positions()
     if positions is None:
         raise HTTPException(status_code=502, detail="Failed to fetch positions")
@@ -73,9 +81,9 @@ async def paper_positions(user: dict = Depends(get_current_user)):
 
 
 @router.get("/orders")
-async def paper_orders(user: dict = Depends(get_current_user)):
+async def paper_orders(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     _require_alpaca()
-    _require_paid(user)
+    await _require_paid(user, db)
     orders = await get_order_history()
     if orders is None:
         raise HTTPException(status_code=502, detail="Failed to fetch orders")
