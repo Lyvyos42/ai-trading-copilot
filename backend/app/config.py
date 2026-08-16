@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS — comma-separated origins. Override via ALLOWED_ORIGINS env var.
-    allowed_origins: str = "http://localhost:3000,https://ai-trading-copilot.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"
+    allowed_origins: str = "http://localhost:3000,https://ai-trading-copilot-tan.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"
 
     # Rate limits per tier (requests per minute)
     rate_limits: dict = {
