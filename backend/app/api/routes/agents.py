@@ -3,7 +3,9 @@ GET /api/v1/agents/status — health and activity of all 9 agents + Risk Gate
 """
 import random
 from datetime import datetime, timezone
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.auth.jwt import get_current_user
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
@@ -100,7 +102,7 @@ AGENTS = [
 
 
 @router.get("/status")
-async def agent_status():
+async def agent_status(_user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc).isoformat()
     statuses = []
     for a in AGENTS:

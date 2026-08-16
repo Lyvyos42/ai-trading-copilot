@@ -21,6 +21,14 @@ from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+
+def _get_real_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
+
+
 _AUTH_RATE_LIMIT = 5
 _AUTH_RATE_WINDOW = 900  # 15 minutes
 _auth_rate_store: dict[str, list[float]] = defaultdict(list)
@@ -51,7 +59,7 @@ class TokenResponse(BaseModel):
 
 @router.post("/register", status_code=201)
 async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+    client_ip = _get_real_ip(request)
     _check_auth_rate_limit(client_ip)
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
@@ -65,7 +73,7 @@ async def register(body: RegisterRequest, request: Request, db: AsyncSession = D
 
 @router.post("/token", response_model=TokenResponse)
 async def login(form: OAuth2PasswordRequestForm = Depends(), request: Request = None, db: AsyncSession = Depends(get_db)):
-    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip() if request else "unknown"
+    client_ip = _get_real_ip(request) if request else "unknown"
     _check_auth_rate_limit(client_ip)
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()

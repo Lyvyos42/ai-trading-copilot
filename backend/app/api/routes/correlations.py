@@ -6,7 +6,9 @@ GET /api/v1/correlations/pair
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+
+from app.auth.jwt import get_current_user
 
 router = APIRouter(prefix="/api/v1/correlations", tags=["correlations"])
 
@@ -155,6 +157,7 @@ def _compute_pair(t1: str, t2: str, period_days: int) -> dict:
 async def get_correlation_matrix(
     tickers: str = Query(None, description="Comma-separated tickers"),
     period: int = Query(90, ge=30, le=365, description="Lookback period in days"),
+    _user: dict = Depends(get_current_user),
 ):
     ticker_list = [t.strip() for t in tickers.split(",")] if tickers else _DEFAULT_TICKERS
 
@@ -175,6 +178,7 @@ async def get_correlation_pair(
     t1: str = Query(..., description="First ticker"),
     t2: str = Query(..., description="Second ticker"),
     period: int = Query(90, ge=30, le=365),
+    _user: dict = Depends(get_current_user),
 ):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(_pool, _compute_pair, t1, t2, period)

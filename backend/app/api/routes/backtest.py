@@ -8,7 +8,9 @@ import asyncio
 import random
 import math
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.auth.jwt import get_current_user
 
 router = APIRouter(prefix="/api/v1/backtest", tags=["backtest"])
 
@@ -241,6 +243,7 @@ async def get_ohlcv(
     symbol:    str = Query("EURUSD"),
     timeframe: str = Query("1d"),
     years:     int = Query(2, ge=1, le=5),
+    _user: dict = Depends(get_current_user),
 ):
     tf = timeframe.lower()
     if tf not in _YF_LIMITS:
@@ -255,6 +258,7 @@ async def run_backtest(
     strategy: str,
     ticker: str = Query(default="SPY"),
     period: str = Query(default="1Y", pattern="^(1Y|2Y|3Y|5Y)$"),
+    _user: dict = Depends(get_current_user),
 ):
     strategy = strategy.lower().replace("-", "_")
     if strategy not in STRATEGIES:
@@ -266,7 +270,7 @@ async def run_backtest(
 
 
 @router.get("")
-async def list_strategies():
+async def list_strategies(_user: dict = Depends(get_current_user)):
     return {
         "strategies": [
             {"name": k, "ref": v["ref"], "description": v["description"]}

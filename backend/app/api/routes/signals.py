@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.jwt import get_optional_user
+from app.auth.jwt import get_current_user, get_optional_user
 from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
@@ -292,16 +292,15 @@ async def generate_signal(
     request: Request,
     body: GenerateRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
     # ── Layer 0: IP rate limit (protects unauthenticated + authenticated) ────────
-    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "unknown")
     _check_ip_rate_limit(client_ip)
 
-    # ── Visitor daily limit (unauthenticated) ─────────────────────────────────
+    # ── Fetch DB user ─────────────────────────────────────────────────────────
     db_user = None
-    if not user:
-        _check_visitor_daily_limit(client_ip)
 
     # ── Authenticated user guards ────────────────────────────────────────────────
     if user:
@@ -554,15 +553,13 @@ async def journal_signals(
     min_confidence: float | None = None,
     max_confidence: float | None = None,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
     """Full signal history with filters — for authenticated journal page."""
+    uid = user.get("sub") or user.get("id") or user.get("user_id")
     query = select(Signal).order_by(desc(Signal.created_at))
-
-    if user:
-        uid = user.get("sub") or user.get("id") or user.get("user_id")
-        if uid:
-            query = query.where(Signal.user_id == uid)
+    if uid:
+        query = query.where(Signal.user_id == uid)
 
     if ticker:
         query = query.where(Signal.ticker == ticker.upper().strip())
@@ -585,10 +582,8 @@ async def journal_signals(
 async def get_signal(
     signal_id: str,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
     uid = user.get("sub") or user.get("id") or user.get("user_id")
     result = await db.execute(
         select(Signal).where(Signal.id == signal_id, Signal.user_id == uid)
@@ -607,13 +602,12 @@ async def get_signal(
 async def list_signals(
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
+    uid = user.get("sub") or user.get("id") or user.get("user_id")
     query = select(Signal).order_by(desc(Signal.created_at)).limit(min(limit, 100))
-    if user:
-        uid = user.get("sub") or user.get("id") or user.get("user_id")
-        if uid:
-            query = query.where(Signal.user_id == uid)
+    if uid:
+        query = query.where(Signal.user_id == uid)
     result = await db.execute(query)
     signals = result.scalars().all()
 
@@ -689,26 +683,21 @@ async def set_signal_outcome(
     signal_id: str,
     body: OutcomeRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
     if body.outcome not in ("WIN", "LOSS", "EXPIRED"):
         raise HTTPException(status_code=400, detail="outcome must be WIN, LOSS, or EXPIRED")
+
+    owner_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
+    _u = (await db.execute(select(User).where(User.id == owner_id))).scalar_one_or_none()
+    is_admin = (_u.tier if _u else "free") == "admin"
 
     result = await db.execute(select(Signal).where(Signal.id == signal_id))
     signal = result.scalar_one_or_none()
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
 
-    # Only the owner (or admin) can resolve a signal
-    owner_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
-    is_admin = False
-    if owner_id:
-        from app.models.user import User
-        _u = (await db.execute(select(User).where(User.id == owner_id))).scalar_one_or_none()
-        is_admin = (_u.tier if _u else user.get("tier", "free")) == "admin"
     if not is_admin:
-        if not user:
-            raise HTTPException(status_code=401, detail="Authentication required")
         if signal.user_id and signal.user_id != owner_id:
             raise HTTPException(status_code=403, detail="Not your signal")
         if not signal.user_id:

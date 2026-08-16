@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.jwt import get_current_user
 from app.db.database import get_db
 from app.models.signal import Signal
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/v1/performance", tags=["performance"])
 
 
 @router.get("/summary")
-async def performance_summary(db: AsyncSession = Depends(get_db)):
+async def performance_summary(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Total signals, win rate, avg confidence, avg pnl."""
     total_result = await db.execute(select(func.count()).select_from(Signal))
     total = total_result.scalar() or 0
@@ -57,7 +58,7 @@ async def performance_summary(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/equity-curve")
-async def equity_curve(db: AsyncSession = Depends(get_db)):
+async def equity_curve(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Array of {date, cumulative_pnl_pct} for resolved signals ordered by resolved_at."""
     result = await db.execute(
         select(Signal.resolved_at, Signal.pnl_pct)
@@ -81,7 +82,7 @@ async def equity_curve(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/by-asset-class")
-async def by_asset_class(db: AsyncSession = Depends(get_db)):
+async def by_asset_class(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Win rate breakdown by asset class."""
     result = await db.execute(
         select(
@@ -112,7 +113,7 @@ async def by_asset_class(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/by-agent")
-async def by_agent(db: AsyncSession = Depends(get_db)):
+async def by_agent(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Agent accuracy — which agent's direction call matched the final outcome most often."""
     result = await db.execute(
         select(Signal.agent_votes, Signal.direction, Signal.outcome)
@@ -156,7 +157,7 @@ async def by_agent(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/calibration")
-async def calibration(db: AsyncSession = Depends(get_db)):
+async def calibration(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Confidence vs actual win rate — bucketed by 10% intervals."""
     result = await db.execute(
         select(Signal.confidence_score, Signal.outcome)
@@ -190,7 +191,7 @@ async def calibration(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/monthly")
-async def monthly_returns(db: AsyncSession = Depends(get_db)):
+async def monthly_returns(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     """Monthly returns for heatmap — grouped by year/month."""
     result = await db.execute(
         select(Signal.resolved_at, Signal.pnl_pct)

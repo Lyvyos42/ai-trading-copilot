@@ -41,11 +41,8 @@ async def trigger_debate(
     body: DebateRequest,
     _user: dict = Depends(get_current_user),
 ):
-    client_ip = (
-        request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
-        .split(",")[0]
-        .strip()
-    )
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "unknown")
     _check_ip_rate_limit(client_ip)
 
     ticker = body.ticker.upper().strip()
