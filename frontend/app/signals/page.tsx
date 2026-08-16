@@ -646,7 +646,7 @@ export default function SignalsPage() {
             </div>
           )}
 
-          {/* Latest Signal output — only the most recent signal as full card */}
+          {/* Signal output — all signals as full cards */}
           {signals.length === 0 && !loading ? (
             <div className="panel">
               <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -660,7 +660,7 @@ export default function SignalsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {signals.slice(0, 1).map((signal) => (
+              {signals.map((signal) => (
                 <SignalCard key={signal.signal_id} signal={signal} onResolve={(id, outcome) => handleResolveSignal(id, outcome)} />
               ))}
             </div>
