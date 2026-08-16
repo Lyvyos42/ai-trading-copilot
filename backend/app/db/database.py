@@ -30,8 +30,8 @@ def _build_engine_args(raw_url: str):
     clean_url = urlunparse(parsed._replace(query=urlencode(qs, doseq=True)))
 
     _ssl_ctx = _ssl.create_default_context()
-    _ssl_ctx.check_hostname = True
-    _ssl_ctx.verify_mode = _ssl.CERT_REQUIRED
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = _ssl.CERT_NONE
     return clean_url, {"ssl": _ssl_ctx}
 
 _db_url, _connect_args = _build_engine_args(settings.database_url)
