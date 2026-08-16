@@ -80,16 +80,19 @@ async def lifespan(app: FastAPI):
             from app.models.user import User
             from app.auth.jwt import hash_password
             from sqlalchemy import select
+            import secrets
             async with AsyncSessionLocal() as session:
                 existing = await session.execute(select(User).where(User.email == "demo@tradingcopilot.ai"))
                 if not existing.scalar_one_or_none():
+                    demo_pw = secrets.token_urlsafe(24)
                     session.add(User(
                         id="00000000-0000-0000-0000-000000000001",
                         email="demo@tradingcopilot.ai",
-                        hashed_password=hash_password("demo1234"),
-                        tier="pro",
+                        hashed_password=hash_password(demo_pw),
+                        tier="free",
                     ))
                     await session.commit()
+                    log.info("demo_user_created", password=demo_pw)
 
         log.info("startup_db_ok", environment=settings.environment)
     except Exception as exc:
@@ -138,18 +141,30 @@ app = FastAPI(
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
+_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=(
-        r"https://.*\.vercel\.app"
-        r"|https://app\.quantneuraledge\.com"
-        r"|https://quantneuraledge\.com"
-        r"|http://localhost:\d+"
-    ),
+    allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# ─── Security Headers ────────────────────────────────────────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
@@ -177,14 +192,7 @@ app.include_router(ws_router)
 # ─── Health check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {
-        "status": "healthy",
-        "version": "1.0.0",
-        "environment": settings.environment,
-        "agents": 9,
-        "memory_layer": "active",
-        "strategies": 80,
-    }
+    return {"status": "healthy"}
 
 
 # ─── Global error handler ─────────────────────────────────────────────────────

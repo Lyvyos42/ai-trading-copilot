@@ -3,8 +3,10 @@ POST /api/v1/auth/register  — create account
 POST /api/v1/auth/token     — login, return JWT
 GET  /api/v1/auth/me        — current user info
 """
+import time
+from collections import defaultdict
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
@@ -19,6 +21,22 @@ from app.models.user import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+_AUTH_RATE_LIMIT = 5
+_AUTH_RATE_WINDOW = 900  # 15 minutes
+_auth_rate_store: dict[str, list[float]] = defaultdict(list)
+
+def _check_auth_rate_limit(ip: str) -> None:
+    now = time.time()
+    window_start = now - _AUTH_RATE_WINDOW
+    _auth_rate_store[ip] = [t for t in _auth_rate_store[ip] if t > window_start]
+    if len(_auth_rate_store[ip]) >= _AUTH_RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many attempts. Try again in {_AUTH_RATE_WINDOW // 60} minutes.",
+            headers={"Retry-After": str(_AUTH_RATE_WINDOW)},
+        )
+    _auth_rate_store[ip].append(now)
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -32,7 +50,9 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/register", status_code=201)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+    _check_auth_rate_limit(client_ip)
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -44,7 +64,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/token", response_model=TokenResponse)
-async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+async def login(form: OAuth2PasswordRequestForm = Depends(), request: Request = None, db: AsyncSession = Depends(get_db)):
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip() if request else "unknown"
+    _check_auth_rate_limit(client_ip)
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(form.password, user.hashed_password):

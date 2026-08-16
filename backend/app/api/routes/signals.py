@@ -706,8 +706,13 @@ async def set_signal_outcome(
         from app.models.user import User
         _u = (await db.execute(select(User).where(User.id == owner_id))).scalar_one_or_none()
         is_admin = (_u.tier if _u else user.get("tier", "free")) == "admin"
-    if user and signal.user_id and signal.user_id != owner_id and not is_admin:
-        raise HTTPException(status_code=403, detail="Not your signal")
+    if not is_admin:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if signal.user_id and signal.user_id != owner_id:
+            raise HTTPException(status_code=403, detail="Not your signal")
+        if not signal.user_id:
+            raise HTTPException(status_code=403, detail="System signals can only be resolved by admins")
 
     signal.status = body.outcome
     signal.outcome = body.outcome

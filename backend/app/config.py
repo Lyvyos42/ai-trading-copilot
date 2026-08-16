@@ -43,14 +43,14 @@ class Settings(BaseSettings):
     stripe_price_enterprise: str = "" # Stripe Price ID for $499/mo Enterprise
 
     # Auth
-    jwt_secret: str = "change_me_in_production"
+    jwt_secret: str = "MUST_SET_VIA_ENV_VAR"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440
+    access_token_expire_minutes: int = 30
     # Supabase — set SUPABASE_URL + SUPABASE_JWT_SECRET in Render env vars
     supabase_url: str = ""          # e.g. https://xxxx.supabase.co
     supabase_jwt_secret: str = ""   # optional legacy HS256 secret
     # Admin — set ADMIN_SECRET in Render env vars to protect the promote endpoint
-    admin_secret: str = "change_me_admin_secret"
+    admin_secret: str = "MUST_SET_VIA_ENV_VAR"
 
     # Provider tier configuration (format: "provider:model")
     provider_tier_premium: str = "anthropic:claude-opus-4-6"
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS — comma-separated origins. Override via ALLOWED_ORIGINS env var.
-    allowed_origins: str = "http://localhost:3000,https://*.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"
+    allowed_origins: str = "http://localhost:3000,https://ai-trading-copilot.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"
 
     # Rate limits per tier (requests per minute)
     rate_limits: dict = {
