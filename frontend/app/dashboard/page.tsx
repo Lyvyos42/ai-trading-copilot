@@ -100,6 +100,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
   });
   const [chartMode, setChartMode] = useState<"tradingview" | "orderflow">("tradingview");
+  const [pipelineOpen, setPipelineOpen] = useState(false);
 
   // Auto-scanner state
   const [scannerRunning, setScannerRunning] = useState(false);
@@ -529,7 +530,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           )}
 
           {/* Chart area */}
-          <div className="min-h-0 overflow-hidden relative" style={{ flex: "1 1 0%", minHeight: 200 }}>
+          <div className="min-h-0 overflow-hidden relative" style={{ flex: "3 1 0%", minHeight: 280 }}>
             {chartMode === "tradingview" ? (
               <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
             ) : (
@@ -540,7 +541,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
             )}
           </div>
           {/* 3D Microstructure surfaces — side by side below chart */}
-          <div className="hidden lg:flex border-t border-border border-b" style={{ flex: "1 0 180px" }}>
+          <div className="hidden lg:flex border-t border-border border-b" style={{ flex: "1 0 180px", maxHeight: "28%" }}>
             <DepthSurface3D ticker={activeTicker} className="flex-1 border-r border-border" />
             <LiquiditySurface3D ticker={activeTicker} className="flex-1" />
           </div>
@@ -633,28 +634,42 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           <div className="flex-1 overflow-y-auto">
             <AgentStatusPanel agents={agents.length > 0 ? agents : PLACEHOLDER_AGENTS} compact />
 
-            {/* Pipeline card */}
-            <div className="border-t border-border mt-2 pt-2 px-3 pb-3">
-              <div className="terminal-label mb-2">PIPELINE STAGES</div>
-              {[
-                { n: "1", name: "Parallel Analysis",  detail: "7 agents concurrent" },
-                { n: "2", name: "Quant Validation",   detail: "Statistical edge check" },
-                { n: "3", name: "Bull/Bear Debate",   detail: "Researcher debate" },
-                { n: "4", name: "Trade Decision",     detail: "TraderAgent (Opus 4)" },
-                { n: "5", name: "Risk Gate",          detail: "15 hard veto rules" },
-                { n: "6", name: "Risk Check",         detail: "Kelly + exposure" },
-                { n: "7", name: "Fund Manager",       detail: "Final approval" },
-              ].map(({ n, name, detail }) => (
-                <div key={n} className="flex items-start gap-2 mb-2">
-                  <div className="h-4 w-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-[8px] font-bold text-primary">{n}</span>
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-medium text-foreground leading-tight">{name}</div>
-                    <div className="text-[13px] text-muted-foreground">{detail}</div>
-                  </div>
+            {/* Pipeline card — collapsible */}
+            <div className="border-t border-border mt-1 pt-1 px-2.5 pb-2">
+              <button
+                onClick={() => setPipelineOpen(p => !p)}
+                className="flex items-center gap-1.5 w-full text-left py-1 group"
+              >
+                <svg
+                  width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  className={cn("text-muted-foreground transition-transform", pipelineOpen && "rotate-90")}
+                >
+                  <polyline points="2,1 6,4 2,7" />
+                </svg>
+                <span className="terminal-label group-hover:text-foreground/80 transition-colors">PIPELINE STAGES</span>
+                <span className="text-[8px] font-mono text-muted-foreground/50 ml-auto">7 STEPS</span>
+              </button>
+              {pipelineOpen && (
+                <div className="mt-1">
+                  {[
+                    { n: "1", name: "Parallel Analysis",  detail: "7 agents concurrent" },
+                    { n: "2", name: "Quant Validation",   detail: "Statistical edge check" },
+                    { n: "3", name: "Bull/Bear Debate",    detail: "Researcher debate" },
+                    { n: "4", name: "Trade Decision",      detail: "TraderAgent (Opus 4)" },
+                    { n: "5", name: "Risk Gate",           detail: "15 hard veto rules" },
+                    { n: "6", name: "Risk Check",          detail: "Kelly + exposure" },
+                    { n: "7", name: "Fund Manager",        detail: "Final approval" },
+                  ].map(({ n, name, detail }) => (
+                    <div key={n} className="flex items-center gap-1.5 mb-1">
+                      <div className="h-3.5 w-3.5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                        <span className="text-[7px] font-bold text-primary">{n}</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-foreground leading-tight">{name}</span>
+                      <span className="text-[9px] text-muted-foreground/60 ml-auto">{detail}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Agent Scanner */}

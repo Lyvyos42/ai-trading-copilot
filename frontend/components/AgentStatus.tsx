@@ -51,51 +51,46 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
             <div
               key={agent.name}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 transition-colors",
+                "flex items-center gap-1.5 px-2.5 py-1 transition-colors",
                 isTrader && "bg-primary/[0.04]"
               )}
             >
               {/* Icon */}
               <div className={cn(
-                "h-5 w-5 rounded flex items-center justify-center shrink-0",
+                "h-4 w-4 rounded flex items-center justify-center shrink-0",
                 isTrader ? "bg-primary/10 border border-primary/20" : "bg-muted border border-border/50"
               )}>
-                <Icon className={cn("h-2.5 w-2.5", isTrader ? "text-primary" : "text-muted-foreground")} />
+                <Icon className={cn("h-2 w-2", isTrader ? "text-primary" : "text-muted-foreground")} />
               </div>
 
-              {/* Name + role */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className={cn(
-                    "text-[14px] font-mono font-bold truncate",
-                    isTrader ? "text-primary" : "text-foreground"
-                  )}>
-                    {AGENT_SHORT[agent.name] || agent.name.toUpperCase()}
-                  </span>
-                  {isTrader && (
-                    <span className="text-[8px] font-mono text-primary/60 border border-primary/20 rounded px-0.5">OPUS</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[13px] font-mono text-muted-foreground">{agent.avg_latency_ms}ms</span>
-                  <span className="text-[13px] font-mono text-muted-foreground">{agent.signals_today} sig</span>
-                </div>
+              {/* Name + stats inline */}
+              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                <span className={cn(
+                  "text-[11px] font-mono font-bold truncate",
+                  isTrader ? "text-primary" : "text-foreground"
+                )}>
+                  {AGENT_SHORT[agent.name] || agent.name.toUpperCase()}
+                </span>
+                {isTrader && (
+                  <span className="text-[7px] font-mono text-primary/60 border border-primary/20 rounded px-0.5">OPUS</span>
+                )}
+                <span className="text-[9px] font-mono text-muted-foreground/60 ml-auto mr-1">{agent.avg_latency_ms}ms {agent.signals_today} sig</span>
               </div>
 
               {/* Status + accuracy */}
-              <div className="text-right shrink-0">
-                <div className={cn(
-                  "text-[14px] font-mono font-bold",
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className={cn(
+                  "text-[11px] font-mono font-bold",
                   agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear"
                 )}>
                   {agent.accuracy_7d}%
-                </div>
-                <div className="flex items-center justify-end gap-1 mt-0.5">
+                </span>
+                <div className="flex items-center gap-0.5">
                   <div className={cn(
-                    "h-1.5 w-1.5 rounded-full",
+                    "h-1 w-1 rounded-full",
                     healthy ? "bg-bull animate-pulse" : "bg-bear"
                   )} />
-                  <span className="text-[8px] font-mono text-muted-foreground">
+                  <span className="text-[7px] font-mono text-muted-foreground">
                     {healthy ? "LIVE" : "DOWN"}
                   </span>
                 </div>
