@@ -154,7 +154,9 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
         return self._mock_analysis(ticker, market_data, vwap_dev, vol_ratio, obv_trend, micro)
 
     def _mock_analysis(self, ticker: str, market_data: dict, vwap_dev: float, vol_ratio: float, obv_trend: str, micro: dict | None = None) -> dict:
-        seed = sum(ord(c) for c in ticker) + 55
+        from datetime import date
+        price = market_data.get("close", 0)
+        seed = sum(ord(c) for c in ticker) + 55 + date.today().toordinal() + int(price * 100)
         rng = random.Random(seed)
 
         # VPIN: higher when volume is unusual

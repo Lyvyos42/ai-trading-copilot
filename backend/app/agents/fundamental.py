@@ -57,7 +57,9 @@ Output JSON only."""
         return self._mock_analysis(ticker, market_data)
 
     def _mock_analysis(self, ticker: str, market_data: dict) -> dict:
-        seed = sum(ord(c) for c in ticker)
+        from datetime import date
+        price = market_data.get("close", 0)
+        seed = sum(ord(c) for c in ticker) + date.today().toordinal() + int(price * 100)
         rng = random.Random(seed)
 
         eps_growth = market_data.get("eps_growth", rng.uniform(-10, 30))

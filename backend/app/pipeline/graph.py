@@ -463,17 +463,28 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         )
         initial_state["is_fallback"] = True
 
-    # ── Stage 1: Run all 7 analysts in parallel ─────────────────────────────
+    # ── Stage 1a: Run independent analysts + macro in parallel ───────────────
     t0 = time.monotonic()
     (fundamental_result, technical_result, sentiment_result, macro_result,
-     order_flow_result, regime_change_result, correlation_result) = await asyncio.gather(
+     order_flow_result) = await asyncio.gather(
         _fundamental.analyze(initial_state),
         _technical.analyze(initial_state),
         _sentiment.analyze(initial_state),
         _macro.analyze(initial_state),
         _order_flow.analyze(initial_state),
-        _regime_change.analyze(initial_state),
-        _correlation.analyze(initial_state),
+    )
+
+    # Inject macro output so regime_change and correlation can use it
+    state_with_macro: TradingState = {
+        **initial_state,
+        "macro_analysis": _wrap("macro", macro_result,
+                                ["live_macro"] if macro_result.get("_live_news") else ["estimated_macro"]),
+    }
+
+    # ── Stage 1b: regime_change and correlation depend on macro ─────────────
+    regime_change_result, correlation_result = await asyncio.gather(
+        _regime_change.analyze(state_with_macro),
+        _correlation.analyze(state_with_macro),
     )
 
     state_after_analysts: TradingState = {

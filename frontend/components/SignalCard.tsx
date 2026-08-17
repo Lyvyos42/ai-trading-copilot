@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
 import { type Signal, executePosition, resolveSignal } from "@/lib/api";
 import { formatPrice, timeAgo } from "@/lib/utils";
@@ -34,7 +34,7 @@ interface SignalCardProps {
   compact?: boolean;
 }
 
-export function SignalCard({ signal, onExecute, onResolve, onDismiss, compact }: SignalCardProps) {
+export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolve, onDismiss, compact }: SignalCardProps) {
   const [expanded, setExpanded]   = useState(false);
   const [loading, setLoading]     = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
@@ -517,7 +517,7 @@ export function SignalCard({ signal, onExecute, onResolve, onDismiss, compact }:
       </div>
     </div>
   );
-}
+});
 
 /* ── Sub-components ────────────────────────────────────────────── */
 

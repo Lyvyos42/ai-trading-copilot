@@ -278,7 +278,8 @@ Output JSON only."""
     def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None, profile: str = "balanced", timeframe: str = "1D") -> dict:
         if market_data is None:
             market_data = {}
-        rng = random.Random(sum(ord(c) for c in ticker) + 13)
+        from datetime import date
+        rng = random.Random(sum(ord(c) for c in ticker) + 13 + date.today().toordinal() + int(price * 100))
 
         dec = _price_decimals(price, ticker)
         # Forex pairs have much smaller ATR (~0.5%) vs stocks (~1.2%)
@@ -302,13 +303,17 @@ Output JSON only."""
         if profile in ("scalper",) and atr_15m > 0:
             atr = atr_15m
 
-        # Compute probability from vote weights
+        # Compute probability from vote weights (exclude NEUTRAL from denominator)
         long_weight = sum(c for d, c in votes if d == "LONG")
         short_weight = sum(c for d, c in votes if d == "SHORT")
-        total = sum(c for _, c in votes) or 100
-        bullish_pct = round(long_weight / total * 100, 1)
+        directional_total = long_weight + short_weight
+        if directional_total > 0:
+            bullish_pct = round(long_weight / directional_total * 100, 1)
+        else:
+            bullish_pct = 50.0
         bearish_pct = round(100 - bullish_pct, 1)
         probability_score = bullish_pct
+        direction = "LONG" if probability_score >= 50 else "SHORT"
 
         conviction = max(long_weight, short_weight) / total
         confidence = min(92, max(35, 45 + conviction * 50))

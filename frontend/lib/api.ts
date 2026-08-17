@@ -5,7 +5,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
 
 export { API_URL, WS_URL };
 
-async function getToken(): Promise<string | null> {
+export async function getToken(): Promise<string | null> {
   // Prefer live Supabase session (handles refresh automatically)
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -15,7 +15,7 @@ async function getToken(): Promise<string | null> {
   return typeof window !== "undefined" ? localStorage.getItem("token") : null;
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getToken();
   const reqOptions: RequestInit = {
     headers: {

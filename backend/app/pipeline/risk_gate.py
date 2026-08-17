@@ -109,7 +109,7 @@ def run_risk_gate(state: dict) -> dict:
         })
 
     # ── Rule 9: No statistical edge (p > 0.10) → WARN ─────────────────────
-    p_value = quant.get("p_value", 0.05)
+    p_value = quant.get("p_value", 0.5)
     if p_value > 0.10:
         triggered.append({
             "rule": 9, "name": "no_statistical_edge",
@@ -117,7 +117,7 @@ def run_risk_gate(state: dict) -> dict:
         })
 
     # ── Rule 10: Win rate below 40% in backtest → BLOCK ───────────────────
-    backtest_wr = quant.get("backtest_win_rate", 0.5)
+    backtest_wr = quant.get("backtest_win_rate", 0.0)
     if backtest_wr < 0.40:
         triggered.append({
             "rule": 10, "name": "low_win_rate",
@@ -142,7 +142,7 @@ def run_risk_gate(state: dict) -> dict:
         })
 
     # ── Rule 13: Negative expectancy → BLOCK ──────────────────────────────
-    expectancy = quant.get("expectancy_per_trade", 0)
+    expectancy = quant.get("expectancy_per_trade", -1)
     if expectancy < 0:
         triggered.append({
             "rule": 13, "name": "negative_expectancy",
@@ -175,8 +175,8 @@ def run_risk_gate(state: dict) -> dict:
         })
 
     # ── Determine final gate status ────────────────────────────────────────
-    # Hard blocks: rules 1-8, 10, 12, 13, 15
-    hard_block_rules = {1, 2, 3, 4, 6, 7, 8, 10, 12, 13, 15}
+    # Hard blocks: rules 1-8, 10, 12, 13, 14, 15
+    hard_block_rules = {1, 2, 3, 4, 6, 7, 8, 10, 12, 13, 14, 15}
     hard_blocks = [t for t in triggered if t["rule"] in hard_block_rules]
 
     if hard_blocks:

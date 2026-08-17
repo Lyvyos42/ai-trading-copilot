@@ -184,7 +184,9 @@ Pay special attention to any direct ticker mentions. Output JSON only."""
     }
 
     async def _analyze_with_mock(self, ticker: str, market_data: dict) -> dict:
-        rng = random.Random(sum(ord(c) for c in ticker) + 42)
+        from datetime import date
+        price = market_data.get("close", 0)
+        rng = random.Random(sum(ord(c) for c in ticker) + 42 + date.today().toordinal() + int(price * 100))
         sentiment_bias = rng.uniform(-0.4, 0.4)
 
         if sentiment_bias > 0.1:

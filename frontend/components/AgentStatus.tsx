@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Activity, Brain, BarChart2, Newspaper, Globe, Shield, Waves, RefreshCw, GitBranch, FlaskConical, ShieldCheck } from "lucide-react";
 import { type AgentStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ interface AgentStatusPanelProps {
   compact?: boolean;
 }
 
-export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
+export const AgentStatusPanel = memo(function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
   if (compact) {
     return (
       <div className="divide-y divide-border/50">
@@ -158,4 +159,4 @@ export function AgentStatusPanel({ agents, compact }: AgentStatusPanelProps) {
       </div>
     </div>
   );
-}
+});

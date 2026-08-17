@@ -67,14 +67,19 @@ class RiskManager(BaseAgent):
         half_kelly = kelly / 2
         position_size = round(min(5.0, half_kelly * 100), 2)
 
+        portfolio = state.get("portfolio_stats", {})
+        port_drawdown = portfolio.get("drawdown_pct", 0.0)
+        port_sector_exposure = portfolio.get("sector_exposure_pct", 0.0)
+        port_correlation = portfolio.get("avg_correlation", 0.0)
+
         strategy_ctx = self._strategy_context(state)
         user_msg = f"""{strategy_ctx}Validate risk for {ticker}.
 Analyst confidence: {avg_confidence:.1f}%
 Kelly fraction: {kelly:.3f} → Half-Kelly position size: {half_kelly * 100:.1f}%
 Estimated reward/risk ratio: {reward_risk:.2f}
-Simulated portfolio drawdown: 4.2%
-Simulated sector exposure: 18%
-Simulated correlation with existing positions: 0.45
+Portfolio drawdown: {port_drawdown:.1f}%
+Sector exposure: {port_sector_exposure:.1f}%
+Correlation with existing positions: {port_correlation:.2f}
 
 Apply all risk constraints. Output JSON only."""
 
@@ -91,7 +96,8 @@ Apply all risk constraints. Output JSON only."""
         return self._mock_analysis(ticker, kelly, half_kelly, position_size, avg_confidence, reward_risk)
 
     def _mock_analysis(self, ticker, kelly, half_kelly, position_size, avg_confidence, reward_risk) -> dict:
-        rng = random.Random(sum(ord(c) for c in ticker) + 77)
+        from datetime import date
+        rng = random.Random(sum(ord(c) for c in ticker) + 77 + date.today().toordinal())
         drawdown = rng.uniform(1, 12)
         sector_conc = rng.uniform(5, 28)
         correlation = rng.uniform(0.1, 0.65)

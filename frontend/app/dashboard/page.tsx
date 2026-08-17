@@ -101,6 +101,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   });
   const [chartMode, setChartMode] = useState<"tradingview" | "orderflow">("tradingview");
   const [pipelineOpen, setPipelineOpen] = useState(false);
+  const [show3D, setShow3D] = useState(false);
 
   // Auto-scanner state
   const [scannerRunning, setScannerRunning] = useState(false);
@@ -120,11 +121,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const SCAN_INTERVAL_MS = 90_000;
 
   useEffect(() => {
-    localStorage.setItem("scanner_symbols", JSON.stringify(scanSymbols));
+    const t = setTimeout(() => localStorage.setItem("scanner_symbols", JSON.stringify(scanSymbols)), 500);
+    return () => clearTimeout(t);
   }, [scanSymbols]);
 
   useEffect(() => {
-    localStorage.setItem("dashboard_signals", JSON.stringify(signals));
+    const t = setTimeout(() => localStorage.setItem("dashboard_signals", JSON.stringify(signals)), 1000);
+    return () => clearTimeout(t);
   }, [signals]);
 
   const signalsRef = useRef(signals);
@@ -144,14 +147,15 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   useEffect(() => {
     wakeBackend();
     loadData();
-    // Poll signals every 30s for auto-resolution (SL/TP/expiry)
-    const signalPoll = setInterval(loadData, 30_000);
+    // Poll signals every 30s for auto-resolution, but only when tab is visible
+    const signalPoll = setInterval(() => {
+      if (!document.hidden) loadData();
+    }, 30_000);
     // Handle Stripe checkout success redirect
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("checkout") === "success") {
         setCheckoutSuccess(true);
-        // Clean up URL
         window.history.replaceState({}, "", window.location.pathname);
         setTimeout(() => setCheckoutSuccess(false), 8000);
       }
@@ -540,11 +544,21 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
               <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
             )}
           </div>
-          {/* 3D Microstructure surfaces — side by side below chart */}
-          <div className="hidden lg:flex border-t border-border border-b" style={{ flex: "1 0 180px", maxHeight: "28%" }}>
-            <DepthSurface3D ticker={activeTicker} className="flex-1 border-r border-border" />
-            <LiquiditySurface3D ticker={activeTicker} className="flex-1" />
+          {/* 3D Microstructure surfaces — lazy-loaded behind toggle */}
+          <div className="hidden lg:flex items-center border-t border-border px-2 py-0.5 gap-2">
+            <button
+              onClick={() => setShow3D(v => !v)}
+              className="text-[8px] font-mono font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors"
+            >
+              {show3D ? "HIDE 3D" : "SHOW 3D MICROSTRUCTURE"}
+            </button>
           </div>
+          {show3D && (
+            <div className="hidden lg:flex border-b border-border" style={{ flex: "1 0 180px", maxHeight: "28%" }}>
+              <DepthSurface3D ticker={activeTicker} className="flex-1 border-r border-border" />
+              <LiquiditySurface3D ticker={activeTicker} className="flex-1" />
+            </div>
+          )}
         </div>
 
         {/* CENTER — Signal Feed */}

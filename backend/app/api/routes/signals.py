@@ -24,6 +24,23 @@ from app.pipeline.graph import run_pipeline
 from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _fetch_tv_ta_spot
 
 
+def _window_to_hours(window: str | None) -> int:
+    """Convert analytical_window string like '3-7 DAY' to expiry hours."""
+    import re
+    if not window:
+        return 24
+    w = window.upper()
+    nums = [int(x) for x in re.findall(r"\d+", w)]
+    max_num = max(nums) if nums else 1
+    if "MIN" in w:
+        return max(1, max_num // 60 + 1)
+    if "HOUR" in w:
+        return max(1, max_num * 2)
+    if "DAY" in w:
+        return max_num * 24
+    return 24
+
+
 async def _get_spot_price(ticker: str) -> float | None:
     """Get spot price: TradingView scanner first, Yahoo REST fallback."""
     price = await _fetch_tv_ta_spot(ticker)
@@ -390,8 +407,31 @@ async def generate_signal(
     # not whatever stale close fetch_market_data may have returned.
     live_spot = await _get_spot_price(ticker)
     if live_spot and live_spot > 0:
+        old_entry = final.get("entry_price") or live_spot
+        if old_entry and old_entry > 0 and abs(old_entry - live_spot) / old_entry > 0.0001:
+            ratio = live_spot / old_entry
+            for lvl_key in ("stop_loss", "take_profit_1", "take_profit_2", "take_profit_3",
+                            "research_target", "invalidation_level"):
+                if final.get(lvl_key):
+                    final[lvl_key] = round(final[lvl_key] * ratio, 6)
+            tf_levels = final.get("timeframe_levels") or {}
+            for tf_key in ("scalp", "swing"):
+                tf = tf_levels.get(tf_key)
+                if not tf:
+                    continue
+                for k in ("entry", "stop_loss", "take_profit_1", "take_profit_2", "take_profit_3"):
+                    if tf.get(k):
+                        tf[k] = round(tf[k] * ratio, 6)
         final["entry_price"] = live_spot
         final["current_price"] = live_spot
+
+    # Reject weak signals: probability must lean >= 55% in either direction
+    prob = final.get("probability_score")
+    if prob is not None:
+        directional_strength = abs(prob - 50)
+        if directional_strength < 5:
+            final["conviction_tier"] = "NO_EDGE"
+            final["status"] = "FILTERED"
 
     # Build agent_votes summary (all 7 analysts + risk + quant)
     agent_votes = {}
@@ -433,7 +473,7 @@ async def generate_signal(
         strategy_sources=final.get("strategy_sources", []),
         timeframe_levels=final.get("timeframe_levels", {}),
         status="ACTIVE",
-        expiry_time=datetime.utcnow() + timedelta(hours=24),
+        expiry_time=datetime.utcnow() + timedelta(hours=_window_to_hours(final.get("analytical_window"))),
         # Probability model fields
         probability_score=final.get("probability_score"),
         bullish_pct=final.get("bullish_pct"),
@@ -639,25 +679,34 @@ async def list_signals(
         hit_sl = False
         hit_tp = False
         if is_long:
-            if s.stop_loss and cp <= s.stop_loss:
-                hit_sl = True
             if s.take_profit_1 and cp >= s.take_profit_1:
                 hit_tp = True
-        else:
-            if s.stop_loss and cp >= s.stop_loss:
+            elif s.stop_loss and cp <= s.stop_loss:
                 hit_sl = True
+        else:
             if s.take_profit_1 and cp <= s.take_profit_1:
                 hit_tp = True
-        if hit_sl:
-            s.status = "LOSS"
-            s.outcome = "LOSS"
+            elif s.stop_loss and cp >= s.stop_loss:
+                hit_sl = True
+        # Track max favorable excursion for analytics
+        if s.entry_price and s.entry_price > 0:
+            excursion = ((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1)
+            mfe = getattr(s, "max_favorable_excursion", None) or 0.0
+            if excursion > mfe:
+                try:
+                    s.max_favorable_excursion = round(excursion, 2)
+                except Exception:
+                    pass
+        if hit_tp:
+            s.status = "WIN"
+            s.outcome = "WIN"
             s.resolved_at = datetime.utcnow()
             s.exit_price = cp
             if s.entry_price and s.entry_price > 0:
                 s.pnl_pct = round(((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1), 2)
-        elif hit_tp:
-            s.status = "WIN"
-            s.outcome = "WIN"
+        elif hit_sl:
+            s.status = "LOSS"
+            s.outcome = "LOSS"
             s.resolved_at = datetime.utcnow()
             s.exit_price = cp
             if s.entry_price and s.entry_price > 0:

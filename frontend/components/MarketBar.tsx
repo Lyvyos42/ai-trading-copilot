@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, memo } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -101,7 +101,7 @@ export function MarketBar() {
           };
         })
       );
-    }, 3000);
+    }, 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -126,18 +126,9 @@ export function MarketBar() {
 
       <div className="flex-1 overflow-hidden relative">
         <div className="ticker-track">
-          {doubled.map((tick, i) => {
-            const up = tick.changePct >= 0;
-            return (
-              <div key={i} className="inline-flex items-center gap-2 px-4 border-r border-border/30 h-8 shrink-0">
-                <span className="font-mono text-[14px] font-bold text-foreground">{tick.symbol}</span>
-                <span className="font-mono text-[14px] text-foreground">{fmt(tick)}</span>
-                <span className={`font-mono text-[13px] font-semibold ${up ? "text-bull" : "text-bear"}`}>
-                  {fmtChg(tick)}
-                </span>
-              </div>
-            );
-          })}
+          {doubled.map((tick, i) => (
+            <TickerItem key={i} tick={tick} />
+          ))}
         </div>
       </div>
 
@@ -147,6 +138,19 @@ export function MarketBar() {
     </div>
   );
 }
+
+const TickerItem = memo(function TickerItem({ tick }: { tick: Tick }) {
+  const up = tick.changePct >= 0;
+  return (
+    <div className="inline-flex items-center gap-2 px-4 border-r border-border/30 h-8 shrink-0">
+      <span className="font-mono text-[14px] font-bold text-foreground">{tick.symbol}</span>
+      <span className="font-mono text-[14px] text-foreground">{fmt(tick)}</span>
+      <span className={`font-mono text-[13px] font-semibold ${up ? "text-bull" : "text-bear"}`}>
+        {fmtChg(tick)}
+      </span>
+    </div>
+  );
+});
 
 function ClockDisplay() {
   const [time, setTime] = useState("");

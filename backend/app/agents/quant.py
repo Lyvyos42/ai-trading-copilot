@@ -111,7 +111,8 @@ Output JSON only."""
 
     def _mock_analysis(self, ticker: str, consensus_dir: str, avg_conf: float,
                        long_count: int, short_count: int, total: int) -> dict:
-        seed = sum(ord(c) for c in ticker) + 77
+        from datetime import date
+        seed = sum(ord(c) for c in ticker) + 77 + date.today().toordinal()
         rng = random.Random(seed)
 
         # Agreement ratio affects quality

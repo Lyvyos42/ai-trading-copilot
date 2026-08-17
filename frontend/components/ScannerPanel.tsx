@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Plus, Play, Square, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiFetch } from "@/lib/api";
 
 interface ScannerConfig {
   enabled:                   boolean;
@@ -19,31 +17,6 @@ interface ScannerConfig {
 const INTERVAL_OPTIONS = [15, 30, 60] as const;
 const CONCURRENT_OPTIONS = [1, 2, 3, 4, 5] as const;
 const MAX_SYMBOLS = 20;
-
-async function getToken(): Promise<string | null> {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) return session.access_token;
-  } catch {}
-  return typeof window !== "undefined" ? localStorage.getItem("token") : null;
-}
-
-async function apiFetch(path: string, options?: RequestInit) {
-  const token = await getToken();
-  const res = await fetch(`${API}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
 
 interface ScannerPanelProps {
   /** Called when a new alert arrives so the feed can refresh */
