@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 log = structlog.get_logger()
 
-CONFLUENCE_THRESHOLD = 80
+CONFLUENCE_THRESHOLD = 75
 
 
 # ── Pure technical indicator calculations ────────────────────────────────────
