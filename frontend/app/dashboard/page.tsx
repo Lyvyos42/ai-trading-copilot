@@ -72,13 +72,18 @@ const SCANNER_SYMBOL_OPTIONS = [
 ];
 
 
+function _isExpired(s: Signal): boolean {
+  if (!s.expiry_time) return false;
+  return new Date(s.expiry_time).getTime() < Date.now();
+}
+
 export default function DashboardPage() {
   const [signals, setSignals]               = useState<Signal[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_signals");
       if (saved) try {
         const parsed: Signal[] = JSON.parse(saved);
-        return parsed.filter(s => s.status === "ACTIVE");
+        return parsed.filter(s => s.status === "ACTIVE" && !_isExpired(s));
       } catch {}
     }
     return [];
@@ -185,10 +190,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           return local ? { ...s, signal_mode: local.signal_mode } : s;
         });
         prev.forEach(s => {
-          if (s.status === "ACTIVE" && !resolvedIds.has(s.signal_id) && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
+          if (s.status === "ACTIVE" && !_isExpired(s) && !resolvedIds.has(s.signal_id) && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
         });
         const seen = new Set<string>();
         return merged.filter(s => {
+          if (_isExpired(s)) return false;
           if (seen.has(s.ticker)) return false;
           seen.add(s.ticker);
           return true;
@@ -237,7 +243,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     scannerBusyRef.current = true;
     const sym = syms[scannerIndexRef.current % syms.length];
 
-    const hasActive = signalsRef.current.some(s => s.ticker === sym && s.status === "ACTIVE");
+    const hasActive = signalsRef.current.some(s => s.ticker === sym && s.status === "ACTIVE" && !_isExpired(s));
     if (hasActive) {
       setScannerStatus(`${sym} locked — skipping`);
       scannerIndexRef.current++;

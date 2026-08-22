@@ -331,13 +331,15 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str]) -> list[dict]
 
     results: list[dict] = []
 
-    # Check for existing active signals to avoid duplicates
+    # Check for existing active (non-expired) signals to avoid duplicates
+    now = datetime.utcnow()
     active_tickers: set[str] = set()
     async with AsyncSessionLocal() as session:
         existing = await session.execute(
             select(Signal.ticker)
             .where(Signal.user_id == user_id)
             .where(Signal.status == "ACTIVE")
+            .where(Signal.expiry_time > now)
         )
         active_tickers = {row[0] for row in existing.all()}
 
@@ -411,11 +413,6 @@ async def auto_scan_job() -> None:
     log.info("auto_scan_job_start", configs=len(configs))
 
     for cfg in configs:
-        if cfg.last_scan_at:
-            elapsed_min = (now - cfg.last_scan_at).total_seconds() / 60
-            if elapsed_min < cfg.interval_minutes:
-                continue
-
         symbols = cfg.symbols or []
         if not symbols:
             continue

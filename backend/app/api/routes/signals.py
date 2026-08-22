@@ -340,12 +340,13 @@ async def generate_signal(
             if cached:
                 return {**cached, "cached": True}
 
-            # Block if user already has an ACTIVE signal for this ticker
+            # Block if user already has an ACTIVE (non-expired) signal for this ticker
             existing = await db.execute(
                 select(Signal)
                 .where(Signal.user_id == user_id)
                 .where(Signal.ticker == body.ticker.upper().strip())
                 .where(Signal.status == "ACTIVE")
+                .where(Signal.expiry_time > datetime.utcnow())
                 .limit(1)
             )
             if existing.scalar_one_or_none():
