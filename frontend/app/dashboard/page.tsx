@@ -260,11 +260,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         if (prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE")) return prev;
         return [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)];
       });
-    } catch {
-      // Silently skip failed scans
+      setScannerStatus(`${sym} done`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "scan failed";
+      setScannerStatus(`${sym} ERR: ${msg.slice(0, 40)}`);
     } finally {
       scannerIndexRef.current++;
-      setScannerStatus("");
+      setTimeout(() => setScannerStatus(""), 4000);
       scannerBusyRef.current = false;
     }
   }, [activeProfile]);
@@ -572,8 +574,11 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           <div className="terminal-header shrink-0">
             <span className="terminal-label">SIGNAL FEED</span>
             {scannerRunning && scannerStatus && (
-              <div className="ml-auto flex items-center gap-1 text-[13px] font-mono text-info">
-                <Radar className="h-2.5 w-2.5 animate-spin" />
+              <div className={cn(
+                "ml-auto flex items-center gap-1 text-[13px] font-mono",
+                scannerStatus.includes("ERR") ? "text-bear" : "text-info"
+              )}>
+                <Radar className={cn("h-2.5 w-2.5", !scannerStatus.includes("ERR") && "animate-spin")} />
                 {scannerStatus.replace("…", "")}
               </div>
             )}
