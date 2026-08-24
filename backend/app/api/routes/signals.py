@@ -17,6 +17,7 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user, get_optional_user
+from app.config import settings
 from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
@@ -140,19 +141,26 @@ def _check_user_cooldown(user_id: str) -> None:
         )
     _user_last_request[user_id] = now
 
-# ── Layer 3: Burst circuit breaker — >15 signals in 1 hour suspends user ────────
+# ── Layer 3: Burst circuit breaker — per-tier hourly cap ────────────────────────
 _user_burst_store: dict[str, list[float]] = defaultdict(list)
-_BURST_LIMIT = 15
 _BURST_WINDOW = 3600  # 1 hour
+_BURST_LIMITS: dict[str, int] = {
+    "free":       15,
+    "retail":     40,
+    "pro":        80,
+    "enterprise": 200,
+    "admin":      9999,
+}
 
-def _check_burst(user_id: str) -> None:
+def _check_burst(user_id: str, tier: str = "free") -> None:
+    limit = _BURST_LIMITS.get(tier, 15)
     now = time.time()
     window_start = now - _BURST_WINDOW
     _user_burst_store[user_id] = [t for t in _user_burst_store[user_id] if t > window_start]
-    if len(_user_burst_store[user_id]) >= _BURST_LIMIT:
+    if len(_user_burst_store[user_id]) >= limit:
         raise HTTPException(
             status_code=429,
-            detail=f"Burst limit exceeded ({_BURST_LIMIT} signals/hour). Account temporarily restricted. Try again in 1 hour.",
+            detail=f"Burst limit exceeded ({limit} signals/hour for {tier} tier). Try again later.",
             headers={"Retry-After": "3600"},
         )
     _user_burst_store[user_id].append(now)
@@ -326,14 +334,16 @@ async def generate_signal(
         db_user_result = await db.execute(select(User).where(User.id == user_id))
         db_user = db_user_result.scalar_one_or_none()
         tier = (db_user.tier if db_user else None) or user.get("tier", "free") or "free"
-        is_admin = tier == "admin"
+        user_email = user.get("email", "") or (db_user.email if db_user and hasattr(db_user, "email") else "")
+        admin_emails = {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+        is_admin = tier == "admin" or user_email.lower() in admin_emails
 
         if not is_admin:
             # Layer 2: cooldown check BEFORE burst/quota (cheapest check first)
             _check_user_cooldown(user_id)
 
             # Layer 3: burst circuit breaker
-            _check_burst(user_id)
+            _check_burst(user_id, tier)
 
             # Layer 4: result cache — return immediately without hitting Claude API
             cached = _get_cached_signal(user_id, body.ticker.upper().strip())
