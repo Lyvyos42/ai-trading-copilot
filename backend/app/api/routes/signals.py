@@ -6,6 +6,7 @@ GET  /api/v1/signals           — list recent signals for user
 import asyncio
 import hashlib
 import math
+import os
 import random
 import time
 import uuid
@@ -326,7 +327,9 @@ async def generate_signal(
         db_user_result = await db.execute(select(User).where(User.id == user_id))
         db_user = db_user_result.scalar_one_or_none()
         tier = (db_user.tier if db_user else None) or user.get("tier", "free") or "free"
-        is_admin = tier == "admin"
+        admin_emails = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+        user_email = (db_user.email.lower() if db_user and db_user.email else "")
+        is_admin = tier == "admin" or user_email in admin_emails
 
         if not is_admin:
             # Layer 2: cooldown check BEFORE burst/quota (cheapest check first)
