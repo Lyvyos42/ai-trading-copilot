@@ -17,7 +17,6 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user, get_optional_user
-from app.config import settings
 from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
@@ -327,9 +326,7 @@ async def generate_signal(
         db_user_result = await db.execute(select(User).where(User.id == user_id))
         db_user = db_user_result.scalar_one_or_none()
         tier = (db_user.tier if db_user else None) or user.get("tier", "free") or "free"
-        user_email = user.get("email", "") or (db_user.email if db_user and hasattr(db_user, "email") else "")
-        admin_emails = {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
-        is_admin = tier == "admin" or (user_email and user_email.lower() in admin_emails)
+        is_admin = tier == "admin"
 
         if not is_admin:
             # Layer 2: cooldown check BEFORE burst/quota (cheapest check first)
