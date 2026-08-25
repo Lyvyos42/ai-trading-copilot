@@ -315,7 +315,7 @@ Output JSON only."""
         probability_score = bullish_pct
         direction = "LONG" if probability_score >= 50 else "SHORT"
 
-        conviction = max(long_weight, short_weight) / total
+        conviction = max(long_weight, short_weight) / directional_total if directional_total > 0 else 0.5
         confidence = min(92, max(35, 45 + conviction * 50))
 
         # Research target & invalidation level (replaces TP/SL)
