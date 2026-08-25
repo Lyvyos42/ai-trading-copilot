@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""   # optional legacy HS256 secret
     # Admin — set ADMIN_SECRET in Render env vars to protect the promote endpoint
     admin_secret: str = "MUST_SET_VIA_ENV_VAR"
+    admin_emails: str = "cantorlivmarian@gmail.com"
 
     # Provider tier configuration (format: "provider:model")
     provider_tier_premium: str = "anthropic:claude-opus-4-6"
