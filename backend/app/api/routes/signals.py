@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user, get_optional_user
@@ -898,3 +898,20 @@ def _build_agent_detail(state: dict) -> dict:
         "risk_gate": state.get("risk_gate_result"),
         "agent_attribution": state.get("final_signal", {}).get("agent_attribution", []),
     }
+
+
+@router.delete("/reset")
+async def reset_signals(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
+    db_user_result = await db.execute(select(User).where(User.id == user_id))
+    db_user = db_user_result.scalar_one_or_none()
+    user_email = (db_user.email.lower() if db_user and db_user.email else "")
+    admin_emails = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+    if user_email not in admin_emails and (not db_user or db_user.tier != "admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    result = await db.execute(delete(Signal).where(Signal.user_id == user_id))
+    await db.commit()
+    return {"deleted": result.rowcount}

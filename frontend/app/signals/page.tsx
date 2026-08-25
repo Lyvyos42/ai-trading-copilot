@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, listSignals, resolveSignal, API_URL, type Signal } from "@/lib/api";
+import { generateSignal, listSignals, resolveSignal, apiFetch, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatPrice, timeAgo } from "@/lib/utils";
@@ -682,6 +682,25 @@ export default function SignalsPage() {
               >
                 {signals.length} TOTAL
               </span>
+              {signals.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!confirm("Delete all signals and start fresh?")) return;
+                    try {
+                      await apiFetch("/api/v1/signals/reset", { method: "DELETE" });
+                      setSignals([]);
+                    } catch {}
+                  }}
+                  className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded border transition-colors"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    borderColor: "hsl(var(--bear) / 0.3)",
+                    color: "hsl(var(--bear))",
+                  }}
+                >
+                  RESET
+                </button>
+              )}
             </div>
 
             {/* Stats bar */}

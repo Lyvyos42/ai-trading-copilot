@@ -464,27 +464,27 @@ async function publicFetch<T>(path: string): Promise<T> {
 }
 
 export async function getPerformanceSummary(): Promise<PerformanceSummary> {
-  return publicFetch("/api/v1/performance/summary");
+  return apiFetch("/api/v1/performance/summary");
 }
 
 export async function getEquityCurve(): Promise<{ curve: EquityCurvePoint[] }> {
-  return publicFetch("/api/v1/performance/equity-curve");
+  return apiFetch("/api/v1/performance/equity-curve");
 }
 
 export async function getByAssetClass(): Promise<{ asset_classes: AssetClassPerformance[] }> {
-  return publicFetch("/api/v1/performance/by-asset-class");
+  return apiFetch("/api/v1/performance/by-asset-class");
 }
 
 export async function getByAgent(): Promise<{ agents: AgentPerformance[] }> {
-  return publicFetch("/api/v1/performance/by-agent");
+  return apiFetch("/api/v1/performance/by-agent");
 }
 
 export async function getCalibration(): Promise<{ calibration: CalibrationBucket[] }> {
-  return publicFetch("/api/v1/performance/calibration");
+  return apiFetch("/api/v1/performance/calibration");
 }
 
 export async function getMonthlyReturns(): Promise<{ months: MonthlyReturn[] }> {
-  return publicFetch("/api/v1/performance/monthly");
+  return apiFetch("/api/v1/performance/monthly");
 }
 
 // ─── Evaluation ───────────────────────────────────────────────────────────────
