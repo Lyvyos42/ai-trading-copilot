@@ -539,7 +539,12 @@ async def generate_signal(
         "reasoning_chain": state.get("reasoning_chain", []),
         "strategy_sources": final.get("strategy_sources", []),
         "timeframe_levels": final.get("timeframe_levels", {}),
-        "status": "ACTIVE",
+        # Must mirror the real status. This branch is taken whenever nothing was
+        # persisted — which is now the normal path for a REJECTED signal — and a
+        # hardcoded ACTIVE told the UI a NO_EDGE result was tradeable, putting it
+        # straight back into the feed.
+        "status": final.get("status", "ACTIVE"),
+        "status_reasons": final.get("risk_gate_reasons") or None,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "expiry_time": (datetime.utcnow() + timedelta(hours=24)).isoformat() + "Z",
         "pipeline_latency_ms": state.get("pipeline_latency_ms"),
