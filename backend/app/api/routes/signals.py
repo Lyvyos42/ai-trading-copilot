@@ -838,7 +838,17 @@ def _signal_to_dict(signal: Signal, state: dict | None = None, current_price: fl
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")
         d["agent_detail"] = _build_agent_detail(state)
         # Pipeline state overrides DB default when available
-        d["signal_mode"] = state.get("final_signal", {}).get("signal_mode", d["signal_mode"])
+        _final = state.get("final_signal", {})
+        d["signal_mode"] = _final.get("signal_mode", d["signal_mode"])
+        # Why a signal is not tradeable. Without this the UI could only see that
+        # status != ACTIVE and had nothing to show, so it dropped the card and
+        # the signal appeared to vanish a moment after being generated.
+        reasons = _final.get("risk_gate_reasons") or []
+        gate = state.get("risk_gate_result") or {}
+        if not reasons and gate.get("triggered_rules"):
+            reasons = [t.get("reason") for t in gate["triggered_rules"] if t.get("reason")]
+        if reasons:
+            d["status_reasons"] = reasons
     return d
 
 

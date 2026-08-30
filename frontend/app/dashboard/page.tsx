@@ -212,6 +212,17 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setActiveTicker(t);
     try {
       const signal = await generateSignal(t, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
+      // Only ACTIVE signals belong in the feed — refresh() filters on exactly
+      // that, so adding a blocked one made it appear and vanish seconds later.
+      // Say why instead.
+      if (signal.status !== "ACTIVE") {
+        const why = (signal as { status_reasons?: string[] }).status_reasons;
+        setAnalysisError(
+          `${signal.ticker}: ${String(signal.status).replace(/_/g, " ").toLowerCase()}` +
+          (why?.length ? ` — ${why[0]}` : "")
+        );
+        return;
+      }
       setSignals((prev) => {
         const hasActive = prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE");
         if (hasActive) return prev;
@@ -257,6 +268,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     setScannerStatus(`Scanning ${sym}…`);
     try {
       const signal = await generateSignal(sym, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
+      if (signal.status !== "ACTIVE") {
+        setScannerStatus(`${sym} — ${String(signal.status).replace(/_/g, " ").toLowerCase()}`);
+        return;
+      }
       signal.signal_mode = "AUTO_SCAN";
       setSignals((prev) => {
         if (prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE")) return prev;
