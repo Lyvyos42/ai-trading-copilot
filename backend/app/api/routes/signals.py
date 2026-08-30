@@ -23,23 +23,12 @@ from app.models.signal import Signal
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
 from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _fetch_tv_ta_spot
+from app.services.signal_resolver import resolve_open_signals, window_to_hours
 
 
-def _window_to_hours(window: str | None) -> int:
-    """Convert analytical_window string like '3-7 DAY' to expiry hours."""
-    import re
-    if not window:
-        return 24
-    w = window.upper()
-    nums = [int(x) for x in re.findall(r"\d+", w)]
-    max_num = max(nums) if nums else 1
-    if "MIN" in w:
-        return max(1, max_num // 60 + 1)
-    if "HOUR" in w:
-        return max(1, max_num * 2)
-    if "DAY" in w:
-        return max_num * 24
-    return 24
+# Shared with the auto-scanner and the resolver so every code path agrees on
+# how long a thesis is given to play out.
+_window_to_hours = window_to_hours
 
 
 async def _get_spot_price(ticker: str) -> float | None:
@@ -476,7 +465,10 @@ async def generate_signal(
         reasoning_chain=state.get("reasoning_chain", []),
         strategy_sources=final.get("strategy_sources", []),
         timeframe_levels=final.get("timeframe_levels", {}),
-        status="ACTIVE",
+        # A NO_EDGE result set final["status"] = "FILTERED" above, but the row was
+        # always written as ACTIVE — so nothing was ever actually filtered and
+        # every no-edge signal still landed in the scored track record.
+        status=final.get("status", "ACTIVE"),
         expiry_time=datetime.utcnow() + timedelta(hours=_window_to_hours(final.get("analytical_window"))),
         # Probability model fields
         probability_score=final.get("probability_score"),
@@ -665,60 +657,13 @@ async def list_signals(
             if isinstance(price, (int, float)) and price > 0:
                 price_map[ticker] = price
 
-    # Auto-resolve signals when price hits SL or TP
-    for s in signals:
-        if s.status != "ACTIVE":
-            continue
-        cp = price_map.get(s.ticker)
-        if not cp or cp <= 0:
-            continue
-        # Also auto-expire if past expiry
-        if s.expiry_time and datetime.utcnow() > s.expiry_time:
-            s.status = "EXPIRED"
-            s.outcome = "EXPIRED"
-            s.resolved_at = datetime.utcnow()
-            s.exit_price = cp
-            continue
-        is_long = s.direction.upper() in ("LONG", "BULLISH", "BUY")
-        hit_sl = False
-        hit_tp = False
-        if is_long:
-            if s.take_profit_1 and cp >= s.take_profit_1:
-                hit_tp = True
-            elif s.stop_loss and cp <= s.stop_loss:
-                hit_sl = True
-        else:
-            if s.take_profit_1 and cp <= s.take_profit_1:
-                hit_tp = True
-            elif s.stop_loss and cp >= s.stop_loss:
-                hit_sl = True
-        # Track max favorable excursion for analytics
-        if s.entry_price and s.entry_price > 0:
-            excursion = ((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1)
-            mfe = getattr(s, "max_favorable_excursion", None) or 0.0
-            if excursion > mfe:
-                try:
-                    s.max_favorable_excursion = round(excursion, 2)
-                except Exception:
-                    pass
-        if hit_tp:
-            s.status = "WIN"
-            s.outcome = "WIN"
-            s.resolved_at = datetime.utcnow()
-            s.exit_price = cp
-            if s.entry_price and s.entry_price > 0:
-                s.pnl_pct = round(((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1), 2)
-        elif hit_sl:
-            s.status = "LOSS"
-            s.outcome = "LOSS"
-            s.resolved_at = datetime.utcnow()
-            s.exit_price = cp
-            if s.entry_price and s.entry_price > 0:
-                s.pnl_pct = round(((cp - s.entry_price) / s.entry_price * 100) * (1 if is_long else -1), 2)
-
-    # Commit any auto-resolved signals
+    # Resolve open signals against the actual price path. The scheduler does this
+    # every 15 min for everyone; this keeps the list fresh on load. It replaces a
+    # spot-price snapshot check that could only see where price happened to be at
+    # render time — which missed every target touched intraday and counted any
+    # momentary dip through the (much nearer) stop as a loss.
     try:
-        await db.commit()
+        await resolve_open_signals(db, signals=signals)
     except Exception:
         await db.rollback()
 

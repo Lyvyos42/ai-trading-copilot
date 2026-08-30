@@ -407,6 +407,7 @@ export interface PerformanceSummary {
   total_signals: number;
   resolved_signals: number;
   active_signals: number;
+  expired_signals: number;
   wins: number;
   losses: number;
   win_rate_pct: number;

@@ -19,11 +19,32 @@ from app.data.market_data import fetch_market_data
 from app.db.database import AsyncSessionLocal
 from app.models.alert import ScannerConfig
 from app.models.signal import Signal
+from app.services.signal_resolver import window_to_hours
 from sqlalchemy import select
 
 log = structlog.get_logger()
 
-CONFLUENCE_THRESHOLD = 75
+# Measured, not guessed. scripts/backtest_screener.py, 3y of real daily bars over
+# 20 liquid symbols, best geometry (tp 3.5 / sl 1.0 ATR, 10-bar hold):
+#
+#   threshold  trades  TP-win%  expectancy
+#          65    1266    18.7%    +0.152R
+#          70     498    25.1%    +0.325R   <- ship this
+#          75     411    23.9%    +0.265R
+#          85       0        -          -
+CONFLUENCE_THRESHOLD = 70
+
+# The screener's long side carries the whole edge; its short side loses money.
+# Same run, threshold 70, split by direction:
+#
+#   LONG   263 trades  34.7% win  +0.701R  PF 2.37
+#   SHORT  235 trades  15.1% win  -0.096R  PF 0.86
+#
+# Long-only also beats a long-only random-entry baseline by +0.377R per trade, and
+# the edge holds in both out-of-sample halves (+0.370R / +0.201R) across 18 of 20
+# symbols — so this is signal, not bull-market drift. The sample is a rising market
+# though: re-run the backtest before enabling shorts on the strength of a bear tape.
+AUTO_SCAN_LONG_ONLY = True
 
 
 # ── Pure technical indicator calculations ────────────────────────────────────
@@ -297,7 +318,11 @@ async def _generate_signal_for_user(
             timeframe_levels=final.get("timeframe_levels", {}),
             status="ACTIVE",
             signal_mode="AUTO_SCAN",
-            expiry_time=now + timedelta(hours=24),
+            # Honour the thesis window. A hardcoded 24h gave a 3.5-ATR target
+            # one day to be reached while the 1.5-ATR stop only needed a normal
+            # session's range — the stop was reachable and the target was not,
+            # so resolved signals were losses almost by construction.
+            expiry_time=now + timedelta(hours=window_to_hours(final.get("analytical_window"))),
             probability_score=final.get("probability_score"),
             bullish_pct=final.get("bullish_pct"),
             bearish_pct=final.get("bearish_pct"),
@@ -355,6 +380,10 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str]) -> list[dict]
 
         if score < CONFLUENCE_THRESHOLD:
             log.debug("auto_scan_below_threshold", ticker=sym, score=score)
+            continue
+
+        if AUTO_SCAN_LONG_ONLY and direction != "LONG":
+            log.debug("auto_scan_short_suppressed", ticker=sym, score=score)
             continue
 
         if sym in active_tickers:

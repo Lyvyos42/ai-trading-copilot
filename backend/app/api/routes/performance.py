@@ -1,6 +1,10 @@
 """
-Public performance endpoints — no auth required.
-Aggregates all resolved signals for public track record.
+Performance endpoints — the authenticated user's own track record.
+
+Every query is scoped to the caller. These used to aggregate the whole signals
+table with no user filter, so one account's win rate was really the average of
+every account on the instance (the demo user included), and the equity curve
+and agent leaderboard leaked other tenants' results.
 """
 from collections import defaultdict
 from fastapi import APIRouter, Depends
@@ -13,35 +17,57 @@ from app.models.signal import Signal
 
 router = APIRouter(prefix="/api/v1/performance", tags=["performance"])
 
+# Rows that never represented a tradeable thesis and must not dilute the stats:
+# FILTERED is a no-edge result, VOID is a signal that was written without usable
+# levels and so can never be scored either way.
+_UNSCORED = ("FILTERED", "VOID")
+
+
+def _uid(user: dict) -> str:
+    """Signal-ownership key from the token payload."""
+    return user.get("sub") or user.get("id") or user.get("user_id") or ""
+
+
+def _own(query, user: dict):
+    """Scope a query to the caller's signals, excluding unscoreable rows."""
+    return query.where(Signal.user_id == _uid(user)).where(
+        Signal.status.notin_(_UNSCORED)
+    )
+
 
 @router.get("/summary")
-async def performance_summary(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def performance_summary(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Total signals, win rate, avg confidence, avg pnl."""
-    total_result = await db.execute(select(func.count()).select_from(Signal))
+    total_result = await db.execute(_own(select(func.count()).select_from(Signal), user))
     total = total_result.scalar() or 0
 
     resolved_result = await db.execute(
-        select(func.count()).select_from(Signal).where(Signal.outcome.in_(["WIN", "LOSS"]))
+        _own(select(func.count()).select_from(Signal), user).where(Signal.outcome.in_(["WIN", "LOSS"]))
     )
     resolved = resolved_result.scalar() or 0
 
     win_result = await db.execute(
-        select(func.count()).select_from(Signal).where(Signal.outcome == "WIN")
+        _own(select(func.count()).select_from(Signal), user).where(Signal.outcome == "WIN")
     )
     wins = win_result.scalar() or 0
 
     active_result = await db.execute(
-        select(func.count()).select_from(Signal).where(Signal.status == "ACTIVE")
+        _own(select(func.count()).select_from(Signal), user).where(Signal.status == "ACTIVE")
     )
     active = active_result.scalar() or 0
 
+    expired_result = await db.execute(
+        _own(select(func.count()).select_from(Signal), user).where(Signal.outcome == "EXPIRED")
+    )
+    expired = expired_result.scalar() or 0
+
     avg_conf_result = await db.execute(
-        select(func.avg(Signal.confidence_score)).select_from(Signal)
+        _own(select(func.avg(Signal.confidence_score)).select_from(Signal), user)
     )
     avg_confidence = round(avg_conf_result.scalar() or 0, 1)
 
     avg_pnl_result = await db.execute(
-        select(func.avg(Signal.pnl_pct)).select_from(Signal).where(Signal.pnl_pct.isnot(None))
+        _own(select(func.avg(Signal.pnl_pct)).select_from(Signal), user).where(Signal.pnl_pct.isnot(None))
     )
     avg_pnl = round(avg_pnl_result.scalar() or 0, 2)
 
@@ -49,6 +75,7 @@ async def performance_summary(db: AsyncSession = Depends(get_db), _user: dict = 
         "total_signals": total,
         "resolved_signals": resolved,
         "active_signals": active,
+        "expired_signals": expired,
         "wins": wins,
         "losses": resolved - wins,
         "win_rate_pct": round(wins / resolved * 100, 1) if resolved > 0 else 0,
@@ -58,10 +85,10 @@ async def performance_summary(db: AsyncSession = Depends(get_db), _user: dict = 
 
 
 @router.get("/equity-curve")
-async def equity_curve(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def equity_curve(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Array of {date, cumulative_pnl_pct} for resolved signals ordered by resolved_at."""
     result = await db.execute(
-        select(Signal.resolved_at, Signal.pnl_pct)
+        _own(select(Signal.resolved_at, Signal.pnl_pct), user)
         .where(Signal.pnl_pct.isnot(None))
         .where(Signal.resolved_at.isnot(None))
         .order_by(Signal.resolved_at)
@@ -82,15 +109,18 @@ async def equity_curve(db: AsyncSession = Depends(get_db), _user: dict = Depends
 
 
 @router.get("/by-asset-class")
-async def by_asset_class(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def by_asset_class(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Win rate breakdown by asset class."""
     result = await db.execute(
-        select(
-            Signal.asset_class,
-            func.count().label("total"),
-            func.sum(case((Signal.outcome == "WIN", 1), else_=0)).label("wins"),
-            func.avg(Signal.pnl_pct).label("avg_pnl"),
-            func.avg(Signal.confidence_score).label("avg_conf"),
+        _own(
+            select(
+                Signal.asset_class,
+                func.count().label("total"),
+                func.sum(case((Signal.outcome == "WIN", 1), else_=0)).label("wins"),
+                func.avg(Signal.pnl_pct).label("avg_pnl"),
+                func.avg(Signal.confidence_score).label("avg_conf"),
+            ),
+            user,
         )
         .where(Signal.outcome.in_(["WIN", "LOSS"]))
         .group_by(Signal.asset_class)
@@ -113,10 +143,10 @@ async def by_asset_class(db: AsyncSession = Depends(get_db), _user: dict = Depen
 
 
 @router.get("/by-agent")
-async def by_agent(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def by_agent(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Agent accuracy — which agent's direction call matched the final outcome most often."""
     result = await db.execute(
-        select(Signal.agent_votes, Signal.direction, Signal.outcome)
+        _own(select(Signal.agent_votes, Signal.direction, Signal.outcome), user)
         .where(Signal.outcome.in_(["WIN", "LOSS"]))
     )
     rows = result.all()
@@ -157,10 +187,10 @@ async def by_agent(db: AsyncSession = Depends(get_db), _user: dict = Depends(get
 
 
 @router.get("/calibration")
-async def calibration(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def calibration(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Confidence vs actual win rate — bucketed by 10% intervals."""
     result = await db.execute(
-        select(Signal.confidence_score, Signal.outcome)
+        _own(select(Signal.confidence_score, Signal.outcome), user)
         .where(Signal.outcome.in_(["WIN", "LOSS"]))
     )
     rows = result.all()
@@ -191,10 +221,10 @@ async def calibration(db: AsyncSession = Depends(get_db), _user: dict = Depends(
 
 
 @router.get("/monthly")
-async def monthly_returns(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
+async def monthly_returns(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Monthly returns for heatmap — grouped by year/month."""
     result = await db.execute(
-        select(Signal.resolved_at, Signal.pnl_pct)
+        _own(select(Signal.resolved_at, Signal.pnl_pct), user)
         .where(Signal.pnl_pct.isnot(None))
         .where(Signal.resolved_at.isnot(None))
         .order_by(Signal.resolved_at)

@@ -91,6 +91,9 @@ export default function PerformancePage() {
           <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))]">
             {summary.wins}W / {summary.losses}L resolved
           </span>
+          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))]">
+            {summary.expired_signals} EXPIRED
+          </span>
         </div>
       )}
 

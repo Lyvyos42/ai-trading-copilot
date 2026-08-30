@@ -272,7 +272,13 @@ Output JSON only."""
         "vwap_pullback": {"window": "1-4 HOUR",  "target_atr": 2.0,  "stop_atr": 1.0},
         "news_catalyst": {"window": "1-3 DAY",   "target_atr": 2.5,  "stop_atr": 1.2},
         "swing":         {"window": "5-15 DAY",  "target_atr": 4.0,  "stop_atr": 2.0},
-        "balanced":      {"window": "3-7 DAY",   "target_atr": 3.5,  "stop_atr": 1.5},
+        # Balanced geometry is the one the auto-scanner ships on, so it is the one
+        # that was measured. scripts/backtest_screener.py over 3y of real bars on a
+        # 20-symbol universe: tp 3.5 / sl 1.0 / 10-bar hold was the best of 54
+        # configurations at +0.265R expectancy, and the previous 1.5 stop with a
+        # 7-day window returned +0.148R. The window is stated in calendar days and
+        # 10 trading bars is ~14 of them.
+        "balanced":      {"window": "5-14 DAY",  "target_atr": 3.5,  "stop_atr": 1.0},
     }
 
     def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None, profile: str = "balanced", timeframe: str = "1D") -> dict:

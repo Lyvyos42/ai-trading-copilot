@@ -42,3 +42,6 @@ desktop.ini
 *.swp
 *.swo
 .vercel
+.bars_cache/
+backend/**/.bars_cache/
+backend/scripts/.bars_cache/

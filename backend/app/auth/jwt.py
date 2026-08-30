@@ -4,6 +4,7 @@ import asyncio, httpx, logging
 
 import bcrypt
 from jose import JWTError, jwt
+from jose.exceptions import JOSEError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.config import settings
@@ -45,7 +46,13 @@ async def _get_jwks() -> list[dict]:
 
 
 def _try_supabase_sync(token: str, jwks: list[dict]) -> dict | None:
-    """Try to verify token against each JWKS key."""
+    """Try to verify token against each JWKS key.
+
+    Catches JOSEError, not just JWTError: a key-type mismatch (an HS256 token
+    tried against an EC JWKS key) raises JWKError, which is NOT a JWTError
+    subclass. Letting it escape turned every request carrying a non-Supabase
+    token into a 500.
+    """
     for key in jwks:
         try:
             return jwt.decode(
@@ -53,7 +60,7 @@ def _try_supabase_sync(token: str, jwks: list[dict]) -> dict | None:
                 algorithms=["ES256", "RS256", "HS256"],
                 options={"verify_aud": False},
             )
-        except JWTError:
+        except JOSEError:
             continue
     return None
 
@@ -68,7 +75,7 @@ def _try_legacy_supabase(token: str) -> dict | None:
             algorithms=["HS256"],
             options={"verify_aud": False},
         )
-    except JWTError:
+    except JOSEError:
         return None
 
 
@@ -76,7 +83,7 @@ def _try_legacy_supabase(token: str) -> dict | None:
 def _try_custom(token: str) -> dict | None:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
+    except JOSEError:
         return None
 
 

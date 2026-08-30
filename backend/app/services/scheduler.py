@@ -35,6 +35,22 @@ async def _auto_scan_job():
         log.error("scheduler_auto_scan_failed", error=str(exc))
 
 
+async def _resolve_job():
+    """Resolve open signals against their price path.
+
+    Without this nothing ever closed a signal except an incidental check inside
+    GET /signals, which only ever saw the 20 most recent rows — so everything
+    older sat unresolved forever.
+    """
+    try:
+        from app.db.database import AsyncSessionLocal
+        from app.services.signal_resolver import resolve_open_signals
+        async with AsyncSessionLocal() as session:
+            await resolve_open_signals(session)
+    except Exception as exc:
+        log.error("scheduler_resolve_failed", error=str(exc))
+
+
 def start_scheduler():
     global _scheduler
     _scheduler = AsyncIOScheduler(timezone="UTC")
@@ -62,8 +78,20 @@ def start_scheduler():
         replace_existing=True,
         max_instances=1,
     )
+    _scheduler.add_job(
+        _resolve_job,
+        trigger=IntervalTrigger(minutes=15),
+        id="signal_resolver",
+        name="Signal Outcome Resolver",
+        replace_existing=True,
+        max_instances=1,
+    )
     _scheduler.start()
-    log.info("scheduler_started", jobs=["news_scraper", "agent_scanner", "auto_scanner"], interval_minutes=5)
+    log.info(
+        "scheduler_started",
+        jobs=["news_scraper", "agent_scanner", "auto_scanner", "signal_resolver"],
+        interval_minutes=5,
+    )
 
 
 def stop_scheduler():
