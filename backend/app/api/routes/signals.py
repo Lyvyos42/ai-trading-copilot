@@ -502,15 +502,25 @@ async def generate_signal(
         signal_mode=final.get("signal_mode", "AI"),
     )
 
-    # Save to DB — non-blocking: return signal even if DB write fails
+    # Save to DB — non-blocking: return signal even if DB write fails.
+    #
+    # REJECTIONS ARE NOT PERSISTED. A NO_EDGE result or a risk-gate block is the
+    # pipeline declining to produce a signal, not a signal with a bad outcome.
+    # Writing them filled Signal History with a row every time the scanner swept
+    # a symbol — the scanner runs about once a minute, so the history refilled
+    # within a minute of any RESET and the button looked broken. The response
+    # still carries the status and its reasons, so the UI can explain the
+    # rejection; there is simply no row to accumulate.
+    _persist = signal.status == "ACTIVE"
     signal_id = None
-    try:
-        db.add(signal)
-        await db.commit()
-        await db.refresh(signal)
-        signal_id = str(signal.id)
-    except Exception:
-        pass  # DB unavailable — analysis result is still returned
+    if _persist:
+        try:
+            db.add(signal)
+            await db.commit()
+            await db.refresh(signal)
+            signal_id = str(signal.id)
+        except Exception:
+            pass  # DB unavailable — analysis result is still returned
 
     result = _signal_to_dict(signal, state, current_price=live_spot if live_spot and live_spot > 0 else None) if signal_id else {
         "signal_id": None,
