@@ -121,6 +121,20 @@ def resolve_against_bars(signal: Signal, bars: list, now: datetime) -> dict | No
     sl = signal.stop_loss or 0.0
     expired = bool(signal.expiry_time and now > signal.expiry_time)
 
+    # A signal generated while its market was shut is not a weak signal, it is
+    # not a signal: the entry is a stale print from the last session, the ATR is
+    # yesterday's, and the invalidation level cannot be reached because nothing
+    # is trading. Generation is now refused up front, but rows created before
+    # that guard existed are still sitting in the table pricing off dead quotes.
+    # They are voided rather than scored.
+    from app.services.market_hours import market_status
+    if signal.created_at and not market_status(
+            signal.ticker, signal.asset_class, signal.created_at)["open"]:
+        return {
+            "status": "VOID", "outcome": "VOID",
+            "resolved_at": signal.resolved_at or now,
+        }
+
     # A signal with no usable levels can never be scored either way.
     if entry <= 0 or tp <= 0 or sl <= 0 or tp == sl:
         if expired:

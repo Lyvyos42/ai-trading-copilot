@@ -112,6 +112,11 @@ export default function SignalsPage() {
   const [assetClass, setAssetClass] = useState("stocks");
   const [customTicker, setCustomTicker] = useState("");
   const [error, setError]           = useState("");
+  // Reset feedback lives beside the RESET button. It used to write to
+  // `error`, which renders in the LEFT analysis column as a red "ERR —"
+  // banner — so a successful reset looked like a failure, in a part of the
+  // page nowhere near the button that caused it.
+  const [resetMsg, setResetMsg]     = useState<{ ok: boolean; text: string } | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(0);
 
@@ -682,19 +687,37 @@ export default function SignalsPage() {
               >
                 {signals.length} TOTAL
               </span>
+              {resetMsg && (
+                <span
+                  className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                    color: resetMsg.ok ? "hsl(var(--bull))" : "hsl(var(--bear))",
+                    background: resetMsg.ok ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
+                  }}
+                >
+                  {resetMsg.text}
+                </span>
+              )}
               {signals.length > 0 && (
                 <button
                   onClick={async () => {
                     if (!confirm("Delete all signals and start fresh?")) return;
+                    setResetMsg({ ok: true, text: "resetting…" });
                     try {
                       const r = await apiFetch<{ deleted: number }>("/api/v1/signals/reset", { method: "DELETE" });
-                      setSignals([]);
-                      setError(`Reset complete — ${r?.deleted ?? 0} signals deleted.`);
+                      // Re-read from the server rather than just clearing local
+                      // state, so the panel shows what actually remains.
+                      const left = await listSignals(50).catch(() => [] as Signal[]);
+                      setSignals(left);
+                      setResetMsg({
+                        ok: true,
+                        text: `deleted ${r?.deleted ?? 0}${left.length ? `, ${left.length} left` : ""}`,
+                      });
                     } catch (e) {
-                      // Was `catch {}`: a 403 from the old admin gate looked
-                      // identical to success, so the button appeared inert.
-                      setError(e instanceof Error ? e.message : "Reset failed");
+                      setResetMsg({ ok: false, text: e instanceof Error ? e.message : "reset failed" });
                     }
+                    setTimeout(() => setResetMsg(null), 6000);
                   }}
                   className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded border transition-colors"
                   style={{
