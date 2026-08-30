@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/v1/performance", tags=["performance"])
 # Rows that never represented a tradeable thesis and must not dilute the stats:
 # FILTERED is a no-edge result, VOID is a signal that was written without usable
 # levels and so can never be scored either way.
-_UNSCORED = ("FILTERED", "VOID")
+_UNSCORED = ("FILTERED", "VOID", "RISK_GATE_BLOCKED", "MARKET_CLOSED")
 
 
 def _uid(user: dict) -> str:

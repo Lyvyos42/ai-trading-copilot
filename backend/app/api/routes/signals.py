@@ -23,6 +23,7 @@ from app.models.signal import Signal
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
 from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _fetch_tv_ta_spot
+from app.services.market_hours import market_status
 from app.services.signal_resolver import resolve_open_signals, window_to_hours
 
 
@@ -301,6 +302,19 @@ async def generate_signal(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
+    # ── Layer -1: market session ─────────────────────────────────────────────
+    # Refuse before the pipeline runs. A signal computed on a closed market
+    # prices off a stale print, sizes off yesterday's ATR, and sets an
+    # invalidation level nothing can reach. The risk gate did catch these, but
+    # only after nine agents had run and a row had been written.
+    _session = market_status(body.ticker, body.asset_class)
+    if not _session["open"]:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"{body.ticker.upper()} — {_session['reason']}."
+                    + (f" Reopens {_session['reopens']}." if _session.get("reopens") else "")),
+        )
+
     # ── Layer 0: IP rate limit (protects unauthenticated + authenticated) ────────
     forwarded = request.headers.get("x-forwarded-for", "")
     client_ip = forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "unknown")
@@ -850,13 +864,13 @@ async def reset_signals(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
+    # Deletes only the caller's own rows, so this needs no admin gate — clearing
+    # your own track record before a fresh test run is ordinary use. It was
+    # gated on ADMIN_EMAILS, which meant the RESET button silently did nothing
+    # for everyone else.
     user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
-    db_user_result = await db.execute(select(User).where(User.id == user_id))
-    db_user = db_user_result.scalar_one_or_none()
-    user_email = (db_user.email.lower() if db_user and db_user.email else "")
-    admin_emails = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
-    if user_email not in admin_emails and (not db_user or db_user.tier != "admin"):
-        raise HTTPException(status_code=403, detail="Admin only")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
     result = await db.execute(delete(Signal).where(Signal.user_id == user_id))
     await db.commit()
     return {"deleted": result.rowcount}

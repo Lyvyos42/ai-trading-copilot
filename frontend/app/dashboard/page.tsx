@@ -222,6 +222,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
       const msg = e instanceof Error ? e.message : "Analysis failed";
       // Distinguish network errors (cold start) from API errors
       const isColdStart = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network");
+      // A market-closed 409 already reads as a full sentence naming the session
+      // and its reopen time, so it is shown as-is.
       setAnalysisError(
         isColdStart
           ? "Backend is waking up (Render free tier). This takes ~60s on first use. Please wait and try again."
@@ -263,7 +265,10 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
       setScannerStatus(`${sym} done`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "scan failed";
-      setScannerStatus(`${sym} ERR: ${msg.slice(0, 40)}`);
+      // The backend refuses closed markets with 409 and an explanatory message.
+      // That is not a failure, so it must not read as one.
+      const closed = /closed|outside the regular session|reopens/i.test(msg);
+      setScannerStatus(closed ? `${sym} — market closed` : `${sym} ERR: ${msg.slice(0, 40)}`);
     } finally {
       scannerIndexRef.current++;
       setTimeout(() => setScannerStatus(""), 4000);

@@ -687,9 +687,14 @@ export default function SignalsPage() {
                   onClick={async () => {
                     if (!confirm("Delete all signals and start fresh?")) return;
                     try {
-                      await apiFetch("/api/v1/signals/reset", { method: "DELETE" });
+                      const r = await apiFetch<{ deleted: number }>("/api/v1/signals/reset", { method: "DELETE" });
                       setSignals([]);
-                    } catch {}
+                      setError(`Reset complete — ${r?.deleted ?? 0} signals deleted.`);
+                    } catch (e) {
+                      // Was `catch {}`: a 403 from the old admin gate looked
+                      // identical to success, so the button appeared inert.
+                      setError(e instanceof Error ? e.message : "Reset failed");
+                    }
                   }}
                   className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded border transition-colors"
                   style={{

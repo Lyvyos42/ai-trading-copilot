@@ -19,6 +19,7 @@ from app.data.market_data import fetch_market_data
 from app.db.database import AsyncSessionLocal
 from app.models.alert import ScannerConfig
 from app.models.signal import Signal
+from app.services.market_hours import market_status
 from app.services.signal_resolver import window_to_hours
 from sqlalchemy import select
 
@@ -242,6 +243,8 @@ def _score_setup(data: dict) -> tuple[int, str, str]:
 
 async def _scan_symbol(ticker: str) -> tuple[int, str, str, dict] | None:
     """Fetch market data and score a single symbol. Returns None on failure."""
+    if not market_status(ticker)["open"]:
+        return None
     try:
         data = await fetch_market_data(ticker)
         score, direction, summary = _score_setup(data)
@@ -377,6 +380,10 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str]) -> list[dict]
             continue
 
         score, direction, summary, _data = result
+
+        if not market_status(sym)["open"]:
+            log.debug("auto_scan_market_closed", ticker=sym)
+            continue
 
         if score < CONFLUENCE_THRESHOLD:
             log.debug("auto_scan_below_threshold", ticker=sym, score=score)
