@@ -439,6 +439,10 @@ async def generate_signal(
         if directional_strength < 5:
             final["conviction_tier"] = "NO_EDGE"
             final["status"] = "FILTERED"
+            final["risk_gate_reasons"] = [
+                f"Probability {prob:.1f}% is within 5 points of neutral — "
+                f"no directional edge to trade"
+            ]
 
     # Build agent_votes summary (all 7 analysts + risk + quant)
     agent_votes = {}
