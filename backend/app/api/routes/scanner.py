@@ -25,19 +25,19 @@ MAX_SYMBOLS   = 20
 VALID_INTERVALS = {15, 30, 60}
 
 
-async def _require_premium(user: dict, db: AsyncSession) -> str:
-    user_id = user.get("sub", "")
+FREE_MAX_SYMBOLS = 5
+PREMIUM_MAX_SYMBOLS = 20
+
+async def _get_user_id_and_max_symbols(user: dict, db: AsyncSession) -> tuple[str, int]:
+    user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
     tier = user.get("tier", "") or ""
-    if tier not in PREMIUM_TIERS:
+    if not tier:
         result = await db.execute(select(User).where(User.id == user_id))
         db_user = result.scalar_one_or_none()
         tier = db_user.tier if db_user else "free"
-    if tier not in PREMIUM_TIERS:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Agent Scanner requires a Pro or Enterprise plan (your tier: {tier}).",
-        )
-    return user_id
+    max_symbols = PREMIUM_MAX_SYMBOLS if tier in PREMIUM_TIERS else FREE_MAX_SYMBOLS
+    return user_id, max_symbols
+
 
 
 # ── Config schema ──────────────────────────────────────────────────────────────
@@ -73,17 +73,19 @@ async def get_config(
     db:   AsyncSession = Depends(get_db),
     user: dict         = Depends(get_current_user),
 ):
-    user_id = await _require_premium(user, db)
+    user_id, max_symbols = await _get_user_id_and_max_symbols(user, db)
     result  = await db.execute(select(ScannerConfig).where(ScannerConfig.user_id == user_id))
     cfg     = result.scalar_one_or_none()
     if not cfg:
-        # Return default config (not yet saved)
         return {
             "enabled": False, "symbols": [], "max_concurrent": 2,
             "interval_minutes": 30, "last_scan_at": None,
             "estimated_cost_per_hour": 0.0,
+            "max_symbols": max_symbols,
         }
-    return _config_to_dict(cfg)
+    data = _config_to_dict(cfg)
+    data["max_symbols"] = max_symbols
+    return data
 
 
 # ── PUT config ────────────────────────────────────────────────────────────────
@@ -94,12 +96,12 @@ async def save_config(
     db:   AsyncSession = Depends(get_db),
     user: dict         = Depends(get_current_user),
 ):
-    user_id = await _require_premium(user, db)
+    user_id, max_symbols = await _get_user_id_and_max_symbols(user, db)
 
     if body.interval_minutes not in VALID_INTERVALS:
         raise HTTPException(status_code=400, detail="interval_minutes must be 15, 30, or 60")
 
-    symbols = body.validate_symbols()
+    symbols = body.validate_symbols()[:max_symbols]
 
     result = await db.execute(select(ScannerConfig).where(ScannerConfig.user_id == user_id))
     cfg    = result.scalar_one_or_none()
@@ -115,7 +117,10 @@ async def save_config(
 
     await db.commit()
     await db.refresh(cfg)
-    return _config_to_dict(cfg)
+    data = _config_to_dict(cfg)
+    data["max_symbols"] = max_symbols
+    return data
+
 
 
 # ── GET alerts ────────────────────────────────────────────────────────────────
@@ -165,34 +170,59 @@ async def mark_read(
 
 # ── POST auto/trigger ─────────────────────────────────────────────────────────
 
+class ScanNowIn(BaseModel):
+    symbols: list[str] = Field(default_factory=list)
+    replace_active: bool = True
+
+
 @router.post("/auto/trigger")
 async def trigger_auto_scan(
     db:   AsyncSession = Depends(get_db),
     user: dict         = Depends(get_current_user),
 ):
     """Manually trigger an auto-scan for the current user (testing/on-demand)."""
-    user_id = await _require_premium(user, db)
+    user_id, _max = await _get_user_id_and_max_symbols(user, db)
 
     result = await db.execute(
         select(ScannerConfig).where(ScannerConfig.user_id == user_id)
     )
     cfg = result.scalar_one_or_none()
 
-    if not cfg or not cfg.symbols:
-        raise HTTPException(
-            status_code=400,
-            detail="No scanner config found. Save a config with symbols first.",
-        )
+    symbols = cfg.symbols if (cfg and cfg.symbols) else ["BTC-USD", "ETH-USD", "EURUSD=X", "GBPUSD=X", "XAUUSD"]
 
     from app.services.auto_scanner import run_auto_scan_for_user
 
-    results = await run_auto_scan_for_user(user_id, cfg.symbols)
+    results = await run_auto_scan_for_user(user_id, symbols, replace_active=True)
 
     return {
-        "symbols_scanned": len(cfg.symbols),
+        "symbols_scanned": len(symbols),
         "signals_generated": len(results),
         "signals": results,
     }
+
+
+@router.post("/scan-now")
+async def scan_now(
+    body: ScanNowIn,
+    db:   AsyncSession = Depends(get_db),
+    user: dict         = Depends(get_current_user),
+):
+    """Instant zero-cost batch scan for dashboard symbols."""
+    user_id, max_symbols = await _get_user_id_and_max_symbols(user, db)
+    symbols = [s.upper().strip() for s in body.symbols if s.strip()][:max_symbols]
+    if not symbols:
+        symbols = ["BTC-USD", "EURUSD=X", "GBPUSD=X", "XAUUSD"]
+
+    from app.services.auto_scanner import run_auto_scan_for_user
+
+    results = await run_auto_scan_for_user(user_id, symbols, replace_active=body.replace_active)
+
+    return {
+        "symbols_scanned": len(symbols),
+        "signals_generated": len(results),
+        "signals": results,
+    }
+
 
 
 def _alert_to_dict(a: MarketAlert) -> dict:

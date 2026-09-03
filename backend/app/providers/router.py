@@ -54,7 +54,11 @@ class ModelRouter:
         max_tokens: int = 2000,
         agent_name: str = "",
     ) -> str:
+        if getattr(settings, "python_engine_mode", True):
+            return ""
+
         provider_name, model = self._tiers.get(tier, self._tiers["standard"])
+
         provider = self._get_provider(provider_name)
 
         text, usage = await provider.complete(

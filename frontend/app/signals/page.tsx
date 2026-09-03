@@ -127,11 +127,11 @@ export default function SignalsPage() {
 
   // Load existing signals from DB on mount
   useEffect(() => {
-    if (!isLoggedIn) return;
     listSignals(50)
-      .then((data) => setSignals(data))
+      .then((data) => setSignals(data || []))
       .catch(() => {}); // silent — signals will appear when generated
   }, [isLoggedIn]);
+
 
   const STAGE_DELAYS = [0, 4_000, 11_000, 25_000, 31_000, 37_000];
   useEffect(() => {
@@ -665,11 +665,12 @@ export default function SignalsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {signals.map((signal) => (
-                <SignalCard key={signal.signal_id} signal={signal} onResolve={(id, outcome) => handleResolveSignal(id, outcome)} />
+              {signals.map((signal, idx) => (
+                <SignalCard key={signal.signal_id || `${signal.ticker}-${signal.timestamp || idx}`} signal={signal} onResolve={(id, outcome) => handleResolveSignal(id, outcome)} />
               ))}
             </div>
           )}
+
         </div>
 
         {/* RIGHT — Signal History Sidebar (25%) */}
@@ -796,8 +797,9 @@ export default function SignalsPage() {
                   const isResolved = sig.status === "WIN" || sig.status === "LOSS";
                   return (
                     <div
-                      key={sig.signal_id}
+                      key={sig.signal_id || `${sig.ticker}-${sig.timestamp || idx}`}
                       className="px-3 py-2 transition-colors"
+
                       style={{
                         borderBottom: idx < signals.length - 1 ? "1px solid hsl(var(--border) / 0.5)" : "none",
                         background: idx === 0 ? "hsl(var(--primary) / 0.03)" : "transparent",

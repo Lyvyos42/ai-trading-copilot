@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, desc, func, delete
+from sqlalchemy import select, desc, func, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user, get_optional_user
@@ -346,7 +346,7 @@ async def generate_signal(
             if cached:
                 return {**cached, "cached": True}
 
-            # Block if user already has an ACTIVE (non-expired) signal for this ticker
+            # If user already has an ACTIVE signal for this ticker, supersede it to allow fresh analysis
             existing = await db.execute(
                 select(Signal)
                 .where(Signal.user_id == user_id)
@@ -355,11 +355,11 @@ async def generate_signal(
                 .where(Signal.expiry_time > datetime.utcnow())
                 .limit(1)
             )
-            if existing.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"You already have an active signal for {body.ticker.upper().strip()}. Mark it as WIN or LOSS before generating a new one.",
-                )
+            prev_sig = existing.scalar_one_or_none()
+            if prev_sig:
+                prev_sig.status = "SUPERSEDED"
+                await db.commit()
+
 
             # Layer 1: daily quota (DB query — do last to avoid unnecessary I/O)
             await _check_daily_quota(user_id, tier, db)
@@ -522,12 +522,16 @@ async def generate_signal(
         except Exception:
             pass  # DB unavailable — analysis result is still returned
 
-    result = _signal_to_dict(signal, state, current_price=live_spot if live_spot and live_spot > 0 else None) if signal_id else {
-        "signal_id": None,
+    if not signal_id:
+        signal_id = str(uuid.uuid4())
+
+    result = _signal_to_dict(signal, state, current_price=live_spot if live_spot and live_spot > 0 else None) if _persist and signal.id else {
+        "signal_id": signal_id,
         "ticker": ticker,
         "asset_class": body.asset_class,
         "timeframe": body.timeframe,
         "direction": direction,
+
         "entry_price": final.get("entry_price", 0),
         "current_price": live_spot if live_spot and live_spot > 0 else final.get("entry_price", 0),
         "stop_loss": final.get("stop_loss", 0),
@@ -671,14 +675,17 @@ async def get_signal(
 async def list_signals(
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict | None = Depends(get_optional_user),
 ):
-    uid = user.get("sub") or user.get("id") or user.get("user_id")
+    uid = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
     query = select(Signal).order_by(desc(Signal.created_at)).limit(min(limit, 100))
     if uid:
-        query = query.where(Signal.user_id == uid)
+        query = query.where(or_(Signal.user_id == uid, Signal.user_id == None))
+    else:
+        query = query.where(Signal.user_id == None)
     result = await db.execute(query)
     signals = result.scalars().all()
+
 
     # Batch-fetch current prices for active signals so the frontend shows live entry
     active_tickers = list({s.ticker for s in signals if s.status == "ACTIVE"})
@@ -731,8 +738,9 @@ async def set_signal_outcome(
     if not is_admin:
         if signal.user_id and signal.user_id != owner_id:
             raise HTTPException(status_code=403, detail="Not your signal")
-        if not signal.user_id:
-            raise HTTPException(status_code=403, detail="System signals can only be resolved by admins")
+        if not signal.user_id and owner_id:
+            signal.user_id = owner_id
+
 
     signal.status = body.outcome
     signal.outcome = body.outcome

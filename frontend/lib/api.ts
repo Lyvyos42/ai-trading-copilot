@@ -183,11 +183,36 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
 }
 
 export async function resolveSignal(signalId: string, outcome: "WIN" | "LOSS"): Promise<Signal> {
+  if (!signalId) throw new Error("Invalid signal ID");
   return apiFetch<Signal>(`/api/v1/signals/${signalId}/outcome`, {
     method: "PATCH",
     body: JSON.stringify({ outcome }),
   });
 }
+
+export interface ScanResult {
+  signal_id: string;
+  ticker: string;
+  direction: "LONG" | "SHORT" | "NEUTRAL";
+  confidence_score: number;
+  entry_price: number;
+  stop_loss: number;
+  signal_mode: string;
+  confluence_score: number;
+  summary: string;
+  timestamp: string;
+}
+
+export async function scanNow(
+  symbols?: string[],
+  replaceActive = true
+): Promise<{ symbols_scanned: number; signals_generated: number; signals: ScanResult[] }> {
+  return apiFetch("/api/v1/scanner/scan-now", {
+    method: "POST",
+    body: JSON.stringify({ symbols: symbols || [], replace_active: replaceActive }),
+  });
+}
+
 
 export async function executePosition(signalId: string, quantity = 1): Promise<{ id: string }> {
   return apiFetch("/api/v1/portfolio/execute", {

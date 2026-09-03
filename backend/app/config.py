@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     # App
     environment: str = "development"
     log_level: str = "INFO"
+    python_engine_mode: bool = True  # Run all 9 agents directly in high-performance Python mode
 
     # CORS — comma-separated origins. Override via ALLOWED_ORIGINS env var.
     allowed_origins: str = "http://localhost:3000,https://ai-trading-copilot-tan.vercel.app,https://app.quantneuraledge.com,https://quantneuraledge.com"

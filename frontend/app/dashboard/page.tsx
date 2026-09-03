@@ -7,7 +7,8 @@ import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
 import { SignalOverlay } from "@/components/SignalOverlay";
 import { AgentStatusPanel } from "@/components/AgentStatus";
-import { generateSignal, listSignals, getAgentStatus, wakeBackend, type Signal, type AgentStatus } from "@/lib/api";
+import { generateSignal, listSignals, getAgentStatus, wakeBackend, scanNow, type Signal, type AgentStatus } from "@/lib/api";
+
 import { ScannerPanel } from "@/components/ScannerPanel";
 import { ProfileSelector } from "@/components/ProfileSelector";
 import { formatPrice } from "@/lib/utils";
@@ -254,42 +255,40 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     const syms = scanSymbolsRef.current;
     if (syms.length === 0) return;
     scannerBusyRef.current = true;
-    const sym = syms[scannerIndexRef.current % syms.length];
+    setScannerStatus(`Scanning ${syms.length} watchlist symbols…`);
 
-    const hasActive = signalsRef.current.some(s => s.ticker === sym && s.status === "ACTIVE" && !_isExpired(s));
-    if (hasActive) {
-      setScannerStatus(`${sym} locked — skipping`);
-      scannerIndexRef.current++;
-      scannerBusyRef.current = false;
-      setTimeout(() => setScannerStatus(""), 2000);
-      return;
-    }
-
-    setScannerStatus(`Scanning ${sym}…`);
     try {
-      const signal = await generateSignal(sym, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
-      if (signal.status !== "ACTIVE") {
-        setScannerStatus(`${sym} — ${String(signal.status).replace(/_/g, " ").toLowerCase()}`);
-        return;
+      const res = await scanNow(syms, true);
+      if (res.signals && res.signals.length > 0) {
+        setSignals((prev) => {
+          const map = new Map(prev.map(s => [s.ticker, s]));
+          for (const s of res.signals) {
+            map.set(s.ticker, {
+              ...s,
+              status: "ACTIVE",
+              timeframe: PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
+              asset_class: "stocks",
+              agent_votes: {},
+              reasoning_chain: [s.summary],
+              strategy_sources: ["Technical Confluence Screener"],
+              timeframe_levels: {},
+            } as unknown as Signal);
+          }
+          return Array.from(map.values()).slice(0, 20);
+        });
+        setScannerStatus(`⚡ ${res.signals.length} setup${res.signals.length > 1 ? "s" : ""} found (${res.signals.map(s => s.ticker).join(", ")})`);
+      } else {
+        setScannerStatus(`Scanned ${res.symbols_scanned} symbols — no setups meeting confluence`);
       }
-      signal.signal_mode = "AUTO_SCAN";
-      setSignals((prev) => {
-        if (prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE")) return prev;
-        return [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 14)];
-      });
-      setScannerStatus(`${sym} done`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "scan failed";
-      // The backend refuses closed markets with 409 and an explanatory message.
-      // That is not a failure, so it must not read as one.
-      const closed = /closed|outside the regular session|reopens/i.test(msg);
-      setScannerStatus(closed ? `${sym} — market closed` : `${sym} ERR: ${msg.slice(0, 40)}`);
+      setScannerStatus(`Scan error: ${msg.slice(0, 40)}`);
     } finally {
-      scannerIndexRef.current++;
-      setTimeout(() => setScannerStatus(""), 4000);
+      setTimeout(() => setScannerStatus(""), 6000);
       scannerBusyRef.current = false;
     }
   }, [activeProfile]);
+
 
   function startScanner() {
     if (scannerRef.current) return;

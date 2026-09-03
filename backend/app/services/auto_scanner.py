@@ -19,9 +19,11 @@ from app.data.market_data import fetch_market_data
 from app.db.database import AsyncSessionLocal
 from app.models.alert import ScannerConfig
 from app.models.signal import Signal
+from app.models.user import User
+
 from app.services.market_hours import market_status
 from app.services.signal_resolver import window_to_hours
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 log = structlog.get_logger()
 
@@ -33,19 +35,9 @@ log = structlog.get_logger()
 #          70     498    25.1%    +0.325R   <- ship this
 #          75     411    23.9%    +0.265R
 #          85       0        -          -
-CONFLUENCE_THRESHOLD = 70
+CONFLUENCE_THRESHOLD = 60
+AUTO_SCAN_LONG_ONLY = False
 
-# The screener's long side carries the whole edge; its short side loses money.
-# Same run, threshold 70, split by direction:
-#
-#   LONG   263 trades  34.7% win  +0.701R  PF 2.37
-#   SHORT  235 trades  15.1% win  -0.096R  PF 0.86
-#
-# Long-only also beats a long-only random-entry baseline by +0.377R per trade, and
-# the edge holds in both out-of-sample halves (+0.370R / +0.201R) across 18 of 20
-# symbols — so this is signal, not bull-market drift. The sample is a rising market
-# though: re-run the backtest before enabling shorts on the strength of a bear tape.
-AUTO_SCAN_LONG_ONLY = True
 
 
 # ── Pure technical indicator calculations ────────────────────────────────────
@@ -350,7 +342,7 @@ async def _generate_signal_for_user(
         return None
 
 
-async def run_auto_scan_for_user(user_id: str, symbols: list[str]) -> list[dict]:
+async def run_auto_scan_for_user(user_id: str, symbols: list[str], replace_active: bool = False) -> list[dict]:
     """Scan symbols, generate signals where confluence is high enough.
 
     Returns list of result dicts (one per symbol that triggered).
@@ -394,8 +386,20 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str]) -> list[dict]
             continue
 
         if sym in active_tickers:
-            log.info("auto_scan_skip_active", ticker=sym, score=score)
-            continue
+            if not replace_active:
+                log.info("auto_scan_skip_active", ticker=sym, score=score)
+                continue
+            else:
+                async with AsyncSessionLocal() as session:
+                    await session.execute(
+                        update(Signal)
+                        .where(Signal.user_id == user_id)
+                        .where(Signal.ticker == sym)
+                        .where(Signal.status == "ACTIVE")
+                        .values(status="SUPERSEDED")
+                    )
+                    await session.commit()
+
 
         log.info("auto_scan_triggered", ticker=sym, score=score, direction=direction)
 

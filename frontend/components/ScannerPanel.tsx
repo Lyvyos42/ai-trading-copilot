@@ -12,7 +12,9 @@ interface ScannerConfig {
   interval_minutes:          number;
   last_scan_at:              string | null;
   estimated_cost_per_hour:   number;
+  max_symbols?:              number;
 }
+
 
 const INTERVAL_OPTIONS = [15, 30, 60] as const;
 const CONCURRENT_OPTIONS = [1, 2, 3, 4, 5] as const;
@@ -85,9 +87,13 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
     }
   }
 
+  const maxAllowedSymbols = config?.max_symbols ?? 20;
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
+
   function addSymbol() {
     const s = newSymbol.trim().toUpperCase();
-    if (!s || symbols.includes(s) || symbols.length >= MAX_SYMBOLS) return;
+    if (!s || symbols.includes(s) || symbols.length >= maxAllowedSymbols) return;
     setSymbols(prev => [...prev, s]);
     setNewSymbol("");
   }
@@ -101,6 +107,24 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
     setEnabled(next);
     await saveConfig(next);
   }
+
+  async function triggerNow() {
+    setTriggering(true);
+    setTriggerMsg(null);
+    try {
+      const res = await apiFetch<{ symbols_scanned: number; signals_generated: number }>("/api/v1/scanner/auto/trigger", {
+        method: "POST",
+      });
+      setTriggerMsg(`Scanned ${res.symbols_scanned} syms — ${res.signals_generated} setups`);
+      onConfigChange?.();
+    } catch (e) {
+      setTriggerMsg(e instanceof Error ? e.message : "Trigger failed");
+    } finally {
+      setTriggering(false);
+      setTimeout(() => setTriggerMsg(null), 5000);
+    }
+  }
+
 
   if (loading) {
     return (
@@ -269,14 +293,30 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
         </div>
       </div>
 
-      {/* Save button */}
-      <button
-        onClick={() => saveConfig()}
-        disabled={saving}
-        className="w-full text-[8px] font-mono font-bold px-2 py-1.5 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
-      >
-        {saving ? "SAVING…" : "SAVE CONFIG"}
-      </button>
+      {triggerMsg && (
+        <div className="text-[8px] font-mono text-center text-primary bg-primary/10 border border-primary/20 py-1 px-2 rounded">
+          {triggerMsg}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => triggerNow()}
+          disabled={triggering}
+          className="text-[8px] font-mono font-bold px-2 py-1.5 rounded border border-primary/50 text-primary bg-primary/5 hover:bg-primary/15 transition-colors disabled:opacity-40"
+        >
+          {triggering ? "SCANNING…" : "⚡ SCAN NOW"}
+        </button>
+        <button
+          onClick={() => saveConfig()}
+          disabled={saving}
+          className="text-[8px] font-mono font-bold px-2 py-1.5 rounded border border-border/60 text-foreground hover:bg-white/5 transition-colors disabled:opacity-40"
+        >
+          {saving ? "SAVING…" : "SAVE CONFIG"}
+        </button>
+      </div>
     </div>
+
   );
 }
