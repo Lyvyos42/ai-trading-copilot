@@ -682,7 +682,13 @@ async def list_signals(
     if uid:
         query = query.where(or_(Signal.user_id == uid, Signal.user_id == None))
     else:
-        query = query.where(Signal.user_id == None)
+        # An anonymous caller gets NOTHING. This previously returned every
+        # ownerless row, which handed the entire signal history to anyone with
+        # the URL - no token needed, and a fake bearer token worked equally
+        # well. The signals are the product; they are not public.
+        # Returns a LIST, not an object - this endpoint is typed Signal[] in
+        # frontend/lib/api.ts and the page calls .map() on it directly.
+        return []
     result = await db.execute(query)
     signals = result.scalars().all()
 
@@ -908,6 +914,13 @@ async def reset_signals(
     user_id = user.get("sub") or user.get("id") or user.get("user_id") or ""
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
-    result = await db.execute(delete(Signal).where(Signal.user_id == user_id))
+    # Also clears OWNERLESS rows (user_id IS NULL). Both creation paths set a
+    # user_id now, but rows created before that fix belong to nobody - so a
+    # reset that filtered on user_id alone deleted none of them and the button
+    # looked broken. Those same rows are the ones served to anonymous callers
+    # below, so clearing them closes that too.
+    result = await db.execute(
+        delete(Signal).where(or_(Signal.user_id == user_id, Signal.user_id.is_(None)))
+    )
     await db.commit()
     return {"deleted": result.rowcount}
