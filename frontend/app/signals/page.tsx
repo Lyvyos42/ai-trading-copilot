@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, listSignals, resolveSignal, apiFetch, API_URL, type Signal } from "@/lib/api";
+import { generateSignal, listSignals, resolveSignal, apiFetch, wakeBackend, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatPrice, timeAgo } from "@/lib/utils";
@@ -127,6 +127,10 @@ export default function SignalsPage() {
 
   // Load existing signals from DB on mount
   useEffect(() => {
+    // Wake the backend first. dashboard, journal and performance all do this;
+    // this page did not, so it was the one place you could land on a cold
+    // Render instance and have the first action - usually RESET - time out.
+    wakeBackend();
     listSignals(50)
       .then((data) => setSignals(data || []))
       .catch(() => {}); // silent — signals will appear when generated

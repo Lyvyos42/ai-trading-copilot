@@ -26,9 +26,13 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     ...options,
   };
 
-  // Exponential backoff — 3 retries on network errors (handles Render cold-start).
-  // Delays: 2s → 6s → 18s. Total max wait ~26s vs the old 50s single retry.
-  const DELAYS = [2_000, 6_000, 18_000];
+  // Exponential backoff on network errors, sized to outlast a Render cold start.
+  // Render's own free-tier banner says a spun-down instance "can delay requests
+  // by 50 seconds or more" - and the previous budget was 2+6+18 = 26s, so it
+  // gave up BEFORE the server could possibly answer. That surfaced as
+  // "Failed to fetch", which reads like a broken endpoint rather than a
+  // sleeping one. 2+5+12+25+30 = 74s now covers it.
+  const DELAYS = [2_000, 5_000, 12_000, 25_000, 30_000];
   let lastError: unknown;
   for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
     try {
