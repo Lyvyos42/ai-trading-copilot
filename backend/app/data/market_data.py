@@ -514,6 +514,179 @@ async def _fetch_rest_bars(yf_sym: str, asset_class: str, ticker: str) -> dict |
     return await asyncio.to_thread(_sync)
 
 
+# ─── TradingView as the PRIMARY source ───────────────────────────────────────
+#
+# TradingView was always meant to be primary with Yahoo as the fallback, but
+# the only TV bar path went through tvDatafeed, which is not in requirements -
+# so the import failed on every call and every request silently fell through to
+# Yahoo. TradingView has never served a bar in production.
+#
+# tvDatafeed is not the fix. It is an unofficial websocket scraper, TradingView's
+# terms prohibit it, and it would be blocked from a datacentre IP the same way
+# yfinance sometimes is.
+#
+# The public SCANNER endpoint is a different matter: it is the same API
+# tradingview.com's own screener calls, it needs no package and no key, and it
+# already works from this host - it is what has been serving live spot prices
+# all along. Probed 2026-09-05, it returns 33 of 34 requested fields, all
+# computed by TradingView on TradingView's data:
+#
+#   close open high low volume change  RSI ATR ADX  EMA20/50/200 SMA20/50/200
+#   MACD.macd MACD.signal  Stoch.K Stoch.D  BB.upper BB.lower  VWAP
+#   Perf.W/1M/3M/6M/Y  volatility.D  Recommend.All/MA/Other
+#
+# That covers everything the technical agent computes, and two of its inputs
+# come out cleaner than the local versions:
+#   MACD.macd IS EMA12 - EMA26, so the crossover is its sign
+#   Perf.Y - Perf.1M IS the 12-1 month momentum, straight from TradingView
+#
+# Yahoo still supplies the historical `closes` array, because the scanner
+# returns a snapshot rather than a series. So: TradingView primary for price
+# and every indicator a decision is made on, Yahoo fallback for history and
+# for symbols TradingView cannot resolve.
+
+_TV_SCREENER_BY_CLASS = {
+    "crypto": "crypto",
+    "fx": "forex",
+    "stocks": "america",
+    "etfs": "america",
+    "commodities": "cfd",
+    "indices": "cfd",
+    "futures": "futures",
+    "fixed_income": "america",
+}
+
+# The scanner returns every venue carrying a symbol - EURUSD alone resolves to
+# VANTAGE and BLACKBULL broker feeds. Prefer the canonical venue so a price is
+# reproducible rather than whichever broker happened to sort first.
+_TV_PREFERRED_EXCHANGE = {
+    "forex":   ("FX_IDC", "FX", "OANDA", "SAXO"),
+    "crypto":  ("BITSTAMP", "COINBASE", "BINANCE", "KRAKEN"),
+    "america": ("NASDAQ", "NYSE", "AMEX"),
+    "cfd":     ("OANDA", "TVC", "FOREXCOM", "CAPITALCOM", "PEPPERSTONE"),
+    "futures": ("CME", "CME_MINI", "COMEX", "NYMEX", "CBOT"),
+}
+
+_TV_COLUMNS = [
+    "close", "open", "high", "low", "volume", "change",
+    "RSI", "ATR", "ADX",
+    "EMA20", "EMA50", "EMA200", "SMA20", "SMA50", "SMA200",
+    "MACD.macd", "MACD.signal",
+    "Stoch.K", "Stoch.D",
+    "BB.upper", "BB.lower", "VWAP",
+    "Perf.W", "Perf.1M", "Perf.3M", "Perf.6M", "Perf.Y",
+    "volatility.D", "average_volume_10d_calc",
+    "Recommend.All", "Recommend.MA", "Recommend.Other",
+]
+
+_tv_symbol_cache: dict[str, str | None] = {}      # "SCREENER|NAME" -> "EXCH:SYM"
+_tv_ind_cache: dict[str, tuple[dict, float]] = {}  # "EXCH:SYM" -> (fields, ts)
+_TV_IND_TTL = 45.0
+
+
+def _tv_scan_name(ticker: str) -> str:
+    """Our ticker -> the bare name TradingView screens on."""
+    t = (ticker or "").upper().strip()
+    for suffix in ("=X", "=F"):
+        t = t.replace(suffix, "")
+    if t.endswith("-USD"):
+        t = t[:-4] + "USD"
+    if t.endswith("-USDT"):
+        t = t[:-5] + "USDT"
+    return t.replace("^", "")
+
+
+def _tv_post(screener: str, payload: dict, timeout: int = 12):
+    import json as _json
+    import urllib.request as _urlreq
+    req = _urlreq.Request(
+        f"https://scanner.tradingview.com/{screener}/scan",
+        data=_json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+    )
+    with _urlreq.urlopen(req, timeout=timeout) as r:
+        return _json.loads(r.read())
+
+
+def _tv_resolve_sync(ticker: str, asset_class: str) -> tuple[str, str] | None:
+    """(EXCHANGE:SYMBOL, screener) for a ticker, or None.
+
+    TradingView's symbol-search endpoint returns 403 to non-browser clients, so
+    the exchange is resolved through the scanner's own name filter, which does
+    answer. Cached because it does not change.
+    """
+    screener = _TV_SCREENER_BY_CLASS.get(asset_class, "america")
+    name = _tv_scan_name(ticker)
+    key = f"{screener}|{name}"
+    if key in _tv_symbol_cache:
+        hit = _tv_symbol_cache[key]
+        return (hit, screener) if hit else None
+
+    # A hand-mapped symbol always wins - it was chosen deliberately.
+    mapped = _TV_SCAN_SYMBOL.get(name)
+    if mapped:
+        _tv_symbol_cache[key] = mapped[0]
+        return mapped[0], mapped[1]
+
+    try:
+        data = _tv_post(screener, {
+            "filter": [{"left": "name", "operation": "equal", "right": name}],
+            "columns": ["name", "exchange"],
+            "range": [0, 12],
+        })
+        rows = [r["s"] for r in data.get("data", []) if r.get("s")]
+    except Exception as exc:
+        log.warning("tv_resolve_failed", ticker=ticker, screener=screener,
+                    error=f"{type(exc).__name__}: {exc}")
+        return None
+
+    if not rows:
+        _tv_symbol_cache[key] = None
+        return None
+
+    for pref in _TV_PREFERRED_EXCHANGE.get(screener, ()):
+        for full in rows:
+            if full.startswith(pref + ":"):
+                _tv_symbol_cache[key] = full
+                return full, screener
+    _tv_symbol_cache[key] = rows[0]
+    return rows[0], screener
+
+
+def _tv_indicators_sync(ticker: str, asset_class: str) -> dict | None:
+    """TradingView's own computed indicator set for one symbol."""
+    import time as _time
+    resolved = _tv_resolve_sync(ticker, asset_class)
+    if not resolved:
+        return None
+    tv_sym, screener = resolved
+
+    cached = _tv_ind_cache.get(tv_sym)
+    if cached and (_time.time() - cached[1]) < _TV_IND_TTL:
+        return cached[0]
+
+    try:
+        data = _tv_post(screener, {"symbols": {"tickers": [tv_sym]},
+                                   "columns": _TV_COLUMNS})
+        rows = data.get("data") or []
+        if not rows or not rows[0].get("d"):
+            return None
+        fields = {c: v for c, v in zip(_TV_COLUMNS, rows[0]["d"]) if v is not None}
+        if not fields.get("close"):
+            return None
+        fields["tv_symbol"] = tv_sym
+        _tv_ind_cache[tv_sym] = (fields, _time.time())
+        return fields
+    except Exception as exc:
+        log.warning("tv_indicators_failed", ticker=ticker, tv_symbol=tv_sym,
+                    error=f"{type(exc).__name__}: {exc}")
+        return None
+
+
+async def fetch_tv_indicators(ticker: str, asset_class: str) -> dict | None:
+    return await asyncio.to_thread(_tv_indicators_sync, ticker, asset_class)
+
+
 async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     """Main entry point. TradingView → yfinance → mock fallback chain.
 
@@ -606,6 +779,31 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
                 "pe_ratio": None, "eps_growth": None, "revenue_growth": None,
             }
 
+    # ── TradingView, PRIMARY ─────────────────────────────────────────────────
+    #
+    # Bars above come from whichever source answered (Yahoo, in practice).
+    # TradingView now supplies the price and every indicator a decision is
+    # actually made on, overriding the locally computed equivalents. Where TV
+    # cannot resolve the symbol, the local values stand and data_source says so.
+    if data:
+        tv = await fetch_tv_indicators(ticker, asset_class)
+        if tv:
+            data["tv"] = tv
+            data["tv_symbol"] = tv.get("tv_symbol")
+            data_source = ("tradingview" if data_source in ("mock", "unavailable")
+                           else f"tradingview+{data_source}")
+            # TradingView's ATR is computed on its own feed; prefer it over the
+            # ATR derived from Yahoo bars, so the level geometry and the price
+            # the user sees come from the same place.
+            if tv.get("ATR"):
+                data["atr"] = float(tv["ATR"])
+            if tv.get("volume"):
+                data["volume"] = float(tv["volume"])
+            if tv.get("average_volume_10d_calc"):
+                data["avg_volume"] = float(tv["average_volume_10d_calc"])
+            if tv.get("change") is not None:
+                data["price_change_pct"] = round(float(tv["change"]), 3)
+
     # Inject live spot price — prefer TradingView scanner (true spot for
     # FX/metals), fall back to Yahoo REST for stocks/indices.
     live_price = await live_price_task
@@ -646,6 +844,14 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     else:
         data["atr_15m"] = 0.0
 
+    # Stamp which feed actually served this. The local `data_source` variable
+    # was tracked all the way down this function and then NEVER written into
+    # the dict except on the unavailable path - so every successful fetch
+    # returned no data_source key at all. Consequences: the decision log
+    # recorded None for every real run, the report could attribute nothing,
+    # and the trader's guard against synthetic bars was testing a key that was
+    # usually absent rather than equal to "mock".
+    data["data_source"] = data_source
     return data
 
 

@@ -136,6 +136,19 @@ async def run_one(ticker: str, profile: str) -> dict:
     if (not md or md.get("data_source") in (None, "unavailable")) and             os.getenv("PREFLIGHT_INSECURE_TLS", "").lower() in ("1", "true", "yes"):
         direct = await _direct_bars(ticker, asset_class)
         if direct:
+            # Attach TradingView's indicator set, exactly as fetch_market_data
+            # does in production - otherwise this harness silently tests the
+            # Yahoo-only path and reports it as if it were the live one.
+            from app.data.market_data import fetch_tv_indicators
+            tv = await fetch_tv_indicators(ticker, asset_class)
+            if tv:
+                direct["tv"] = tv
+                direct["tv_symbol"] = tv.get("tv_symbol")
+                direct["data_source"] = "tradingview+yahoo-direct(preflight)"
+                if tv.get("ATR"):
+                    direct["atr"] = float(tv["ATR"])
+                if tv.get("close"):
+                    direct["close"] = float(tv["close"])
             md = direct
     state = {
         "ticker": ticker,

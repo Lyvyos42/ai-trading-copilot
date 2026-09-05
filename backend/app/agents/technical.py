@@ -102,6 +102,46 @@ class TechnicalAnalyst(BaseAgent):
 
         ema_cross = "BULLISH" if ema12 > ema26 else ("BEARISH" if ema12 < ema26 else "NEUTRAL")
 
+        # PREFER TRADINGVIEW'S OWN INDICATORS where they exist.
+        #
+        # The values above are computed locally from whatever bars arrived -
+        # Yahoo, in practice, because the TradingView bar path never ran. But
+        # the price shown beside them in the UI comes from TradingView, so the
+        # analysis and the quote were describing two different feeds.
+        #
+        # Two of these come out cleaner from TradingView than from local
+        # arithmetic rather than merely different:
+        #   MACD.macd IS EMA12 - EMA26, so its SIGN is the crossover, computed
+        #     on TV's own series instead of inferred from a stitched one.
+        #   Perf.Y - Perf.1M IS the 12-1 month momentum of strategy 3.1,
+        #     which locally needs 252 clean bars and silently degrades to a
+        #     first-to-last return when there are fewer.
+        #
+        # Anything TradingView does not return keeps its locally computed
+        # value, so this is an upgrade where available and never a regression.
+        tv = market_data.get("tv") or {}
+        indicator_source = "local"
+        if tv:
+            indicator_source = f"tradingview ({tv.get('tv_symbol', '?')})"
+            if tv.get("RSI") is not None:
+                rsi = float(tv["RSI"])
+            if tv.get("MACD.macd") is not None:
+                _macd = float(tv["MACD.macd"])
+                ema_cross = "BULLISH" if _macd > 0 else ("BEARISH" if _macd < 0 else "NEUTRAL")
+            if tv.get("Perf.Y") is not None and tv.get("Perf.1M") is not None:
+                momentum = (float(tv["Perf.Y"]) - float(tv["Perf.1M"])) / 100.0
+            if tv.get("close"):
+                current_price = float(tv["close"])
+                dec = _price_decimals(current_price)
+            # Bollinger position is a z-score by construction: the bands are
+            # +/- 2 standard deviations around the 20-period mean.
+            _bu, _bl = tv.get("BB.upper"), tv.get("BB.lower")
+            if _bu and _bl and _bu > _bl:
+                _mid = (float(_bu) + float(_bl)) / 2.0
+                _sigma = (float(_bu) - _mid) / 2.0
+                if _sigma > 0:
+                    zscore = (current_price - _mid) / _sigma
+
         user_msg = (
             f"{self._strategy_context(state)}"
             f"Analyze {ticker} technically.\n"
@@ -127,9 +167,11 @@ class TechnicalAnalyst(BaseAgent):
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_analysis(ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross, atr)
+        return self._compute_analysis(ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross, atr, indicator_source)
 
-    def _compute_analysis(self, ticker, closes, ema12, ema26, rsi, zscore, momentum, support, resistance, ema_cross, atr=None) -> dict:
+    def _compute_analysis(self, ticker, closes, ema12, ema26, rsi, zscore, momentum,
+                          support, resistance, ema_cross, atr=None,
+                          indicator_source: str = "local") -> dict:
         if atr is None:
             atr = (closes[-1] if closes else 100.0) * 0.012
         # Composite signal from multiple indicators
@@ -194,12 +236,14 @@ class TechnicalAnalyst(BaseAgent):
             "rsi": round(rsi, 1),
             "atr": atr,
             "ema_crossover": ema_cross,
+            "indicator_source": indicator_source,
             "reasoning": (
                 f"{ticker}: EMA12/26 crossover is {ema_cross} (strategy 3.11-3.13). "
                 f"RSI at {rsi:.0f} ({'oversold' if rsi < 35 else 'overbought' if rsi > 70 else 'neutral'}). "
                 f"12-1m momentum {momentum:+.1%} (strategy 3.1). "
                 f"Mean-reversion Z-score {zscore:.1f} (strategy 3.9). "
-                f"Composite signal: {direction} with {confidence:.0f}% confidence."
+                f"Composite signal: {direction} with {confidence:.0f}% confidence. "
+                f"Indicators from {indicator_source}."
             ),
         }
 
