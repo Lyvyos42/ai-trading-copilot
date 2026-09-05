@@ -248,7 +248,7 @@ export default function NewsPage() {
     .slice(0, 6);
 
   return (
-    <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
+    <div className="h-[calc(100vh-var(--chrome-h))] flex flex-col bg-background overflow-hidden">
 
       {/* ── TOP INTEL BAR ──────────────────────────────────────────── */}
       <div className="flex items-center gap-4 px-4 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0">

@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <KeepAlive />
         {/* ClientLayout renders Navbar + page content + alert toasts */}
         <ClientLayout>
-          <main className="pt-[72px]">{children}</main>
+          <main className="pt-[var(--chrome-h)]">{children}</main>
         </ClientLayout>
       </body>
     </html>

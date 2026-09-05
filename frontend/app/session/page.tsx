@@ -103,7 +103,7 @@ export default function SessionPage() {
   // Pro gate
   if (!isPro && isLoggedIn) {
     return (
-      <div className="h-[calc(100vh-72px)] flex items-center justify-center bg-background">
+      <div className="h-[calc(100vh-var(--chrome-h))] flex items-center justify-center bg-background">
         <div className="text-center max-w-md px-6">
           <Zap className="h-10 w-10 text-amber-400 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-foreground mb-2">Session Mode requires Pro</h2>
@@ -123,7 +123,7 @@ export default function SessionPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
+    <div className="h-[calc(100vh-var(--chrome-h))] flex flex-col bg-background overflow-hidden">
 
       {/* Session Control Bar */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0">

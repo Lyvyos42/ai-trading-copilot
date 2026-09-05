@@ -332,7 +332,7 @@ export default function DashboardPage() {
   if (!isLoggedIn) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-var(--chrome-h))] bg-background overflow-hidden">
       {/* Top Header: Kill Zones, Clocks, Regime Status, Strategy Profile, Briefing Drawer Toggle */}
       <CockpitHeader
         activeProfile={activeProfile}

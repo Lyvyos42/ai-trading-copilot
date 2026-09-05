@@ -32,6 +32,14 @@
 /* ── Design Tokens ─────────────────────────────────────────────────────────── */
 @layer base {
   :root {
+    /* Height of the fixed chrome above every page: the 40px navbar plus the
+       32px market ticker. Defined ONCE because it was previously duplicated as
+       a literal in two places that drifted apart - layout.tsx padded content by
+       72px while the dashboard sized itself to 100vh-48px, so the page stood
+       24px taller than the viewport and scrolled by exactly that sliver.
+       Any bar added or removed changes this number and nothing else. */
+    --chrome-h: 72px;
+
     /* Elevation ladder — dark mode uses lightness, not shadow */
     --surface-0:  0 0% 3.1%;    /* #080808 — canvas */
     --surface-1:  0 0% 5.9%;    /* #0f0f0f — panels */
