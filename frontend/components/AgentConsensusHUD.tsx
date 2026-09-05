@@ -157,26 +157,35 @@ export function AgentConsensusHUD({
 
   const isNoSignal = matchingSignal.status === "NO_SIGNAL" || matchingSignal.direction === "NEUTRAL";
 
-  // Parse actual agent vote stances
-  const longVotes: string[] = [];
-  const shortVotes: string[] = [];
-  const abstainedAgents: { name: string; role: string; color: string }[] = [];
+  // ── PRECISE 3-WAY STANCE TRIAGE (Directional Voted / Saw No Edge / Abstained No Data) ──
+  const directionalVotes: { agent: AgentMeta; direction: "LONG" | "SHORT"; confidence: number }[] = [];
+  const neutralAgents: AgentMeta[] = [];
+  const abstainedAgents: AgentMeta[] = [];
 
   AGENTS.forEach((agent) => {
     const raw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
     if (raw && typeof raw === "object") {
       const v = raw as { direction?: string; confidence?: number; abstained?: boolean };
-      if (!v.abstained && v.direction === "LONG") {
-        longVotes.push(`${agent.name} (${v.confidence ? Math.round(v.confidence * 100) : 50}%)`);
-      } else if (!v.abstained && v.direction === "SHORT") {
-        shortVotes.push(`${agent.name} (${v.confidence ? Math.round(v.confidence * 100) : 50}%)`);
+      if (v.abstained === true) {
+        abstainedAgents.push(agent);
+      } else if (v.direction === "LONG" || v.direction === "SHORT") {
+        directionalVotes.push({
+          agent,
+          direction: v.direction as "LONG" | "SHORT",
+          confidence: v.confidence ? Math.round(v.confidence * 100) : 50,
+        });
       } else {
-        abstainedAgents.push({ name: agent.name, role: agent.role, color: agent.color });
+        // Evaluated market data and actively reported NEUTRAL / saw no directional edge
+        neutralAgents.push(agent);
       }
     } else {
-      abstainedAgents.push({ name: agent.name, role: agent.role, color: agent.color });
+      // Missing entry or null raw object indicates missing data feed
+      abstainedAgents.push(agent);
     }
   });
+
+  const longVotes = directionalVotes.filter((v) => v.direction === "LONG");
+  const shortVotes = directionalVotes.filter((v) => v.direction === "SHORT");
 
   // ── FIRST-CLASS ABSTENTION LAYOUT (Replacing lie-shaped dial and empty bars) ──
   if (isNoSignal) {
@@ -210,24 +219,24 @@ export function AgentConsensusHUD({
               </span>
             </div>
 
-            {/* Directional Vote Breakdown Matrix */}
+            {/* Directional Vote Breakdown Matrix: 3-Way Triage */}
             <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px] text-center">
               <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
-                <span className="block text-muted-foreground text-[11px]">BULL VOTES</span>
-                <span className={cn("text-xs font-bold", longVotes.length > 0 ? "text-bull" : "text-muted-foreground")}>
-                  {longVotes.length}
+                <span className="block text-muted-foreground text-[10px] font-bold">DIRECTIONAL</span>
+                <span className={cn("text-xs font-bold", directionalVotes.length > 0 ? "text-primary" : "text-muted-foreground")}>
+                  {directionalVotes.length} / 2 MIN
                 </span>
               </div>
               <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
-                <span className="block text-muted-foreground text-[11px]">BEAR VOTES</span>
-                <span className={cn("text-xs font-bold", shortVotes.length > 0 ? "text-bear" : "text-muted-foreground")}>
-                  {shortVotes.length}
+                <span className="block text-muted-foreground text-[10px] font-bold">SAW NO EDGE</span>
+                <span className="text-xs font-bold text-foreground">
+                  {neutralAgents.length}
                 </span>
               </div>
               <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
-                <span className="block text-muted-foreground text-[11px]">ABSTAINED</span>
-                <span className="text-xs font-bold text-muted-foreground">
-                  {abstainedAgents.length} / {AGENTS.length}
+                <span className="block text-muted-foreground text-[10px] font-bold">NO DATA</span>
+                <span className={cn("text-xs font-bold", abstainedAgents.length > 0 ? "text-warn" : "text-muted-foreground")}>
+                  {abstainedAgents.length}
                 </span>
               </div>
             </div>
@@ -240,14 +249,14 @@ export function AgentConsensusHUD({
           </div>
         </div>
 
-        {/* Section 2: Composed Capital Preservation Statement */}
-        <div className="px-3 py-2.5 border-b border-border/40 bg-surface-1/90 space-y-2 shrink-0">
+        {/* Section 2: Composed Capital Preservation Statement & Named Specialists */}
+        <div className="px-3 py-2.5 border-b border-border/40 bg-surface-1/90 space-y-2.5 shrink-0 overflow-y-auto max-h-[45%]">
           <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider flex items-center justify-between">
             <span>PIPELINE TRUTH OBSERVATION</span>
             <span className="text-warn text-[11px] font-bold">CAPITAL PRESERVED</span>
           </div>
 
-          <div className="space-y-1.5 text-[11px] font-mono leading-relaxed">
+          <div className="space-y-2 text-[11px] font-mono leading-relaxed">
             {/* Primary pipeline reason */}
             <div className="p-2 rounded bg-surface-2/60 border border-border/40 text-foreground/90 font-medium">
               {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0
@@ -266,13 +275,81 @@ export function AgentConsensusHUD({
               </div>
             )}
 
+            {/* Named Specialists: Directional Calls */}
+            {directionalVotes.length > 0 && (
+              <div className="space-y-1 pt-0.5">
+                <div className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+                  Active Directional Calls ({directionalVotes.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {directionalVotes.map((v) => (
+                    <span
+                      key={v.agent.key}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 font-bold",
+                        v.direction === "LONG"
+                          ? "bg-bull/10 text-bull border-bull/30"
+                          : "bg-bear/10 text-bear border-bear/30"
+                      )}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: v.agent.color }} />
+                      <span>{v.agent.name}: {v.direction}</span>
+                      <span>({v.confidence}%)</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Named Specialists: Saw No Edge */}
+            {neutralAgents.length > 0 && (
+              <div className="space-y-1 pt-0.5">
+                <div className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+                  Evaluated Data • Saw No Edge ({neutralAgents.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {neutralAgents.map((a) => (
+                    <span
+                      key={a.key}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-surface-2/80 border border-border/40 text-foreground/80 flex items-center gap-1"
+                      title={a.role}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: a.color }} />
+                      <span>{a.name}</span>
+                      <span className="text-muted-foreground">({a.role})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Named Specialists: Stood Down (Abstained No Data) */}
+            {abstainedAgents.length > 0 && (
+              <div className="space-y-1 pt-0.5">
+                <div className="text-[10px] font-mono text-warn uppercase font-bold">
+                  Stood Down • No Data Feed ({abstainedAgents.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {abstainedAgents.map((a) => (
+                    <span
+                      key={a.key}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-warn/10 border border-warn/30 text-warn flex items-center gap-1"
+                      title={a.role}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-warn" />
+                      <span className="font-bold">{a.name}</span>
+                      <span className="opacity-80">({a.role})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* What unlocks the trade */}
             <div className="p-2 rounded bg-surface-0 border border-border/30 text-[11px] text-muted-foreground">
               <span className="text-primary font-bold mr-1">WHAT UNLOCKS A TRADE:</span>
-              {longVotes.length > 0
-                ? `A second confirming specialist aligned with ${longVotes.join(", ")} reaching conviction ≥ 55%.`
-                : shortVotes.length > 0
-                ? `A second confirming specialist aligned with ${shortVotes.join(", ")} reaching conviction ≥ 55%.`
+              {directionalVotes.length > 0
+                ? `A second confirming specialist aligned with ${directionalVotes.map((v) => `${v.agent.name} ${v.direction}`).join(", ")} reaching conviction ≥ 55%.`
                 : `A directional catalyst producing statistical Z-score divergence or CVD order book imbalance.`}
             </div>
           </div>
@@ -329,8 +406,13 @@ export function AgentConsensusHUD({
                 let confidence = 0;
                 if (voteRaw && typeof voteRaw === "object") {
                   const v = voteRaw as { direction?: string; confidence?: number; abstained?: boolean };
-                  if (!v.abstained && v.direction && v.direction !== "NEUTRAL") {
+                  if (v.abstained === true) {
+                    direction = "NO DATA";
+                  } else if (v.direction && v.direction !== "NEUTRAL") {
                     direction = v.direction.toUpperCase();
+                    confidence = v.confidence || 0;
+                  } else {
+                    direction = "NO EDGE";
                     confidence = v.confidence || 0;
                   }
                 }
@@ -356,7 +438,9 @@ export function AgentConsensusHUD({
                             ? "bg-bull/10 text-bull"
                             : direction === "SHORT"
                             ? "bg-bear/10 text-bear"
-                            : "bg-surface-3 text-muted-foreground"
+                            : direction === "NO EDGE"
+                            ? "bg-surface-3 text-foreground/80"
+                            : "bg-warn/10 text-warn"
                         )}
                       >
                         {direction}
@@ -580,12 +664,17 @@ export function AgentConsensusHUD({
           <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[11px]">
             {AGENTS.map((agent) => {
               const voteRaw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
-              let direction = "ABSTAINED";
+              let direction = "NO DATA";
               let confidence = 0;
               if (voteRaw && typeof voteRaw === "object") {
                 const v = voteRaw as { direction?: string; confidence?: number; abstained?: boolean };
-                if (!v.abstained && v.direction && v.direction !== "NEUTRAL") {
+                if (v.abstained === true) {
+                  direction = "NO DATA";
+                } else if (v.direction && v.direction !== "NEUTRAL") {
                   direction = v.direction.toUpperCase();
+                  confidence = v.confidence || 0;
+                } else {
+                  direction = "NO EDGE";
                   confidence = v.confidence || 0;
                 }
               }
@@ -611,12 +700,14 @@ export function AgentConsensusHUD({
                           ? "bg-bull/10 text-bull"
                           : direction === "SHORT"
                           ? "bg-bear/10 text-bear"
-                          : "bg-surface-3 text-muted-foreground"
+                          : direction === "NO EDGE"
+                          ? "bg-surface-3 text-foreground/80"
+                          : "bg-warn/10 text-warn"
                       )}
                     >
                       {direction}
                     </span>
-                    <span className="text-muted-foreground font-bold">
+                    <span className="text-muted-foreground font-bold text-[11px]">
                       {confidence > 0 ? `${(confidence * 100).toFixed(0)}%` : "—"}
                     </span>
                   </div>
