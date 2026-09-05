@@ -12,7 +12,10 @@ const PERIODS = [
   { label: "180D", value: 180 },
 ];
 
-function corrColor(v: number): string {
+function corrColor(v: number | null | undefined): string {
+  if (v == null || typeof v !== "number" || isNaN(v)) {
+    return "rgba(255, 255, 255, 0.04)";
+  }
   // -1 = red, 0 = neutral dark, +1 = green
   if (v >= 0) {
     const g = Math.round(v * 180);
@@ -23,7 +26,10 @@ function corrColor(v: number): string {
   }
 }
 
-function corrTextColor(v: number): string {
+function corrTextColor(v: number | null | undefined): string {
+  if (v == null || typeof v !== "number" || isNaN(v)) {
+    return "rgba(255, 255, 255, 0.25)";
+  }
   const abs = Math.abs(v);
   if (abs > 0.6) return "rgba(255,255,255,0.95)";
   return "rgba(255,255,255,0.6)";
@@ -108,6 +114,16 @@ function CorrelationContent() {
         </div>
       </div>
 
+      {/* Notice banner if correlations are syncing or unavailable */}
+      {data?.detail && (
+        <div className="panel p-3 mb-4 bg-muted/20 border-border/40 text-xs font-mono text-muted-foreground flex items-center gap-2">
+          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            NOTICE
+          </span>
+          <span>{data.detail}</span>
+        </div>
+      )}
+
       {loading ? (
         <div className="panel p-12 flex items-center justify-center">
           <div className="live-dot" />
@@ -122,8 +138,10 @@ function CorrelationContent() {
           <div className="panel p-4 lg:col-span-2">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest">CORRELATION MATRIX</span>
-              {data.data_points > 0 && (
+              {data.data_points > 0 ? (
                 <span className="text-[13px] font-mono text-muted-foreground">({data.data_points} data points)</span>
+              ) : (
+                <span className="text-[11px] font-mono text-amber-400/80 uppercase">SYNCING HISTORICAL OVERLAP</span>
               )}
             </div>
             <div className="overflow-x-auto -mx-4 px-4" style={{ minWidth: 0 }}>
@@ -186,7 +204,7 @@ function CorrelationHeatmap({
   tickers, matrix, onCellClick, selectedPair,
 }: {
   tickers: string[];
-  matrix: number[][];
+  matrix: (number | null)[][];
   onCellClick: (t1: string, t2: string) => void;
   selectedPair: { t1: string; t2: string } | null;
 }) {
@@ -227,15 +245,16 @@ function CorrelationHeatmap({
             {rowTicker.replace("-USD", "").replace("=X", "")}
           </text>
           {tickers.map((colTicker, j) => {
-            const val = matrix[i]?.[j] ?? 0;
+            const rawVal = matrix[i]?.[j];
+            const hasVal = rawVal != null && typeof rawVal === "number" && !isNaN(rawVal);
             const isSelected = selectedPair &&
               ((selectedPair.t1 === rowTicker && selectedPair.t2 === colTicker) ||
                (selectedPair.t1 === colTicker && selectedPair.t2 === rowTicker));
             return (
               <g
                 key={`cell-${i}-${j}`}
-                onClick={() => onCellClick(rowTicker, colTicker)}
-                style={{ cursor: i === j ? "default" : "pointer" }}
+                onClick={() => (hasVal && i !== j) ? onCellClick(rowTicker, colTicker) : undefined}
+                style={{ cursor: (i === j || !hasVal) ? "default" : "pointer" }}
               >
                 <rect
                   x={LABEL + j * CELL + 1}
@@ -243,20 +262,20 @@ function CorrelationHeatmap({
                   width={CELL - 2}
                   height={CELL - 2}
                   rx="3"
-                  fill={corrColor(val)}
+                  fill={corrColor(rawVal)}
                   stroke={isSelected ? "hsl(142, 65%, 50%)" : "transparent"}
                   strokeWidth={isSelected ? 2 : 0}
                 />
                 <text
                   x={LABEL + j * CELL + CELL / 2}
                   y={LABEL + i * CELL + CELL / 2 + 3.5}
-                  fill={corrTextColor(val)}
+                  fill={corrTextColor(rawVal)}
                   fontSize="10"
                   fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
                 >
-                  {val.toFixed(2)}
+                  {hasVal ? rawVal.toFixed(2) : "—"}
                 </text>
               </g>
             );

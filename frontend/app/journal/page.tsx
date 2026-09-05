@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { useRequireAuth } from "@/lib/useAuth";
 import { wakeBackend, getJournalSignals, listSignals } from "@/lib/api";
 import type { Signal } from "@/lib/api";
 import { SignalDetailModal } from "@/components/SignalDetailModal";
@@ -13,7 +13,7 @@ const PAGE_SIZE = 20;
 
 export default function JournalPage() {
   const router = useRouter();
-  const [user, setUser] = useState<unknown>(null);
+  const { isLoggedIn, loading: authLoading } = useRequireAuth();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -23,19 +23,6 @@ export default function JournalPage() {
   const [tickerFilter, setTickerFilter] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState("");
   const [assetFilter, setAssetFilter] = useState("");
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          router.push("/login");
-          return;
-        }
-      }
-      setUser(session?.user || { demo: true });
-    });
-  }, [router]);
 
   const fetchSignals = useCallback(async () => {
     setLoading(true);
@@ -59,11 +46,11 @@ export default function JournalPage() {
   }, [page, tickerFilter, outcomeFilter, assetFilter]);
 
   useEffect(() => {
-    if (user) {
+    if (isLoggedIn) {
       wakeBackend();
       fetchSignals();
     }
-  }, [user, fetchSignals]);
+  }, [isLoggedIn, fetchSignals]);
 
   const totalSignals = signals.length;
   const wins = signals.filter((s) => s.outcome === "WIN").length;
@@ -72,7 +59,18 @@ export default function JournalPage() {
   const winRate = resolved > 0 ? ((wins / resolved) * 100).toFixed(1) : "—";
   const avgPnl = signals.filter((s) => s.pnl_pct != null).reduce((sum, s) => sum + (s.pnl_pct || 0), 0);
 
-  if (!user) return null;
+  if (authLoading || !isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
+            AUTHENTICATING...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto pt-16">
@@ -199,7 +197,9 @@ export default function JournalPage() {
                         );
                       })()}
                     </td>
-                    <td className="text-[14px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.entry_price.toFixed(2)}</td>
+                    <td className="text-[14px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">
+                      {signal.entry_price != null ? signal.entry_price.toFixed(2) : "—"}
+                    </td>
                     <td className="text-[14px] font-mono text-[hsl(var(--foreground))] text-right py-2 px-3">{signal.confidence_score}</td>
                     <td className="text-center py-2 px-3">
                       {signal.outcome ? (

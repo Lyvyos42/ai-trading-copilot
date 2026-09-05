@@ -5,7 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(price: number, ticker?: string): string {
+export function formatPrice(price: number | null | undefined, ticker?: string): string {
+  if (price == null || typeof price !== "number" || !Number.isFinite(price)) {
+    return "—";
+  }
   const abs = Math.abs(price);
   let decimals = 2;
   if (abs < 0.001) decimals = 6;
@@ -31,13 +34,19 @@ export function formatPrice(price: number, ticker?: string): string {
   }).format(price);
 }
 
-export function formatPct(pct: number, decimals = 1): string {
-  const sign = pct >= 0 ? "+" : "";
+export function formatPct(pct: number | null | undefined, decimals = 1): string {
+  if (pct == null || typeof pct !== "number" || !Number.isFinite(pct)) {
+    return "—";
+  }
+  const sign = pct > 0 ? "+" : "";
   return `${sign}${pct.toFixed(decimals)}%`;
 }
 
-export function formatPnl(pnl: number): string {
-  const sign = pnl >= 0 ? "+" : "";
+export function formatPnl(pnl: number | null | undefined): string {
+  if (pnl == null || typeof pnl !== "number" || !Number.isFinite(pnl)) {
+    return "—";
+  }
+  const sign = pnl > 0 ? "+" : "";
   return `${sign}${formatPrice(pnl)}`;
 }
 

@@ -14,15 +14,16 @@ interface Position {
   asset_class: string;
   direction: string;
   entry_price: number;
-  current_price: number;
+  current_price: number | null;
   quantity: number;
   stop_loss: number;
   take_profit_1: number;
-  unrealized_pnl: number;
-  unrealized_pnl_pct: number;
+  unrealized_pnl: number | null;
+  unrealized_pnl_pct: number | null;
   status: string;
   opened_at: string;
   is_paper: boolean;
+  price_unavailable?: boolean;
 }
 
 export default function PortfolioPage() {
@@ -66,7 +67,10 @@ export default function PortfolioPage() {
     }
   };
 
-  const totalUnrealizedPnl = positions.reduce((a, p) => a + p.unrealized_pnl, 0);
+  const pricedPositions = positions.filter((p) => p.unrealized_pnl != null && !isNaN(p.unrealized_pnl));
+  const totalUnrealizedPnl = pricedPositions.length > 0
+    ? pricedPositions.reduce((a, p) => a + (p.unrealized_pnl || 0), 0)
+    : null;
 
   const stats = [
     {
@@ -87,7 +91,7 @@ export default function PortfolioPage() {
       value: formatPnl(totalUnrealizedPnl),
       icon: BarChart2,
       sub: `${positions.length} open position${positions.length !== 1 ? "s" : ""}`,
-      positive: totalUnrealizedPnl >= 0,
+      positive: totalUnrealizedPnl != null ? totalUnrealizedPnl >= 0 : undefined,
     },
     {
       label: "Win Rate",
@@ -180,8 +184,10 @@ export default function PortfolioPage() {
                 <tbody>
                   {positions.map((pos) => {
                     const isLong  = pos.direction === "LONG";
-                    const profit  = pos.unrealized_pnl >= 0;
+                    const isPriced = pos.unrealized_pnl != null && !isNaN(pos.unrealized_pnl) && !pos.price_unavailable && pos.current_price != null;
+                    const profit  = isPriced ? (pos.unrealized_pnl! >= 0) : null;
                     const isClosing = closing === pos.id;
+                    const canClose = isPriced && !isClosing;
                     return (
                       <tr key={pos.id} className="border-b border-border/20 hover:bg-accent/30 transition-colors">
                         <td className="py-3 px-3 font-mono font-bold text-xs">{pos.ticker}</td>
@@ -192,12 +198,16 @@ export default function PortfolioPage() {
                           </span>
                         </td>
                         <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{formatPrice(pos.entry_price, pos.ticker)}</td>
-                        <td className="py-3 px-3 font-mono text-xs">{formatPrice(pos.current_price, pos.ticker)}</td>
+                        <td className="py-3 px-3 font-mono text-xs">
+                          {isPriced ? formatPrice(pos.current_price, pos.ticker) : (
+                            <span className="text-muted-foreground" title="Live market price unavailable">—</span>
+                          )}
+                        </td>
                         <td className="py-3 px-3 text-xs text-muted-foreground font-mono">{pos.quantity}</td>
-                        <td className={cn("py-3 px-3 font-mono text-xs font-bold", profit ? "text-bull" : "text-bear")}>
+                        <td className={cn("py-3 px-3 font-mono text-xs font-bold", profit === true ? "text-bull" : profit === false ? "text-bear" : "text-muted-foreground")}>
                           {formatPnl(pos.unrealized_pnl)}
                         </td>
-                        <td className={cn("py-3 px-3 text-xs font-mono font-semibold", profit ? "text-bull" : "text-bear")}>
+                        <td className={cn("py-3 px-3 text-xs font-mono font-semibold", profit === true ? "text-bull" : profit === false ? "text-bear" : "text-muted-foreground")}>
                           {formatPct(pos.unrealized_pnl_pct)}
                         </td>
                         <td className="py-3 px-3 font-mono text-xs text-bear/70">{formatPrice(pos.stop_loss, pos.ticker)}</td>
@@ -206,10 +216,11 @@ export default function PortfolioPage() {
                         <td className="py-3 px-3">
                           <button
                             onClick={() => handleClose(pos.id)}
-                            disabled={isClosing}
-                            className="text-[11px] font-mono text-muted-foreground hover:text-bear border border-border/50 hover:border-bear/40 rounded px-2 py-0.5 transition-colors disabled:opacity-50"
+                            disabled={!canClose}
+                            title={!isPriced ? "Live price unavailable: cannot close at fabricated market price" : "Close position"}
+                            className="text-[11px] font-mono text-muted-foreground hover:text-bear border border-border/50 hover:border-bear/40 rounded px-2 py-0.5 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50 disabled:cursor-not-allowed"
                           >
-                            {isClosing ? "…" : "CLOSE"}
+                            {isClosing ? "…" : !isPriced ? "FEED DOWN" : "CLOSE"}
                           </button>
                         </td>
                       </tr>

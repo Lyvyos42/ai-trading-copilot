@@ -204,16 +204,17 @@ export interface Signal {
   signal_id: string;
   ticker: string;
   asset_class: string;
-  direction: "LONG" | "SHORT";
-  entry_price: number;
+  direction: "LONG" | "SHORT" | "NEUTRAL";
+  entry_price?: number | null;
   current_price?: number | null;
-  stop_loss: number;
-  take_profit_1: number;
-  take_profit_2: number;
-  take_profit_3: number;
+  stop_loss?: number | null;
+  take_profit_1?: number | null;
+  take_profit_2?: number | null;
+  take_profit_3?: number | null;
   confidence_score: number;
   agent_votes: Record<string, AgentVote | boolean | null>;
   reasoning_chain: string[];
+  status_reasons?: string[];
   timeframe: string;
   strategy_sources: string[];
   timeframe_levels?: { scalp?: TimeframeLevels; swing?: TimeframeLevels };
@@ -683,9 +684,11 @@ export async function getCalendarEvents(weeks = 2): Promise<{ events: CalendarEv
 
 export interface CorrelationMatrix {
   tickers: string[];
-  matrix: number[][];
+  matrix: (number | null)[][];
   period_days: number;
   data_points: number;
+  error?: string;
+  detail?: string;
 }
 
 export interface CorrelationPair {

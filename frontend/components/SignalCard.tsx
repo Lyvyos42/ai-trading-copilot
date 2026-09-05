@@ -46,22 +46,23 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
   );
 
   // Probability model fields (with backward compat)
-  const prob = signal.probability_score ?? signal.confidence_score ?? 50;
-  const bullPct = signal.bullish_pct ?? prob;
-  const bearPct = signal.bearish_pct ?? (100 - bullPct);
+  const isNoSignal = signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
+  const prob = signal.probability_score ?? signal.confidence_score ?? (isNoSignal ? 0 : 50);
+  const bullPct = isNoSignal ? 0 : (signal.bullish_pct ?? prob);
+  const bearPct = isNoSignal ? 0 : (signal.bearish_pct ?? (100 - bullPct));
   const isBullish = bullPct > bearPct;
   const displayPct = isBullish ? bullPct : bearPct;  // Show the dominant side percentage
-  const lean = isBullish ? "BULLISH" : "BEARISH";
-  const leanColor = isBullish ? "text-bull" : "text-bear";
-  const leanBg = isBullish ? "bg-bull/10 border-bull/30" : "bg-bear/10 border-bear/30";
-  const convictionTier = signal.conviction_tier || "MODERATE";
+  const lean = isNoSignal ? "NEUTRAL" : (isBullish ? "BULLISH" : "BEARISH");
+  const leanColor = isNoSignal ? "text-muted-foreground" : (isBullish ? "text-bull" : "text-bear");
+  const leanBg = isNoSignal ? "bg-muted/20 border-border/40" : (isBullish ? "bg-bull/10 border-bull/30" : "bg-bear/10 border-bear/30");
+  const convictionTier = signal.conviction_tier || (isNoSignal ? "ABSTAINED" : "MODERATE");
 
   const isActive = signal.status === "ACTIVE";
   const hasLivePrice = isActive && signal.current_price && signal.current_price > 0;
-  const liveEntry = hasLivePrice ? signal.current_price! : signal.entry_price;
-  let target = signal.research_target || signal.take_profit_1;
-  let inval  = signal.invalidation_level || signal.stop_loss;
-  if (target && inval && liveEntry > 0) {
+  const liveEntry = hasLivePrice ? signal.current_price! : (signal.entry_price ?? 0);
+  let target = signal.research_target || signal.take_profit_1 || 0;
+  let inval  = signal.invalidation_level || signal.stop_loss || 0;
+  if (!isNoSignal && target && inval && liveEntry > 0) {
     if (isBullish && target < liveEntry && inval > liveEntry) {
       [target, inval] = [inval, target];
     } else if (!isBullish && target > liveEntry && inval < liveEntry) {
@@ -71,7 +72,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
     if (Math.abs(target - liveEntry) > maxDrift) target = 0;
     if (Math.abs(inval - liveEntry) > maxDrift) inval = 0;
   }
-  const rawRR = (liveEntry && inval && target)
+  const rawRR = (!isNoSignal && liveEntry && inval && target)
     ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
     : (signal.risk_reward_ratio ?? 0);
   const rrRatio = Math.min(rawRR, 10);
@@ -110,6 +111,47 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
 
   /* ── COMPACT MODE — probability feed row ─────────────────────── */
   if (compact) {
+    if (isNoSignal) {
+      return (
+        <div className="px-3 py-2.5 border-l-2 border-border/60 bg-muted/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
+                ABSTAIN
+              </span>
+              <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
+              {signal.timeframe && (
+                <span className="text-[8px] font-mono text-muted-foreground border border-border/40 px-1 rounded">
+                  {signal.timeframe}
+                </span>
+              )}
+              <span className="text-[11px] font-mono text-muted-foreground">
+                PIPELINE ABSTAINED
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+              <Clock className="h-2.5 w-2.5" />
+              {timeAgo(signal.timestamp)}
+              {onDismiss && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDismiss(signal.signal_id); }}
+                  className="text-[8px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear transition-colors ml-1"
+                  title="Dismiss signal"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          {signal.status_reasons && signal.status_reasons.length > 0 && (
+            <p className="text-[11px] font-mono text-muted-foreground/80 mt-1.5 leading-relaxed line-clamp-2">
+              {signal.status_reasons[0]}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="px-3 py-2.5">
         {/* Row 1: Ticker + Probability + Conviction */}
@@ -178,22 +220,40 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           </div>
         </div>
 
-        {/* Agent contribution chips */}
-        <div className="flex gap-1 mt-2 flex-wrap">
+        {/* Agent contribution chips — de-cluttered with abstention grouping */}
+        <div className="flex gap-1 mt-2 flex-wrap items-center">
           {Object.entries(signal.agent_votes).map(([agent, vote]) => {
             if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
-            const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number };
+            const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number; abstained?: boolean };
+            if (v.abstained || v.direction === "NEUTRAL" || ((v.confidence ?? 0) === 0 && (v.bullish_contribution ?? 0) === 0 && (v.bearish_contribution ?? 0) === 0)) {
+              return null;
+            }
             const contrib = (v.bullish_contribution ?? 0) - (v.bearish_contribution ?? 0);
             const isPos = contrib >= 0;
             return (
               <span key={agent} className={cn(
-                "text-[8px] font-mono px-1 py-0.5 rounded border",
+                "text-[8px] font-mono px-1 py-0.5 rounded border font-semibold",
                 isPos ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"
               )}>
                 {AGENT_SHORT[agent] || agent}: {isPos ? "+" : ""}{contrib.toFixed(0)}pp
               </span>
             );
           })}
+          {(() => {
+            const abstainedCount = Object.entries(signal.agent_votes).filter(([agent, vote]) => {
+              if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return false;
+              const v = vote as { direction?: string; confidence?: number; abstained?: boolean };
+              return v.abstained || v.direction === "NEUTRAL" || (v.confidence ?? 0) === 0;
+            }).length;
+            if (abstainedCount > 0) {
+              return (
+                <span className="text-[8px] font-mono px-1 py-0.5 rounded border border-border/30 bg-muted/20 text-muted-foreground">
+                  {abstainedCount} ABSTAINED
+                </span>
+              );
+            }
+            return null;
+          })()}
           {signal.agent_votes.risk_approved !== undefined && (
             <span className={cn(
               "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
@@ -262,6 +322,119 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
   }
 
   /* ── FULL MODE — probability signal card ─────────────────────── */
+  if (isNoSignal) {
+    return (
+      <div className="terminal-panel animate-fade-in border-muted-foreground/30 bg-card/60">
+        <div className="p-4">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-3 border-b border-border/40 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-foreground text-lg font-mono">{signal.ticker}</span>
+                <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 rounded">
+                  {signal.asset_class}
+                </span>
+                {signal.timeframe && (
+                  <span className="text-xs font-mono text-muted-foreground border border-border/40 px-1.5 rounded">
+                    {signal.timeframe}
+                  </span>
+                )}
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/50 tracking-wider">
+                  STATUS: NO SIGNAL — PIPELINE ABSTAINED
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-mono">
+                <Clock className="h-3 w-3" />
+                {timeAgo(signal.timestamp)}
+                {signal.pipeline_latency_ms && (
+                  <span className="flex items-center gap-0.5 ml-2 text-muted-foreground">
+                    <Zap className="h-3 w-3" />{signal.pipeline_latency_ms}ms
+                  </span>
+                )}
+              </div>
+            </div>
+            {onDismiss && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDismiss(signal.signal_id); }}
+                className="p-1 rounded border border-border/30 text-muted-foreground hover:text-foreground transition-colors"
+                title="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Institutional Restraint Callout */}
+          <div className="p-3 mb-4 rounded border border-border/50 bg-background/50 font-mono text-xs space-y-2">
+            <div className="text-[11px] font-bold text-foreground uppercase tracking-wider">
+              INSTITUTIONAL RESTRAINT ACTIVATED
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              The 9-agent quantitative consensus pipeline evaluated {signal.ticker} and determined market conditions do not meet the strict criteria required to publish a tradeable signal.
+            </p>
+            {signal.status_reasons && signal.status_reasons.length > 0 && (
+              <div className="mt-2 space-y-1 pt-2 border-t border-border/30">
+                <div className="text-[10px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
+                {signal.status_reasons.map((r, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <span className="text-primary font-bold">•</span>
+                    <span>{r}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Agent Attributions — Separated into Active vs Abstained */}
+          {signal.agent_votes && (
+            <div className="mb-4">
+              <div className="text-[11px] font-mono text-muted-foreground uppercase font-bold tracking-wider mb-2">
+                AGENT ATTRIBUTIONS
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(signal.agent_votes).map(([agent, vote]) => {
+                  if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
+                  const v = vote as { direction?: string; confidence?: number; abstained?: boolean };
+                  const isAbstain = v.abstained || v.direction === "NEUTRAL" || (v.confidence ?? 0) === 0;
+                  return (
+                    <span
+                      key={agent}
+                      className={cn(
+                        "text-[10px] font-mono px-2 py-0.5 rounded border",
+                        isAbstain
+                          ? "bg-muted/20 text-muted-foreground border-border/40"
+                          : v.direction === "LONG"
+                          ? "bg-bull/10 text-bull border-bull/20 font-bold"
+                          : "bg-bear/10 text-bear border-bear/20 font-bold"
+                      )}
+                    >
+                      {AGENT_SHORT[agent] || agent.toUpperCase()}: {isAbstain ? "ABSTAIN" : v.direction}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Reasoning Chain */}
+          {signal.reasoning_chain && signal.reasoning_chain.length > 0 && (
+            <div className="p-2.5 rounded border border-border/40 bg-muted/20 text-xs font-mono">
+              <div className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase mb-1">
+                PIPELINE AUDIT TRAIL
+              </div>
+              {signal.reasoning_chain.map((step, i) => (
+                <div key={i} className="text-muted-foreground flex gap-1.5 leading-relaxed">
+                  <span className="text-primary/70">{i + 1}.</span>
+                  <span>{step}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="terminal-panel animate-fade-in">
       <div className="p-4">
@@ -333,12 +506,14 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             </div>
           </div>
           {(() => {
-            const targetDelta = (target && liveEntry > 0) ? ((target - liveEntry) / liveEntry) * 100 : null;
-            const isTargetUp = targetDelta === null || targetDelta >= 0;
+            const isShort = signal.direction === "SHORT";
+            const targetDelta = (target && liveEntry > 0)
+              ? (isShort ? ((liveEntry - target) / liveEntry) * 100 : ((target - liveEntry) / liveEntry) * 100)
+              : null;
             return (
               <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
                 <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
-                  {isTargetUp ? <ArrowUpRight className="h-3 w-3 text-bull" /> : <ArrowDownRight className="h-3 w-3 text-bull" />} RESEARCH TARGET
+                  <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
                 </div>
                 <div className="text-xs font-mono font-bold text-bull">
                   {target ? formatPrice(target, signal.ticker) : "—"}
@@ -352,12 +527,14 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             );
           })()}
           {(() => {
-            const invalDelta = (inval && liveEntry > 0) ? ((inval - liveEntry) / liveEntry) * 100 : null;
-            const isInvalUp = invalDelta !== null && invalDelta >= 0;
+            const isShort = signal.direction === "SHORT";
+            const invalDelta = (inval && liveEntry > 0)
+              ? (isShort ? -((inval - liveEntry) / liveEntry) * 100 : ((inval - liveEntry) / liveEntry) * 100)
+              : null;
             return (
               <div className="text-center p-2.5 rounded border bg-background/40 border-bear/30">
                 <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
-                  {isInvalUp ? <ArrowUpRight className="h-3 w-3 text-bear" /> : <ArrowDownRight className="h-3 w-3 text-bear" />} INVALIDATION
+                  <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
                 </div>
                 <div className="text-xs font-mono font-bold text-bear">
                   {inval ? formatPrice(inval, signal.ticker) : "—"}
@@ -381,20 +558,36 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           </div>
         </div>
 
-        {/* Per-agent contribution bars */}
+        {/* Per-agent contribution bars & attribution */}
         <div className="mb-4">
-          <div className="terminal-label mb-2">AGENT CONTRIBUTIONS</div>
+          <div className="terminal-label mb-2">AGENT CONTRIBUTIONS &amp; ATTRIBUTION</div>
           <div className="space-y-1.5">
             {Object.entries(signal.agent_votes).map(([agent, vote]) => {
               if (["risk_approved", "quant_validated"].includes(agent) || typeof vote !== "object" || !vote) return null;
-              const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number };
+              const v = vote as { direction?: string; bullish_contribution?: number; bearish_contribution?: number; confidence?: number; abstained?: boolean };
+              const isAbstained = v.abstained || v.direction === "NEUTRAL" || ((v.confidence ?? 0) === 0 && (v.bullish_contribution ?? 0) === 0 && (v.bearish_contribution ?? 0) === 0);
+              if (isAbstained) {
+                return (
+                  <div key={agent} className="flex items-center gap-2 text-muted-foreground/60">
+                    <span className="text-[13px] font-mono w-24 shrink-0 uppercase text-muted-foreground/60">
+                      {AGENT_LABELS[agent] || agent}
+                    </span>
+                    <div className="flex-1 h-2 bg-muted/20 rounded overflow-hidden relative">
+                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border/30" />
+                    </div>
+                    <span className="text-[11px] font-mono w-16 text-right text-muted-foreground/60 italic">
+                      ABSTAINED
+                    </span>
+                  </div>
+                );
+              }
               const bullContrib = v.bullish_contribution ?? (v.direction === "LONG" ? (v.confidence ?? 50) / 7 : 0);
               const bearContrib = v.bearish_contribution ?? (v.direction === "SHORT" ? (v.confidence ?? 50) / 7 : 0);
               const net = bullContrib - bearContrib;
               const isPos = net >= 0;
               return (
                 <div key={agent} className="flex items-center gap-2">
-                  <span className="text-[14px] font-mono text-muted-foreground w-20 shrink-0 uppercase">
+                  <span className="text-[13px] font-mono text-muted-foreground w-24 shrink-0 uppercase">
                     {AGENT_LABELS[agent] || agent}
                   </span>
                   <div className="flex-1 flex items-center gap-1">
@@ -411,7 +604,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
                     </div>
                   </div>
                   <span className={cn(
-                    "text-[14px] font-mono font-bold w-10 text-right",
+                    "text-[13px] font-mono font-bold w-16 text-right",
                     isPos ? "text-bull" : "text-bear"
                   )}>
                     {isPos ? "+" : ""}{net.toFixed(0)}pp

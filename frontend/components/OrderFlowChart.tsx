@@ -311,6 +311,7 @@ interface OrderFlowChartProps {
 export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fillContainer }: OrderFlowChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
+  const [feedUnavailable, setFeedUnavailable] = useState<string | null>(null);
   const [localInterval, setLocalInterval] = useState(externalInterval);
   useEffect(() => { setLocalInterval(externalInterval); }, [externalInterval]);
   const interval = localInterval;
@@ -367,6 +368,13 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         );
         if (res.ok && !cancelled) {
           const data = await res.json();
+          if (data.error === "no_data" || !data.candles || data.candles.length === 0) {
+            setFeedUnavailable(data.detail || `No market data available for ${ticker}.`);
+            state.current.candles = [];
+            setLoading(false);
+            return;
+          }
+          setFeedUnavailable(null);
           const candles: Candle[] = (data.candles ?? []).map((c: Record<string, number>) => ({
             time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
             volume: c.volume ?? 0,
@@ -417,9 +425,18 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
             s.lastHeatKey = "";
           }
           setLoading(false);
+        } else if (!cancelled) {
+          const errData = await res.json().catch(() => ({}));
+          setFeedUnavailable(errData.detail || `Feed returned HTTP ${res.status}`);
+          state.current.candles = [];
+          setLoading(false);
         }
-      } catch {
-        if (!cancelled) setLoading(false);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Connection error";
+          setFeedUnavailable(message);
+          setLoading(false);
+        }
       } finally {
         fetching = false;
       }
@@ -1307,6 +1324,22 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
           <div className="flex items-center gap-2 text-[14px] font-mono" style={{ color: "rgba(201,168,76,0.6)" }}>
             <span className="h-3 w-3 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
             LOADING {ticker}…
+          </div>
+        </div>
+      )}
+      {feedUnavailable && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20 font-mono" style={{ background: "rgba(6,11,22,0.95)" }}>
+          <div className="text-[11px] tracking-widest text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
+            FEED UNAVAILABLE
+          </div>
+          <div className="text-sm font-semibold text-foreground mb-1">
+            {ticker}
+          </div>
+          <div className="text-xs text-muted-foreground max-w-md leading-relaxed">
+            {feedUnavailable}
+          </div>
+          <div className="text-[10px] text-muted-foreground/60 mt-3">
+            Institutional restraint: abstaining from simulating synthetic order flow.
           </div>
         </div>
       )}

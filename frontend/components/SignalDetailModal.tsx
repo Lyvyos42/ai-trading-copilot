@@ -11,23 +11,27 @@ interface SignalDetailModalProps {
 }
 
 export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
-  const prob = signal.probability_score ?? signal.confidence_score ?? 50;
-  const bullPct = signal.bullish_pct ?? prob;
-  const bearPct = signal.bearish_pct ?? (100 - bullPct);
+  const isNoSignal = signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
+  const prob = signal.probability_score ?? signal.confidence_score ?? (isNoSignal ? 0 : 50);
+  const bullPct = isNoSignal ? 0 : (signal.bullish_pct ?? prob);
+  const bearPct = isNoSignal ? 0 : (signal.bearish_pct ?? (100 - bullPct));
   const isBullish = bullPct > bearPct;
   const isWin = signal.outcome === "WIN";
-  const convictionTier = signal.conviction_tier || "MODERATE";
+  const convictionTier = signal.conviction_tier || (isNoSignal ? "ABSTAINED" : "MODERATE");
   const isActive = signal.status === "ACTIVE";
   const liveEntry = (isActive && signal.current_price && signal.current_price > 0)
     ? signal.current_price
     : signal.entry_price;
   const target = signal.research_target || signal.take_profit_1;
   const inval  = signal.invalidation_level || signal.stop_loss;
-  const targetDelta = (target && liveEntry > 0) ? ((target - liveEntry) / liveEntry) * 100 : null;
-  const invalDelta = (inval && liveEntry > 0) ? ((inval - liveEntry) / liveEntry) * 100 : null;
-  const isTargetUp = targetDelta === null || targetDelta >= 0;
-  const isInvalUp = invalDelta !== null && invalDelta >= 0;
-  const rrRatio = (liveEntry && inval && target)
+  const isShort = signal.direction === "SHORT";
+  const targetDelta = (target && liveEntry && liveEntry > 0)
+    ? (isShort ? ((liveEntry - target) / liveEntry) * 100 : ((target - liveEntry) / liveEntry) * 100)
+    : null;
+  const invalDelta = (inval && liveEntry && liveEntry > 0)
+    ? (isShort ? -((inval - liveEntry) / liveEntry) * 100 : ((inval - liveEntry) / liveEntry) * 100)
+    : null;
+  const rrRatio = (!isNoSignal && liveEntry && inval && target)
     ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
     : (signal.risk_reward_ratio ?? 0);
 
@@ -43,6 +47,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         <div className="flex items-center gap-3 mb-4">
           <span className={cn(
             "text-xs font-mono font-bold px-2 py-0.5 rounded",
+            isNoSignal ? "bg-muted/40 text-muted-foreground border border-border/50" :
             isBullish ? "bg-[hsl(var(--bull)/0.15)] text-bull" : "bg-[hsl(var(--bear)/0.15)] text-bear"
           )}>
             {signal.direction}
@@ -55,51 +60,77 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
           </span>
         </div>
 
-        {/* Probability bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-[14px] font-mono mb-1">
-            <span className="text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
-            <span className="text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
+        {isNoSignal ? (
+          <div className="space-y-4 mb-4">
+            <div className="p-4 rounded border border-border/50 bg-background/50 font-mono text-xs space-y-2">
+              <div className="text-xs font-bold text-foreground uppercase tracking-wider">
+                INSTITUTIONAL RESTRAINT ACTIVATED
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                The 9-agent quantitative consensus pipeline evaluated {signal.ticker} and determined market conditions do not meet the strict criteria required to publish a tradeable signal.
+              </p>
+              {signal.status_reasons && signal.status_reasons.length > 0 && (
+                <div className="mt-2 space-y-1.5 pt-2 border-t border-border/30">
+                  <div className="text-[11px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
+                  {signal.status_reasons.map((r, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <span className="text-primary font-bold">•</span>
+                      <span>{r}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="w-full flex h-2.5 rounded overflow-hidden">
-            <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
-            <div className="bg-[hsl(var(--bear)/0.7)] transition-all" style={{ width: `${bearPct}%` }} />
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Probability bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-[14px] font-mono mb-1">
+                <span className="text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
+                <span className="text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
+              </div>
+              <div className="w-full flex h-2.5 rounded overflow-hidden">
+                <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
+                <div className="bg-[hsl(var(--bear)/0.7)] transition-all" style={{ width: `${bearPct}%` }} />
+              </div>
+            </div>
 
-        {/* Research Target + Invalidation + R:R */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="data-cell">
-            <span className="data-cell-label flex items-center gap-1">
-              {isTargetUp ? <ArrowUpRight className="h-3 w-3 text-bull" /> : <ArrowDownRight className="h-3 w-3 text-bull" />} RESEARCH TARGET
-            </span>
-            <span className="data-cell-value text-bull">
-              {target ? formatPrice(target, signal.ticker) : "—"}
-            </span>
-            {targetDelta !== null && (
-              <span className="text-[12px] font-mono text-bull/70 mt-0.5">
-                {targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%
-              </span>
-            )}
-          </div>
-          <div className="data-cell">
-            <span className="data-cell-label flex items-center gap-1">
-              {isInvalUp ? <ArrowUpRight className="h-3 w-3 text-bear" /> : <ArrowDownRight className="h-3 w-3 text-bear" />} INVALIDATION
-            </span>
-            <span className="data-cell-value text-bear">
-              {inval ? formatPrice(inval, signal.ticker) : "—"}
-            </span>
-            {invalDelta !== null && (
-              <span className="text-[12px] font-mono text-bear/70 mt-0.5">
-                {invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%
-              </span>
-            )}
-          </div>
-          <div className="data-cell">
-            <span className="data-cell-label">POTENTIAL R:R</span>
-            <span className="data-cell-value text-[hsl(var(--foreground))]">{rrRatio > 0 ? `${rrRatio.toFixed(1)}:1` : "N/A"}</span>
-          </div>
-        </div>
+            {/* Research Target + Invalidation + R:R */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="data-cell">
+                <span className="data-cell-label flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
+                </span>
+                <span className="data-cell-value text-bull">
+                  {target ? formatPrice(target, signal.ticker) : "—"}
+                </span>
+                {targetDelta !== null && (
+                  <span className="text-[12px] font-mono text-bull/70 mt-0.5">
+                    {targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <div className="data-cell">
+                <span className="data-cell-label flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
+                </span>
+                <span className="data-cell-value text-bear">
+                  {inval ? formatPrice(inval, signal.ticker) : "—"}
+                </span>
+                {invalDelta !== null && (
+                  <span className="text-[12px] font-mono text-bear/70 mt-0.5">
+                    {invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <div className="data-cell">
+                <span className="data-cell-label">POTENTIAL R:R</span>
+                <span className="data-cell-value text-[hsl(var(--foreground))]">{rrRatio > 0 ? `${rrRatio.toFixed(1)}:1` : "N/A"}</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Meta row */}
         <div className="flex items-center gap-4 mb-4 text-[14px] font-mono text-[hsl(var(--muted-foreground))]">

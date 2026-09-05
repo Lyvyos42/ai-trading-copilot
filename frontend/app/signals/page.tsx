@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, listSignals, resolveSignal, apiFetch, resetSignals, wakeBackend, API_URL, type Signal } from "@/lib/api";
-import { useAuth } from "@/lib/useAuth";
+import { useRequireAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatPrice, timeAgo } from "@/lib/utils";
 import {
@@ -120,16 +120,14 @@ export default function SignalsPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(0);
 
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useRequireAuth();
   const cancelRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickerRef = useRef<string>("");
 
   // Load existing signals from DB on mount
   useEffect(() => {
-    // Wake the backend first. dashboard, journal and performance all do this;
-    // this page did not, so it was the one place you could land on a cold
-    // Render instance and have the first action - usually RESET - time out.
+    if (!isLoggedIn) return;
     wakeBackend();
     listSignals(50)
       .then((data) => setSignals(data || []))
@@ -229,6 +227,19 @@ export default function SignalsPage() {
     const winRate = resolved > 0 ? (wins / resolved) * 100 : null;
     return { total: signals.length, wins, losses, active, resolved, winRate };
   }, [signals]);
+
+  if (authLoading || !isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
+            AUTHENTICATING...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 py-6">
@@ -920,7 +931,7 @@ export default function SignalsPage() {
                       {/* Row 2: Entry price + R:R + Time */}
                       <div className="flex items-center justify-between mt-1">
                         <div className="flex items-center gap-2">
-                          {sig.entry_price > 0 && (
+                          {typeof sig.entry_price === "number" && sig.entry_price > 0 && (
                             <span
                               className="text-[9px]"
                               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}

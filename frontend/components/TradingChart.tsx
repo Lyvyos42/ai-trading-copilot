@@ -30,6 +30,7 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef     = useRef<LWChart | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedUnavailable, setFeedUnavailable] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,18 +38,31 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
     async function init() {
       if (!containerRef.current) return;
       setLoading(true);
+      setFeedUnavailable(null);
 
       // Fetch real OHLCV from backend
       let candles: CandleBar[] = [];
+      let unavailableReason: string | null = null;
       try {
         const res = await fetch(`${API}/api/v1/market/ohlcv/${encodeURIComponent(ticker)}?period=${period}&interval=${interval}`);
         if (res.ok) {
           const data = await res.json();
-          candles = data.candles ?? [];
+          if (data.error === "no_data" || !data.candles || data.candles.length === 0) {
+            unavailableReason = data.detail || `No market data available for ${ticker}.`;
+          } else {
+            candles = data.candles;
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          unavailableReason = errData.detail || `Feed returned HTTP ${res.status}`;
         }
-      } catch (_) {}
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Connection error to market data provider";
+        unavailableReason = message;
+      }
 
       if (cancelled) return;
+      setFeedUnavailable(unavailableReason);
 
       // Destroy previous chart instance
       if (chartRef.current) {
@@ -56,6 +70,11 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
         chartRef.current = null;
       }
       if (containerRef.current) containerRef.current.innerHTML = "";
+
+      if (unavailableReason || candles.length === 0) {
+        setLoading(false);
+        return;
+      }
 
       const lc = await import("lightweight-charts");
       if (cancelled || !containerRef.current) return;
@@ -136,6 +155,22 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
           <div className="flex items-center gap-2 text-[14px] font-mono text-muted-foreground">
             <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
             LOADING {ticker}…
+          </div>
+        </div>
+      )}
+      {feedUnavailable && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 p-6 text-center z-10 font-mono">
+          <div className="text-[11px] tracking-widest text-warn border border-warn/30 bg-warn/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
+            FEED UNAVAILABLE
+          </div>
+          <div className="text-sm font-semibold text-foreground mb-1">
+            {ticker}
+          </div>
+          <div className="text-xs text-muted-foreground max-w-md leading-relaxed">
+            {feedUnavailable}
+          </div>
+          <div className="text-[10px] text-muted-foreground/60 mt-3">
+            Institutional restraint: abstaining from fabricating synthetic price action.
           </div>
         </div>
       )}

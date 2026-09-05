@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "./supabase";
 
 export type UserTier = "visitor" | "free" | "retail" | "pro" | "enterprise" | "admin";
@@ -111,4 +112,17 @@ export function useAuth() {
     isLoggedIn: !!user,
     isAtLeast,
   };
+}
+
+export function useRequireAuth(redirectTo: string = "/login") {
+  const auth = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!auth.loading && !auth.isLoggedIn) {
+      router.replace(redirectTo);
+    }
+  }, [auth.loading, auth.isLoggedIn, router, redirectTo]);
+
+  return auth;
 }

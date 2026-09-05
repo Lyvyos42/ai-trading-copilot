@@ -50,7 +50,7 @@ async def get_news_context(ticker: str) -> dict:
         "has_news":          bool,        # False if DB is empty (scraper not run yet)
     }
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.utcnow() - timedelta(hours=24)
     clean_ticker = ticker.replace("-USD", "").replace("=X", "").replace("=F", "").replace("^", "").upper()
 
     try:

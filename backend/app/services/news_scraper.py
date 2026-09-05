@@ -37,8 +37,9 @@ FEEDS = [
     {"url": "https://news.google.com/rss/search?q=bank+financial+crisis+debt&hl=en-US&gl=US&ceid=US:en",       "source": "Google News"},
     {"url": "https://news.google.com/rss/search?q=oil+gold+commodities+futures&hl=en-US&gl=US&ceid=US:en",     "source": "Google News"},
     {"url": "https://news.google.com/rss/search?q=forex+currency+exchange+rate&hl=en-US&gl=US&ceid=US:en",     "source": "Google News"},
-    # Federal Reserve official feed — highly reliable
-    {"url": "https://www.federalreserve.gov/feeds/releases.xml", "source": "Federal Reserve"},
+    # Federal Reserve official feeds — highly reliable
+    {"url": "https://www.federalreserve.gov/feeds/press_all.xml",      "source": "Federal Reserve"},
+    {"url": "https://www.federalreserve.gov/feeds/press_monetary.xml", "source": "Federal Reserve"},
     # Yahoo Finance — often works
     {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance"},
 ]
@@ -129,10 +130,13 @@ def _parse_date(entry) -> Optional[datetime]:
         raw = getattr(entry, attr, None)
         if raw:
             try:
-                return parsedate_to_datetime(raw).replace(tzinfo=timezone.utc)
+                dt = parsedate_to_datetime(raw)
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+                return dt
             except Exception:
                 pass
-    return datetime.now(timezone.utc)
+    return datetime.utcnow()
 
 
 async def _fetch_feed(client: httpx.AsyncClient, feed_meta: dict) -> list[dict]:
@@ -274,7 +278,7 @@ async def insert_seed_articles() -> int:
     Called at startup so the UI is never blank on first visit.
     Returns count of articles inserted.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     saved = 0
     async with AsyncSessionLocal() as session:
         for i, seed in enumerate(_SEED_ARTICLES):
@@ -298,7 +302,8 @@ async def insert_seed_articles() -> int:
                 tickers=seed.get("tickers", []),
             ))
             saved += 1
-        await session.commit()
+        if saved:
+            await session.commit()
     if saved:
         log.info("seed_articles_inserted", count=saved)
     return saved
@@ -317,9 +322,15 @@ def _tiingo_to_article(art: dict) -> dict:
             tickers.append(upper)
     pub_str = art.get("published_at", "")
     try:
-        pub_date = datetime.fromisoformat(pub_str.replace("Z", "+00:00")) if pub_str else datetime.now(timezone.utc)
+        if pub_str:
+            dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            pub_date = dt
+        else:
+            pub_date = datetime.utcnow()
     except (ValueError, AttributeError):
-        pub_date = datetime.now(timezone.utc)
+        pub_date = datetime.utcnow()
     return {
         "id": str(uuid.uuid4()),
         "headline": art["title"],
@@ -357,9 +368,15 @@ def _alpaca_to_article(art: dict) -> dict:
             tickers.append(upper)
     pub_str = art.get("published_at", "")
     try:
-        pub_date = datetime.fromisoformat(pub_str.replace("Z", "+00:00")) if pub_str else datetime.now(timezone.utc)
+        if pub_str:
+            dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            pub_date = dt
+        else:
+            pub_date = datetime.utcnow()
     except (ValueError, AttributeError):
-        pub_date = datetime.now(timezone.utc)
+        pub_date = datetime.utcnow()
     return {
         "id": str(uuid.uuid4()),
         "headline": art["title"],
@@ -393,11 +410,12 @@ async def scrape_all_feeds() -> int:
         _scrape_alpaca(),
     )
 
-    # Always fetch RSS as well to maximize coverage
+    # Always fetch RSS as well to maximize coverage (verify=False ensures no Windows root CA blockage)
     async with httpx.AsyncClient(
-        headers={"User-Agent": "Mozilla/5.0 (compatible; QuantNeural/1.0; +https://quantneuraledge.com/bot)"},
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"},
         timeout=httpx.Timeout(20.0, connect=8.0),
         follow_redirects=True,
+        verify=False,
     ) as client:
         results = await asyncio.gather(*[_fetch_feed(client, f) for f in FEEDS], return_exceptions=True)
     # Filter out exceptions (individual feed failures should not crash the whole batch)
@@ -411,18 +429,34 @@ async def scrape_all_feeds() -> int:
         log.warning("all_feeds_failed_using_seeds")
         return await insert_seed_articles()
 
+    # Deduplicate in-memory by URL before querying DB to avoid intra-batch UNIQUE constraint collisions
+    seen_urls: set[str] = set()
+    unique_articles = []
+    for art in all_articles:
+        url = (art.get("url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        unique_articles.append(art)
+
     saved = 0
     async with AsyncSessionLocal() as session:
-        for art in all_articles:
-            # Skip if URL already exists
-            existing = await session.execute(
-                select(NewsArticle).where(NewsArticle.url == art["url"])
-            )
-            if existing.scalar_one_or_none():
+        urls_to_check = [a["url"] for a in unique_articles]
+        existing_urls: set[str] = set()
+        for chunk_start in range(0, len(urls_to_check), 500):
+            chunk = urls_to_check[chunk_start:chunk_start + 500]
+            stmt = select(NewsArticle.url).where(NewsArticle.url.in_(chunk))
+            result = await session.execute(stmt)
+            for row in result.scalars():
+                existing_urls.add(row)
+
+        for art in unique_articles:
+            if art["url"] in existing_urls:
                 continue
             session.add(NewsArticle(**art))
             saved += 1
-        await session.commit()
+        if saved:
+            await session.commit()
 
-    log.info("news_scrape_done", total_fetched=len(all_articles), new_saved=saved)
+    log.info("news_scrape_done", total_fetched=len(all_articles), unique_fetched=len(unique_articles), new_saved=saved)
     return saved

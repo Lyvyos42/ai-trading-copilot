@@ -14,7 +14,7 @@ import { ProfileSelector } from "@/components/ProfileSelector";
 import { formatPrice } from "@/lib/utils";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/useAuth";
+import { useRequireAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import dynamic from "next/dynamic";
 
@@ -139,7 +139,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const signalsRef = useRef(signals);
   useEffect(() => { signalsRef.current = signals; }, [signals]);
 
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useRequireAuth();
 
   // Auto-switch chart timeframe when profile changes
   function handleProfileChange(slug: string) {
@@ -151,6 +151,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     wakeBackend();
     loadData();
     // Poll signals every 30s for auto-resolution, but only when tab is visible
@@ -167,7 +168,7 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
       }
     }
     return () => clearInterval(signalPoll);
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem("dashboard_ticker", activeTicker);
@@ -334,6 +335,19 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const healthyAgents = agentsFetched
     ? agents.filter((a) => a.status === "HEALTHY").length
     : null;   // null = not known, rendered as an em dash rather than 0
+
+  if (authLoading || !isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
+            AUTHENTICATING...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
