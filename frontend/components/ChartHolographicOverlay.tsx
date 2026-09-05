@@ -48,8 +48,17 @@ export function ChartHolographicOverlay({
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-10 select-none">
-      {/* Top Controls & Status Bar (Docked over chart header, pointer-events-auto) */}
-      <div className="absolute top-2.5 right-3 flex items-center gap-2 pointer-events-auto z-20">
+      {/* 
+        SPATIAL SAFETY:
+        TradingView's native embedded chart occupies y = 0px to 38px for its header toolbar
+        (timeframe dropdowns, candle types, indicators, compare).
+        TradingView's drawing sidebar occupies x = 0px to 48px on the left.
+        
+        To guarantee ZERO COLLISION with chart controls:
+        - All top overlay controls are positioned at top-12 (48px from top, below TV toolbar)
+        - All left overlay badges are positioned at left-14 (56px from left, clear of drawing bar)
+      */}
+      <div className="absolute top-12 right-3 flex items-center gap-2 pointer-events-auto z-20">
         {/* Toggle HUD Button */}
         <button
           onClick={() => setHudVisible(!hudVisible)}
@@ -59,13 +68,13 @@ export function ChartHolographicOverlay({
               ? "bg-primary/20 text-primary border-primary/50 shadow-[0_0_10px_rgba(212,162,64,0.15)]"
               : "bg-surface-2/80 text-muted-foreground border-border/40 hover:text-foreground"
           )}
-          title="Toggle 2027 Quantitative Level Telemetry"
+          title="Toggle Quantitative Level Telemetry on Chart"
         >
           <Sparkles className="h-2.5 w-2.5" />
           <span>HUD TELEMETRY: {hudVisible ? "ON" : "OFF"}</span>
         </button>
 
-        {/* If no signal cached for this ticker, offer instant deliberate button */}
+        {/* If no signal cached for this ticker, offer instant deliberate button below toolbar */}
         {!matchingSignal && onGenerate && (
           <button
             onClick={() => onGenerate(ticker)}
@@ -78,12 +87,12 @@ export function ChartHolographicOverlay({
         )}
       </div>
 
-      {/* Floating Holographic Telemetry Cards (Docked to chart margins, 100% symbol-synchronized) */}
+      {/* Floating Holographic Telemetry Cards (Docked safely below TV toolbar at top-12 left-14) */}
       {hudVisible && (
         <>
           {matchingSignal && entry && target && stopLoss ? (
             /* Active Signal Holographic HUD */
-            <div className="absolute top-2.5 left-3 pointer-events-auto flex flex-wrap items-center gap-1.5 animate-fade-in z-20">
+            <div className="absolute top-12 left-14 pointer-events-auto flex flex-wrap items-center gap-1.5 animate-fade-in z-20">
               {/* Instrument & Direction Badge */}
               <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-1/90 backdrop-blur-md border border-border/70 text-[10px] font-mono shadow-xl">
                 <span className="font-bold text-foreground">{ticker}</span>
@@ -131,17 +140,13 @@ export function ChartHolographicOverlay({
                 </div>
               )}
             </div>
-          ) : (
-            /* Standby Calibration State (Strictly for current ticker, NEVER showing previous ticker) */
-            <div className="absolute top-2.5 left-3 pointer-events-auto flex items-center gap-2 px-2.5 py-1 rounded bg-surface-1/90 backdrop-blur-md border border-border/60 text-[10px] font-mono shadow-xl z-20">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              <span className="text-muted-foreground">ACTIVE INSTRUMENT:</span>
-              <span className="font-bold text-foreground">{ticker}</span>
-              <span className="text-muted-foreground border-l border-border/40 pl-2">
-                {loading ? "DELIBERATING 9 AGENTS..." : "READY FOR SYNTHESIS"}
-              </span>
+          ) : loading ? (
+            /* Active Deliberation Status (Positioned safely at top-12 left-14) */
+            <div className="absolute top-12 left-14 pointer-events-auto flex items-center gap-2 px-2.5 py-1 rounded bg-surface-1/90 backdrop-blur-md border border-primary/40 text-[10px] font-mono shadow-xl z-20 animate-pulse text-primary">
+              <Activity className="h-3 w-3 animate-spin" />
+              <span>DELIBERATING 9 AGENTS FOR {ticker}...</span>
             </div>
-          )}
+          ) : null}
         </>
       )}
     </div>

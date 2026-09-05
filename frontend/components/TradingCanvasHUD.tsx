@@ -366,32 +366,28 @@ export function TradingCanvasHUD({
 
           {/* Key Floating Telemetry Chips */}
           <div className="hidden lg:flex items-center gap-1.5 pl-2 border-l border-border/40">
-            {matchingSignal ? (
+            {matchingSignal && !isNoSignal && entry && target && inval ? (
               <>
                 <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono">
                   <span className="text-muted-foreground">ENTRY: </span>
                   <span className="font-bold text-foreground">{formatPrice(entry, ticker)}</span>
                 </div>
 
-                {target && (
-                  <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
-                    <Target className="h-2.5 w-2.5" />
-                    <span>TP: {formatPrice(target, ticker)}</span>
-                    {targetDelta !== null && (
-                      <span className="font-bold">({targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%)</span>
-                    )}
-                  </div>
-                )}
+                <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
+                  <Target className="h-2.5 w-2.5" />
+                  <span>TP: {formatPrice(target, ticker)}</span>
+                  {targetDelta !== null && (
+                    <span className="font-bold">({targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%)</span>
+                  )}
+                </div>
 
-                {inval && (
-                  <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
-                    <Shield className="h-2.5 w-2.5" />
-                    <span>SL: {formatPrice(inval, ticker)}</span>
-                    {invalDelta !== null && (
-                      <span className="font-bold">({invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%)</span>
-                    )}
-                  </div>
-                )}
+                <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
+                  <Shield className="h-2.5 w-2.5" />
+                  <span>SL: {formatPrice(inval, ticker)}</span>
+                  {invalDelta !== null && (
+                    <span className="font-bold">({invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%)</span>
+                  )}
+                </div>
 
                 {matchingSignal.risk_reward_ratio && matchingSignal.risk_reward_ratio > 0 && (
                   <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono text-primary font-bold">
@@ -399,9 +395,22 @@ export function TradingCanvasHUD({
                   </div>
                 )}
               </>
+            ) : analyzing ? (
+              <div className="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-[10px] font-mono text-primary flex items-center gap-1.5 animate-pulse">
+                <Activity className="h-3 w-3 animate-spin" />
+                <span>SYNTHESIZING 9-AGENT CONSENSUS FOR {ticker}...</span>
+              </div>
+            ) : matchingSignal && isNoSignal ? (
+              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
+                <span className="font-bold text-foreground">REGIME: RANGE-BOUND</span>
+                <span>•</span>
+                <span>SPECIALISTS ABSTAINED (NO DIRECTIONAL EDGE)</span>
+              </div>
             ) : (
-              <div className="px-2 py-0.5 rounded bg-surface-2/60 border border-border/30 text-[10px] font-mono text-muted-foreground">
-                NO DOSSIER FOR {ticker} — CLICK &apos;ANALYZE NOW&apos; FOR 9-AGENT SYNTHESIS
+              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
+                <span>TELEMETRY: STANDBY</span>
+                <span>•</span>
+                <span>CLICK &apos;ANALYZE NOW&apos; FOR MULTI-AGENT SYNTHESIS</span>
               </div>
             )}
           </div>
