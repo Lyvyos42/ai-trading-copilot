@@ -173,6 +173,11 @@ async def mark_read(
 class ScanNowIn(BaseModel):
     symbols: list[str] = Field(default_factory=list)
     replace_active: bool = True
+    # The dashboard's strategy switcher decides the analysis timeframe and the
+    # agent weighting. Without it every manual scan ran as "balanced" no matter
+    # which profile the user had selected, so a Z Scalper user got daily-bar
+    # signals from a button labelled with their own strategy.
+    profile: str = "balanced"
 
 
 @router.post("/auto/trigger")
@@ -192,7 +197,12 @@ async def trigger_auto_scan(
 
     from app.services.auto_scanner import run_auto_scan_for_user
 
-    results = await run_auto_scan_for_user(user_id, symbols, replace_active=True)
+    profile_row = await db.execute(select(User.active_profile).where(User.id == user_id))
+    profile = profile_row.scalar_one_or_none() or "balanced"
+
+    results = await run_auto_scan_for_user(
+        user_id, symbols, replace_active=True, profile=profile
+    )
 
     return {
         "symbols_scanned": len(symbols),
@@ -215,7 +225,9 @@ async def scan_now(
 
     from app.services.auto_scanner import run_auto_scan_for_user
 
-    results = await run_auto_scan_for_user(user_id, symbols, replace_active=body.replace_active)
+    results = await run_auto_scan_for_user(
+        user_id, symbols, replace_active=body.replace_active, profile=body.profile
+    )
 
     return {
         "symbols_scanned": len(symbols),

@@ -270,7 +270,7 @@ export default function DashboardPage() {
     setScanning(true);
     setAnalysisError(null);
     try {
-      const res = await scanNow(watchlist, true);
+      const res = await scanNow(watchlist, true, activeProfile);
       if (res.signals && res.signals.length > 0) {
         setSignals((prev) => {
           const map = new Map(prev.map((s) => [s.ticker, s]));

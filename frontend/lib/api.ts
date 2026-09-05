@@ -325,11 +325,16 @@ export interface ScanResult {
 
 export async function scanNow(
   symbols?: string[],
-  replaceActive = true
+  replaceActive = true,
+  profile = "balanced"
 ): Promise<{ symbols_scanned: number; signals_generated: number; signals: ScanResult[] }> {
   return apiFetch("/api/v1/scanner/scan-now", {
     method: "POST",
-    body: JSON.stringify({ symbols: symbols || [], replace_active: replaceActive }),
+    body: JSON.stringify({
+      symbols: symbols || [],
+      replace_active: replaceActive,
+      profile,
+    }),
   });
 }
 

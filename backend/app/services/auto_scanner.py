@@ -269,6 +269,7 @@ async def _generate_signal_for_user(
     direction: str,
     confluence_score: int,
     summary: str,
+    profile: str = "balanced",
 ) -> Signal | None:
     from app.pipeline.graph import run_pipeline
     from app.data.market_data import resolve_asset_class
@@ -455,6 +456,7 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str], replace_activ
             direction=direction,
             confluence_score=score,
             summary=summary,
+            profile=profile,
         )
 
         if signal:
