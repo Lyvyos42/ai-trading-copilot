@@ -1,33 +1,37 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw, TrendingUp, Activity, Zap, DollarSign, Radar, Settings, X } from "lucide-react";
-import { SignalCard } from "@/components/SignalCard";
+import { CockpitHeader } from "@/components/CockpitHeader";
+import { PreMarketBriefing } from "@/components/PreMarketBriefing";
+import { SignalRadar } from "@/components/SignalRadar";
+import { TradingCanvasHUD } from "@/components/TradingCanvasHUD";
 import { TradingViewChart } from "@/components/TradingViewChart";
-import { OrderFlowChart } from "@/components/OrderFlowChart";
-import { SignalOverlay } from "@/components/SignalOverlay";
-import { AgentStatusPanel } from "@/components/AgentStatus";
-import { generateSignal, listSignals, getAgentStatus, wakeBackend, scanNow, setActiveProfile as saveActiveProfile, type Signal, type AgentStatus } from "@/lib/api";
-
-import { ScannerPanel } from "@/components/ScannerPanel";
-import { ProfileSelector } from "@/components/ProfileSelector";
-import { formatPrice } from "@/lib/utils";
-import { SymbolSearch } from "@/components/SymbolSearch";
-import { cn } from "@/lib/utils";
-import { useRequireAuth } from "@/lib/useAuth";
+import { AgentConsensusHUD } from "@/components/AgentConsensusHUD";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { useRequireAuth } from "@/lib/useAuth";
+import {
+  generateSignal,
+  listSignals,
+  getAgentStatus,
+  wakeBackend,
+  scanNow,
+  setActiveProfile as saveActiveProfile,
+  type Signal,
+  type AgentStatus,
+} from "@/lib/api";
+import { Radar, LineChart, Brain, Layers, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
 const DepthSurface3D = dynamic(
-  () => import("@/components/Microstructure3D").then(m => m.DepthSurface3D),
+  () => import("@/components/Microstructure3D").then((m) => m.DepthSurface3D),
   { ssr: false }
 );
 const LiquiditySurface3D = dynamic(
-  () => import("@/components/Microstructure3D").then(m => m.LiquiditySurface3D),
+  () => import("@/components/Microstructure3D").then((m) => m.LiquiditySurface3D),
   { ssr: false }
 );
 
-// Map profile slug → default chart interval for auto-switching
 const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> = {
   balanced:      { timeframe: "1D",  chart: "1d" },
   swing:         { timeframe: "1D",  chart: "1d" },
@@ -38,108 +42,98 @@ const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> =
   news_catalyst: { timeframe: "1h",  chart: "1h" },
 };
 
-const WATCHLIST = ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X"];
-
-const SCANNER_SYMBOL_OPTIONS = [
-  // Stocks — US Large Cap
-  "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META", "AMD", "NFLX", "JPM",
-  "V", "MA", "DIS", "INTC", "PYPL", "BA", "CRM", "UBER", "COIN", "PLTR",
-  "SNOW", "SQ", "SHOP", "ROKU", "RIVN", "LCID", "NIO", "BABA", "PDD", "JD",
-  "WMT", "COST", "HD", "LOW", "TGT", "MCD", "SBUX", "NKE", "KO", "PEP",
-  "XOM", "CVX", "COP", "OXY", "SLB",
-  "LLY", "UNH", "JNJ", "PFE", "ABBV", "MRK", "BMY", "GILD",
-  "GS", "MS", "C", "BAC", "WFC", "BLK", "SCHW",
-  // Crypto
-  "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ADA-USD", "DOGE-USD", "AVAX-USD",
-  "DOT-USD", "MATIC-USD", "LINK-USD", "UNI-USD", "AAVE-USD", "LTC-USD", "ATOM-USD",
-  // Forex
-  "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCHF=X", "USDCAD=X", "NZDUSD=X",
-  "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "CADJPY=X", "CHFJPY=X",
-  "EURCHF=X", "EURAUD=X", "EURCAD=X", "EURNZD=X", "GBPAUD=X", "GBPCAD=X", "GBPNZD=X",
-  "AUDCAD=X", "AUDNZD=X", "NZDCAD=X", "NZDCHF=X", "USDSGD=X", "USDHKD=X",
-  "USDMXN=X", "USDZAR=X", "USDTRY=X", "USDPLN=X", "USDSEK=X", "USDNOK=X",
-  // Metals & Commodities
-  "XAUUSD", "XAGUSD",
-  "GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "PL=F", "PA=F",
-  "ZC=F", "ZW=F", "ZS=F", "KC=F", "SB=F", "CC=F", "CT=F",
-  // Indices
-  "US500", "US30", "USTEC",
-  "^GSPC", "^DJI", "^IXIC", "^RUT", "^VIX",
-  "^FTSE", "^GDAXI", "^FCHI", "^N225", "^HSI", "^STOXX50E",
-  // ETFs
-  "SPY", "QQQ", "IWM", "DIA", "GLD", "SLV", "USO", "TLT", "HYG", "XLF",
-  "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE", "XLC", "XLY",
-  "ARKK", "ARKW", "ARKG", "SOXL", "TQQQ", "SQQQ", "UVXY",
+const WATCHLIST = [
+  "AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "MSFT", "TSLA"
 ];
-
 
 function _isExpired(s: Signal): boolean {
   if (!s.expiry_time) return false;
   return new Date(s.expiry_time).getTime() < Date.now();
 }
 
+function inferAssetClass(ticker: string): string {
+  const u = ticker.toUpperCase();
+  if (u.endsWith("-USD") || ["BTC", "ETH", "SOL"].some((c) => u.startsWith(c))) return "crypto";
+  if (["XAUUSD", "XAGUSD", "GC=F", "SI=F"].includes(u)) return "commodities";
+  if (u.endsWith("=X")) return "forex";
+  if (["US500", "US100", "US30"].includes(u)) return "indices";
+  return "stocks";
+}
+
 export default function DashboardPage() {
-  const [signals, setSignals]               = useState<Signal[]>(() => {
+  const { isLoggedIn, loading: authLoading } = useRequireAuth();
+
+  const [signals, setSignals] = useState<Signal[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_signals");
-      if (saved) try {
-        const parsed: Signal[] = JSON.parse(saved);
-        return parsed.filter(s => s.status === "ACTIVE" && !_isExpired(s));
-      } catch {}
+      if (saved) {
+        try {
+          const parsed: Signal[] = JSON.parse(saved);
+          return parsed.filter((s) => s.status === "ACTIVE" && !_isExpired(s));
+        } catch {}
+      }
     }
     return [];
   });
-  const [agents, setAgents]                 = useState<AgentStatus[]>([]);
+
+  const [adoptedSignals, setAdoptedSignals] = useState<Signal[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("adopted_signals");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return [];
+  });
+
+  const [agents, setAgents] = useState<AgentStatus[]>([]);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
-  const [loading, setLoading]               = useState(false);
-  const [analysisError, setAnalysisError]   = useState<string | null>(null);
-  const [tradeOpened, setTradeOpened]       = useState(false);
-  const [activeTicker, setActiveTicker]     = useState(() =>
-    (typeof window !== "undefined" && localStorage.getItem("dashboard_ticker")) || "AAPL"
-  );
-const [upgradeOpen, setUpgradeOpen]       = useState(false);
-  const [activeProfile, setActiveProfile]   = useState(() =>
-    (typeof window !== "undefined" && localStorage.getItem("dashboard_profile")) || "balanced"
-  );
-  const [chartInterval, setChartInterval]   = useState(() => {
+  const [activeTicker, setActiveTicker] = useState(() => {
+    return (typeof window !== "undefined" && localStorage.getItem("dashboard_ticker")) || "AAPL";
+  });
+
+  const [activeProfile, setActiveProfile] = useState(() => {
+    return (typeof window !== "undefined" && localStorage.getItem("dashboard_profile")) || "balanced";
+  });
+
+  const [chartInterval, setChartInterval] = useState(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("dashboard_profile");
     return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
   });
-  const [chartMode, setChartMode] = useState<"tradingview" | "orderflow">("tradingview");
-  const [pipelineOpen, setPipelineOpen] = useState(false);
+
   const [show3D, setShow3D] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  // Auto-scanner state
-  const [scannerRunning, setScannerRunning] = useState(false);
-  const [scannerStatus, setScannerStatus] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanSymbols, setScanSymbols] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("scanner_symbols");
-      if (saved) try { return JSON.parse(saved); } catch {}
-    }
-    return ["AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "GC=F", "MSFT", "TSLA"];
-  });
-  const scannerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const scannerIndexRef = useRef(0);
-  const scannerBusyRef = useRef(false);
+  // Mobile View Tab: "radar" | "chart" | "agents"
+  const [mobileTab, setMobileTab] = useState<"radar" | "chart" | "agents">("chart");
 
-  const SCAN_INTERVAL_MS = 90_000;
-
+  // Save signals to localStorage
   useEffect(() => {
-    const t = setTimeout(() => localStorage.setItem("scanner_symbols", JSON.stringify(scanSymbols)), 500);
-    return () => clearTimeout(t);
-  }, [scanSymbols]);
-
-  useEffect(() => {
-    const t = setTimeout(() => localStorage.setItem("dashboard_signals", JSON.stringify(signals)), 1000);
+    const t = setTimeout(() => {
+      localStorage.setItem("dashboard_signals", JSON.stringify(signals));
+    }, 1000);
     return () => clearTimeout(t);
   }, [signals]);
 
-  const signalsRef = useRef(signals);
-  useEffect(() => { signalsRef.current = signals; }, [signals]);
+  // Save adopted signals to localStorage
+  useEffect(() => {
+    localStorage.setItem("adopted_signals", JSON.stringify(adoptedSignals));
+  }, [adoptedSignals]);
 
-  const { isLoggedIn, loading: authLoading } = useRequireAuth();
+  // Save ticker and profile to localStorage
+  useEffect(() => {
+    localStorage.setItem("dashboard_ticker", activeTicker);
+  }, [activeTicker]);
+
+  useEffect(() => {
+    localStorage.setItem("dashboard_profile", activeProfile);
+    saveActiveProfile(activeProfile).catch(() => {});
+  }, [activeProfile]);
 
   // Auto-switch chart timeframe when profile changes
   function handleProfileChange(slug: string) {
@@ -148,634 +142,328 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
     if (tf) setChartInterval(tf.chart);
   }
 
-  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    wakeBackend();
-    loadData();
-    // Poll signals every 30s for auto-resolution, but only when tab is visible
-    const signalPoll = setInterval(() => {
-      if (!document.hidden) loadData();
-    }, 30_000);
-    // Handle Stripe checkout success redirect
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("checkout") === "success") {
-        setCheckoutSuccess(true);
-        window.history.replaceState({}, "", window.location.pathname);
-        setTimeout(() => setCheckoutSuccess(false), 8000);
-      }
-    }
-    return () => clearInterval(signalPoll);
-  }, [isLoggedIn]);
-
-  useEffect(() => {
-    localStorage.setItem("dashboard_ticker", activeTicker);
-  }, [activeTicker]);
-
-  useEffect(() => {
-    localStorage.setItem("dashboard_profile", activeProfile);
-    // Persist server-side too. The profile decides the analytical window and
-    // ATR geometry the auto-scanner uses, and the scanner runs in the backend
-    // with no sight of localStorage - so a selection kept only in the browser
-    // meant every auto-scanned signal came back on the balanced 5-14 DAY
-    // geometry regardless of what was picked here.
-    saveActiveProfile(activeProfile).catch(() => {});
-  }, [activeProfile]);
-
-  async function loadData() {
-    const [sigs, agentData] = await Promise.allSettled([listSignals(10), getAgentStatus()]);
+  // Load signals from API
+  const loadData = useCallback(async () => {
+    const [sigs, agentData] = await Promise.allSettled([listSignals(20), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
       const allFromApi = sigs.value;
-      const activeOnly = allFromApi.filter(s => s.status === "ACTIVE");
-      // IDs of signals the backend has resolved (WIN/LOSS/EXPIRED)
-      const resolvedIds = new Set(allFromApi.filter(s => s.status !== "ACTIVE").map(s => s.signal_id));
-      setSignals(prev => {
-        const localById = new Map(prev.map(s => [s.signal_id, s]));
-        const merged = activeOnly.map(s => {
+      const activeOnly = allFromApi.filter((s) => s.status === "ACTIVE");
+      const resolvedIds = new Set(
+        allFromApi.filter((s) => s.status !== "ACTIVE").map((s) => s.signal_id)
+      );
+
+      setSignals((prev) => {
+        const localById = new Map(prev.map((s) => [s.signal_id, s]));
+        const merged = activeOnly.map((s) => {
           const local = localById.get(s.signal_id);
           return local ? { ...s, signal_mode: local.signal_mode } : s;
         });
-        prev.forEach(s => {
-          if (s.status === "ACTIVE" && !_isExpired(s) && !resolvedIds.has(s.signal_id) && !merged.some(m => m.signal_id === s.signal_id)) merged.push(s);
+        prev.forEach((s) => {
+          if (
+            s.status === "ACTIVE" &&
+            !_isExpired(s) &&
+            !resolvedIds.has(s.signal_id) &&
+            !merged.some((m) => m.signal_id === s.signal_id)
+          ) {
+            merged.push(s);
+          }
         });
         const seen = new Set<string>();
-        return merged.filter(s => {
+        return merged.filter((s) => {
           if (_isExpired(s)) return false;
           if (seen.has(s.ticker)) return false;
           seen.add(s.ticker);
           return true;
         });
       });
-      if (activeOnly.length > 0 && !selectedSignal) setSelectedSignal(activeOnly[0]);
+
+      if (activeOnly.length > 0 && !selectedSignal) {
+        setSelectedSignal(activeOnly[0]);
+        setActiveTicker(activeOnly[0].ticker);
+      }
     }
-    if (agentData.status === "fulfilled") setAgents(agentData.value.agents);
+    if (agentData.status === "fulfilled") {
+      setAgents(agentData.value.agents);
+    }
+  }, [selectedSignal]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    wakeBackend();
+    loadData();
+    const interval = setInterval(() => {
+      if (!document.hidden) loadData();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, loadData]);
+
+  // Handle Signal Selection
+  function handleSelectSignal(sig: Signal) {
+    setSelectedSignal(sig);
+    setActiveTicker(sig.ticker);
+    setAnalysisError(null);
+    setMobileTab("chart");
   }
 
-  async function handleGenerate(ticker?: string) {
-    const t = ticker || activeTicker;
+  // Toggle Adopt Signal (Pins to My Desk)
+  function handleToggleAdopt(sig: Signal) {
+    setAdoptedSignals((prev) => {
+      const exists = prev.some((s) => s.signal_id === sig.signal_id);
+      if (exists) {
+        return prev.filter((s) => s.signal_id !== sig.signal_id);
+      } else {
+        return [sig, ...prev];
+      }
+    });
+  }
+
+  // Trigger Scanner
+  async function handleScanNow() {
+    setScanning(true);
+    setAnalysisError(null);
+    try {
+      const res = await scanNow(WATCHLIST, true);
+      if (res.signals && res.signals.length > 0) {
+        setSignals((prev) => {
+          const map = new Map(prev.map((s) => [s.ticker, s]));
+          for (const s of res.signals) {
+            const converted: Signal = {
+              signal_id: s.signal_id,
+              ticker: s.ticker,
+              direction: s.direction,
+              confidence_score: s.confidence_score,
+              entry_price: s.entry_price,
+              stop_loss: s.stop_loss,
+              status: "ACTIVE",
+              timeframe: PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
+              asset_class: inferAssetClass(s.ticker),
+              agent_votes: {},
+              reasoning_chain: s.summary ? [s.summary] : [],
+              strategy_sources: ["Confluence Screener"],
+              timestamp: s.timestamp || new Date().toISOString(),
+              expiry_time: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+            };
+            map.set(s.ticker, converted);
+          }
+          return Array.from(map.values());
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Scan failed";
+      setAnalysisError(msg);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  // Generate on-demand signal for ticker
+  async function handleGenerate(t?: string) {
+    const tickerToGen = t || activeTicker;
     setLoading(true);
     setAnalysisError(null);
-    setActiveTicker(t);
+    setActiveTicker(tickerToGen);
     try {
-      const signal = await generateSignal(t, undefined, PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D", activeProfile);
-      // Only ACTIVE signals belong in the feed — refresh() filters on exactly
-      // that, so adding a blocked one made it appear and vanish seconds later.
-      // Say why instead.
-      if (signal.status !== "ACTIVE") {
+      const signal = await generateSignal(
+        tickerToGen,
+        undefined,
+        PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
+        activeProfile
+      );
+
+      if (signal.status !== "ACTIVE" && signal.status !== "NO_SIGNAL") {
         const why = (signal as { status_reasons?: string[] }).status_reasons;
         setAnalysisError(
           `${signal.ticker}: ${String(signal.status).replace(/_/g, " ").toLowerCase()}` +
-          (why?.length ? ` — ${why[0]}` : "")
+            (why?.length ? ` — ${why[0]}` : "")
         );
         return;
       }
+
       setSignals((prev) => {
-        const hasActive = prev.some(s => s.ticker === signal.ticker && s.status === "ACTIVE");
-        if (hasActive) return prev;
-        return [signal, ...prev.filter(s => s.ticker !== signal.ticker).slice(0, 8)];
+        return [signal, ...prev.filter((s) => s.ticker !== signal.ticker).slice(0, 15)];
       });
       setSelectedSignal(signal);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Analysis failed";
-      // Distinguish network errors (cold start) from API errors
-      const isColdStart = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network");
-      // A market-closed 409 already reads as a full sentence naming the session
-      // and its reopen time, so it is shown as-is.
-      setAnalysisError(
-        isColdStart
-          ? "Backend is waking up (Render free tier). This takes ~60s on first use. Please wait and try again."
-          : msg
-      );
+      setAnalysisError(msg);
     } finally {
       setLoading(false);
     }
   }
 
-  // ── Auto-scanner: scan one symbol per tick, rotate through list ──
-  const scanSymbolsRef = useRef(scanSymbols);
-  useEffect(() => { scanSymbolsRef.current = scanSymbols; }, [scanSymbols]);
-
-  const scanNext = useCallback(async () => {
-    if (scannerBusyRef.current) return;
-    const syms = scanSymbolsRef.current;
-    if (syms.length === 0) return;
-    scannerBusyRef.current = true;
-    setScannerStatus(`Scanning ${syms.length} watchlist symbols…`);
-
-    try {
-      const res = await scanNow(syms, true);
-      if (res.signals && res.signals.length > 0) {
-        setSignals((prev) => {
-          const map = new Map(prev.map(s => [s.ticker, s]));
-          for (const s of res.signals) {
-            map.set(s.ticker, {
-              ...s,
-              status: "ACTIVE",
-              timeframe: PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
-              asset_class: "stocks",
-              agent_votes: {},
-              reasoning_chain: [s.summary],
-              strategy_sources: ["Technical Confluence Screener"],
-              timeframe_levels: {},
-            } as unknown as Signal);
-          }
-          return Array.from(map.values()).slice(0, 20);
-        });
-        setScannerStatus(`⚡ ${res.signals.length} setup${res.signals.length > 1 ? "s" : ""} found (${res.signals.map(s => s.ticker).join(", ")})`);
-      } else {
-        setScannerStatus(`Scanned ${res.symbols_scanned} symbols — no setups meeting confluence`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "scan failed";
-      setScannerStatus(`Scan error: ${msg.slice(0, 40)}`);
-    } finally {
-      setTimeout(() => setScannerStatus(""), 6000);
-      scannerBusyRef.current = false;
-    }
-  }, [activeProfile]);
-
-
-  function startScanner() {
-    if (scannerRef.current) return;
-    setScannerRunning(true);
-    scannerIndexRef.current = 0;
-    scanNext();
-    scannerRef.current = setInterval(scanNext, SCAN_INTERVAL_MS);
-  }
-
-  function stopScanner() {
-    if (scannerRef.current) {
-      clearInterval(scannerRef.current);
-      scannerRef.current = null;
-    }
-    setScannerRunning(false);
-    setScannerStatus("");
-  }
-
-  useEffect(() => {
-    return () => { if (scannerRef.current) clearInterval(scannerRef.current); };
-  }, []);
-
-  const activeSignals = signals.filter((s) => s.status === "ACTIVE").length;
-  const activeTickerLocked = signals.some(
-    s => s.ticker === activeTicker && s.status === "ACTIVE"
-  );
-  const avgConf       = signals.length
-    ? (signals.reduce((a, s) => a + s.confidence_score, 0) / signals.length).toFixed(0)
-    : null;
-  // Agents come from ONE source. The rows used to render from
-  // PLACEHOLDER_AGENTS when the fetch failed while the counter read the empty
-  // `agents` array, so a failing /agents/status produced eleven rows all
-  // showing LIVE beneath a header reading "0/11 HEALTHY" - the display
-  // contradicting itself rather than reporting the outage.
-  const agentsFetched = agents.length > 0;
-  const shownAgents   = agentsFetched ? agents : PLACEHOLDER_AGENTS;
-  const healthyAgents = agentsFetched
-    ? agents.filter((a) => a.status === "HEALTHY").length
-    : null;   // null = not known, rendered as an em dash rather than 0
-
-  if (authLoading || !isLoggedIn) {
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
-          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
-            AUTHENTICATING...
-          </span>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="live-dot mx-auto mb-3" />
+          <p className="text-xs font-mono text-muted-foreground tracking-widest">
+            AUTHENTICATING COMMAND HUD
+          </p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
+  if (!isLoggedIn) return null;
 
-      {/* Checkout success banner */}
-      {checkoutSuccess && (
-        <div className="bg-bull/10 border-b border-bull/30 px-4 py-2 text-center text-sm text-bull font-medium">
-          Subscription activated! Your account has been upgraded. Welcome aboard.
+  return (
+    <div className="flex flex-col h-[calc(100vh-65px)] bg-background overflow-hidden">
+      {/* Top Header: Kill Zones, Clocks, Regime Status, Strategy Profile */}
+      <CockpitHeader
+        activeProfile={activeProfile}
+        onProfileChange={handleProfileChange}
+        regimeText="VOL EXPANSION"
+        regimeState="NEUTRAL"
+      />
+
+      {/* Collapsible Daily Regime Briefing */}
+      <PreMarketBriefing />
+
+      {/* Analysis Error Notification Banner */}
+      {analysisError && (
+        <div className="px-4 py-2 bg-warn/10 border-b border-warn/30 text-warn text-xs font-mono flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>{analysisError}</span>
+          </div>
+          <button
+            onClick={() => setAnalysisError(null)}
+            className="text-[10px] uppercase font-bold hover:text-foreground"
+          >
+            DISMISS
+          </button>
         </div>
       )}
 
-      {/* ── TOP STATS BAR ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:flex items-stretch border-b border-border bg-[hsl(0_0%_3%)] shrink-0">
-        {[
-          {
-            label: "ACTIVE SIGNALS",
-            value: activeSignals,
-            suffix: null,
-            icon: Zap,
-            color: "text-primary",
-          },
-          {
-            label: "AVG CONFIDENCE",
-            value: avgConf ?? "—",
-            suffix: avgConf ? "%" : null,
-            icon: TrendingUp,
-            color: "text-bull",
-          },
-          {
-            label: "AGENTS ONLINE",
-            value: healthyAgents === null ? "—" : `${healthyAgents}`,
-            suffix: agentsFetched ? `/${agents.length}` : "",
-            icon: Activity,
-            color: "text-bull",
-          },
-          {
-            label: "PAPER EQUITY",
-            value: "$100,000",
-            suffix: null,
-            icon: DollarSign,
-            color: "text-primary",
-          },
-        ].map(({ label, value, suffix, icon: Icon, color }, i) => (
-          <div
-            key={label}
-            className={cn(
-              "flex-1 flex items-center justify-between px-4 py-2 border-r border-border last:border-r-0",
-              i % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]"
-            )}
-          >
-            <div>
-              <div className="terminal-label">{label}</div>
-              <div className={`font-mono text-sm font-bold mt-0.5 ${color}`}>
-                {value}
-                {suffix && <span className="text-muted-foreground text-xs">{suffix}</span>}
-              </div>
-            </div>
-            <Icon className={`h-4 w-4 ${color} opacity-60`} />
-          </div>
-        ))}
+      {/* Mobile Tab Switcher (Visible on small screens) */}
+      <div className="lg:hidden flex items-center border-b border-border/40 bg-surface-2">
+        <button
+          onClick={() => setMobileTab("radar")}
+          className={cn(
+            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
+            mobileTab === "radar" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
+          )}
+        >
+          <Radar className="h-3.5 w-3.5" />
+          <span>RADAR ({signals.length})</span>
+        </button>
+        <button
+          onClick={() => setMobileTab("chart")}
+          className={cn(
+            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
+            mobileTab === "chart" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
+          )}
+        >
+          <LineChart className="h-3.5 w-3.5" />
+          <span>CHART ({activeTicker})</span>
+        </button>
+        <button
+          onClick={() => setMobileTab("agents")}
+          className={cn(
+            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5",
+            mobileTab === "agents" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
+          )}
+        >
+          <Brain className="h-3.5 w-3.5" />
+          <span>AGENTS</span>
+        </button>
       </div>
 
-      {/* ── MAIN PANELS ──────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+      {/* Main 3-Pane Tactical Command Cockpit */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Left Pane (25% on desktop): Confluence Radar & Signal Stream */}
+        <aside
+          className={cn(
+            "w-full lg:w-[320px] xl:w-[360px] shrink-0 h-full flex flex-col",
+            mobileTab !== "radar" && "hidden lg:flex"
+          )}
+        >
+          <SignalRadar
+            signals={signals}
+            activeSignalId={selectedSignal?.signal_id || null}
+            onSelectSignal={handleSelectSignal}
+            adoptedSignals={adoptedSignals}
+            onToggleAdopt={handleToggleAdopt}
+            onScanNow={handleScanNow}
+            scanning={scanning}
+          />
+        </aside>
 
-        {/* LEFT — Chart + Controls */}
-        <div className="flex flex-col flex-1 min-w-0 min-h-0 lg:border-r border-border border-b lg:border-b-0">
+        {/* Center Pane (50% on desktop): Deep Canvas Viewport */}
+        <main
+          className={cn(
+            "flex-1 h-full flex flex-col min-w-0 overflow-hidden bg-surface-0",
+            mobileTab !== "chart" && "hidden lg:flex"
+          )}
+        >
+          {/* Floating Canvas HUD */}
+          <TradingCanvasHUD
+            ticker={activeTicker}
+            signal={selectedSignal}
+            activeInterval={chartInterval}
+            onIntervalChange={setChartInterval}
+            show3D={show3D}
+            onToggle3D={() => setShow3D(!show3D)}
+            onAdoptSignal={selectedSignal ? handleToggleAdopt : undefined}
+            isAdopted={selectedSignal ? adoptedSignals.some((s) => s.signal_id === selectedSignal.signal_id) : false}
+          />
 
-          {/* Control bar */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-[hsl(0_0%_3%)] shrink-0 flex-wrap">
-            <SymbolSearch value={activeTicker} onChange={setActiveTicker} />
-            <ProfileSelector value={activeProfile} onChange={handleProfileChange} compact />
-
-            <div className="flex items-center gap-1 flex-wrap overflow-x-auto">
-              {WATCHLIST.map((ticker) => {
-                const label = ticker.replace("=X","").replace("-USD","").replace("=F","").replace("^","");
-                return (
+          {/* Chart / 3D Canvas Area */}
+          <div className="flex-1 w-full h-full relative overflow-hidden bg-background">
+            {show3D ? (
+              <div className="h-full w-full flex flex-col p-3 space-y-3 overflow-y-auto">
+                <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                  <span className="text-xs font-mono font-bold text-primary">
+                    MICROSTRUCTURE 3D ORDER FLOW DENSITY
+                  </span>
                   <button
-                    key={ticker}
-                    onClick={() => setActiveTicker(ticker)}
-                    className={cn(
-                      "px-2 py-0.5 rounded text-[14px] font-mono font-bold border transition-colors",
-                      activeTicker === ticker
-                        ? "bg-primary/10 border-primary/50 text-primary"
-                        : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
-                    )}
+                    onClick={() => setShow3D(false)}
+                    className="text-[10px] font-mono px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-muted-foreground hover:text-foreground"
                   >
-                    {label}
+                    RETURN TO CANDLE VIEW
                   </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-1 border-l border-border/30 pl-2 ml-1">
-              <button
-                onClick={() => setChartMode("tradingview")}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[11px] font-mono font-bold border transition-colors",
-                  chartMode === "tradingview"
-                    ? "bg-primary/10 border-primary/50 text-primary"
-                    : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
-                )}
-              >TV</button>
-              <button
-                onClick={() => setChartMode("orderflow")}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[11px] font-mono font-bold border transition-colors",
-                  chartMode === "orderflow"
-                    ? "bg-primary/10 border-primary/50 text-primary"
-                    : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary"
-                )}
-              >ORDER FLOW</button>
-            </div>
-
-            <div className="ml-auto flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => {
-                  if (!isLoggedIn) { window.location.href = "/login"; return; }
-                  if (activeTickerLocked) return;
-                  handleGenerate();
-                }}
-                disabled={loading || activeTickerLocked}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
-                  loading || activeTickerLocked
-                    ? "border-border/40 text-muted-foreground/50 cursor-not-allowed"
-                    : "border-primary/50 text-primary hover:bg-primary/10"
-                )}
-              >
-                <Activity className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "ANALYZING…" : activeTickerLocked ? "SIGNAL ACTIVE" : "RUN AI ANALYSIS"}
-              </button>
-              <button
-                onClick={() => {
-                  if (!isLoggedIn) { window.location.href = "/login"; return; }
-                  scannerRunning ? stopScanner() : startScanner();
-                }}
-                disabled={scanSymbols.length === 0}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
-                  scannerRunning
-                    ? "border-bear/50 text-bear hover:bg-bear/10"
-                    : "border-info/50 text-info hover:bg-info/10",
-                  scanSymbols.length === 0 && "opacity-40 cursor-not-allowed"
-                )}
-              >
-                <Radar className={`h-3 w-3 ${scannerRunning ? "animate-spin" : ""}`} />
-                {scannerRunning ? "STOP SCAN" : "AUTO SCAN"}
-              </button>
-              <button
-                onClick={() => setScannerOpen(o => !o)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono font-bold border transition-colors whitespace-nowrap",
-                  scannerOpen
-                    ? "bg-info/10 border-info/50 text-info"
-                    : "border-border/50 text-muted-foreground hover:text-info hover:border-info/30"
-                )}
-              >
-                <Settings className="h-3 w-3" />
-                SYMBOLS
-              </button>
-              <button
-                onClick={loadData}
-                disabled={loading}
-                className="p-1.5 rounded border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-              >
-                <RefreshCw className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Scanner config panel */}
-          {scannerOpen && (
-            <div className="px-3 py-2 border-b border-border bg-[hsl(0_0%_4%)] shrink-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Radar className="h-3 w-3 text-info" />
-                <span className="text-[11px] font-mono font-bold text-foreground tracking-wider">SCANNER SYMBOLS</span>
-                <span className="text-[10px] font-mono text-muted-foreground">({scanSymbols.length})</span>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 h-[500px]">
+                  <div className="rounded border border-border/40 overflow-hidden">
+                    <DepthSurface3D ticker={activeTicker} />
+                  </div>
+                  <div className="rounded border border-border/40 overflow-hidden">
+                    <LiquiditySurface3D ticker={activeTicker} />
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {scanSymbols.map(sym => (
-                  <span
-                    key={sym}
-                    className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded border border-info/20 bg-info/5 text-info"
-                  >
-                    {sym}
-                    <button
-                      onClick={() => setScanSymbols(prev => prev.filter(s => s !== sym))}
-                      className="hover:text-bear transition-colors"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </span>
-                ))}
-                {scanSymbols.length === 0 && (
-                  <span className="text-[11px] font-mono text-muted-foreground/50 italic">No symbols — add some to scan</span>
-                )}
-                <select
-                  value=""
-                  onChange={e => {
-                    const s = e.target.value;
-                    if (s && !scanSymbols.includes(s)) setScanSymbols(prev => [...prev, s]);
-                  }}
-                  className="text-[11px] font-mono bg-[hsl(0_0%_8%)] border border-info/40 rounded px-2 py-1 text-info focus:outline-none focus:border-info/60 cursor-pointer [&>option]:bg-[hsl(0_0%_10%)] [&>option]:text-foreground [&>optgroup]:bg-[hsl(0_0%_10%)] [&>optgroup]:text-info [&>optgroup]:font-bold"
-                >
-                  <option value="" disabled>+ Add symbol</option>
-                  <optgroup label="Stocks">
-                    {SCANNER_SYMBOL_OPTIONS.slice(0, 45).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Crypto">
-                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.endsWith("-USD")).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Forex">
-                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.endsWith("=X")).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Metals & Commodities">
-                    {SCANNER_SYMBOL_OPTIONS.filter(s => s === "XAUUSD" || s === "XAGUSD" || (s.endsWith("=F") && !["SPY","QQQ"].includes(s))).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Indices">
-                    {SCANNER_SYMBOL_OPTIONS.filter(s => s.startsWith("^") || ["US500","US30","USTEC"].includes(s)).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="ETFs">
-                    {SCANNER_SYMBOL_OPTIONS.filter(s => ["SPY","QQQ","IWM","DIA","GLD","SLV","USO","TLT","HYG","XLF","XLE","XLK","XLV","XLI","XLP","XLU","XLB","XLRE","XLC","XLY","ARKK","ARKW","ARKG","SOXL","TQQQ","SQQQ","UVXY"].includes(s)).filter(s => !scanSymbols.includes(s)).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Chart area */}
-          <div className="min-h-0 overflow-hidden relative" style={{ flex: "3 1 0%", minHeight: 280 }}>
-            {chartMode === "tradingview" ? (
-              <TradingViewChart ticker={activeTicker} interval={chartInterval} fillContainer />
             ) : (
-              <OrderFlowChart ticker={activeTicker} interval={chartInterval} fillContainer />
-            )}
-            {chartMode === "tradingview" && selectedSignal?.signal_mode !== "AUTO_SCAN" && (
-              <SignalOverlay signal={selectedSignal} ticker={activeTicker} />
-            )}
-          </div>
-          {/* 3D Microstructure surfaces — lazy-loaded behind toggle */}
-          <div className="hidden lg:flex items-center border-t border-border px-2 py-0.5 gap-2">
-            <button
-              onClick={() => setShow3D(v => !v)}
-              className="text-[8px] font-mono font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors"
-            >
-              {show3D ? "HIDE 3D" : "SHOW 3D MICROSTRUCTURE"}
-            </button>
-          </div>
-          {show3D && (
-            <div className="hidden lg:flex border-b border-border" style={{ flex: "1 0 180px", maxHeight: "28%" }}>
-              <DepthSurface3D ticker={activeTicker} className="flex-1 border-r border-border" />
-              <LiquiditySurface3D ticker={activeTicker} className="flex-1" />
-            </div>
-          )}
-        </div>
-
-        {/* CENTER — Signal Feed */}
-        <div className="flex flex-col lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-r border-border max-h-48 sm:max-h-64 lg:max-h-none overflow-hidden">
-          <div className="terminal-header shrink-0">
-            <span className="terminal-label">SIGNAL FEED</span>
-            {scannerRunning && scannerStatus && (
-              <div className={cn(
-                "ml-auto flex items-center gap-1 text-[13px] font-mono",
-                scannerStatus.includes("ERR") ? "text-bear" : "text-info"
-              )}>
-                <Radar className={cn("h-2.5 w-2.5", !scannerStatus.includes("ERR") && "animate-spin")} />
-                {scannerStatus.replace("…", "")}
-              </div>
-            )}
-            {loading && !scannerRunning && (
-              <div className="ml-auto flex items-center gap-1 text-[13px] font-mono text-primary">
-                <Activity className="h-2.5 w-2.5 animate-spin" />
-                RUNNING
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {analysisError && (
-              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bear/30 bg-bear/5 text-[14px] font-mono text-bear">
-                {analysisError}
-              </div>
-            )}
-            {signals.length === 0 && !loading && !analysisError && (
-              <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-                <Zap className="h-6 w-6 text-muted-foreground/30 mb-2" />
-                <p className="text-[14px] font-mono text-muted-foreground">
-                  No signals yet.<br />Select a ticker and run analysis.
-                </p>
-              </div>
-            )}
-            {tradeOpened && (
-              <div className="mx-3 mt-3 px-3 py-2 rounded border border-bull/30 bg-bull/5 text-[14px] font-mono text-bull flex items-center justify-between">
-                <span>✓ Paper position opened</span>
-                <a href="/portfolio" className="underline text-bull hover:text-bull/80">View Portfolio →</a>
-              </div>
-            )}
-            {signals.map((signal) => (
-              <div
-                key={signal.signal_id}
-                onClick={() => { setSelectedSignal(signal); setActiveTicker(signal.ticker); }}
-                className={cn(
-                  "cursor-pointer border-b border-border/50 transition-colors relative",
-                  selectedSignal?.signal_id === signal.signal_id
-                    ? "bg-primary/5 border-l-2 border-l-primary"
-                    : "hover:bg-white/[0.02]"
-                )}
-              >
-                {signal.signal_mode === "AUTO_SCAN" && (
-                  <span className="absolute top-1.5 right-2 text-[7px] font-mono font-bold text-info bg-info/10 border border-info/20 px-1 rounded z-10">
-                    AUTO
-                  </span>
-                )}
-                <SignalCard
-                  signal={signal}
-                  compact
-                  onExecute={() => setTradeOpened(true)}
-                  onResolve={(id, outcome) => {
-                    setSignals(prev => prev.map(s =>
-                      s.signal_id === id ? { ...s, status: outcome } : s
-                    ));
-                    if (selectedSignal?.signal_id === id) setSelectedSignal(null);
-                    setTimeout(() => {
-                      setSignals(prev => prev.filter(s => s.signal_id !== id));
-                    }, 2000);
-                  }}
-                  onDismiss={(id) => {
-                    setSignals(prev => prev.filter(s => s.signal_id !== id));
-                    if (selectedSignal?.signal_id === id) setSelectedSignal(null);
-                  }}
+              <div className="h-full w-full">
+                <TradingViewChart
+                  ticker={activeTicker}
+                  interval={chartInterval}
+                  fillContainer={true}
                 />
               </div>
-            ))}
+            )}
           </div>
-        </div>
+        </main>
 
-        {/* RIGHT SIDEBAR — Agents + Pipeline (desktop only) */}
-        <div className="hidden xl:flex flex-col w-64 shrink-0">
-          <div className="terminal-header shrink-0">
-            <span className="terminal-label">AGENT NETWORK</span>
-            <span className={`ml-auto font-mono text-[13px] ${agentsFetched ? "text-bull" : "text-muted-foreground"}`}>
-              {agentsFetched ? `${healthyAgents}/${agents.length} HEALTHY` : "STATUS UNAVAILABLE"}
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <AgentStatusPanel agents={shownAgents} compact />
-
-            {/* Pipeline card — collapsible */}
-            <div className="border-t border-border mt-1 pt-1 px-2.5 pb-2">
-              <button
-                onClick={() => setPipelineOpen(p => !p)}
-                className="flex items-center gap-1.5 w-full text-left py-1 group"
-              >
-                <svg
-                  width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                  className={cn("text-muted-foreground transition-transform", pipelineOpen && "rotate-90")}
-                >
-                  <polyline points="2,1 6,4 2,7" />
-                </svg>
-                <span className="terminal-label group-hover:text-foreground/80 transition-colors">PIPELINE STAGES</span>
-                <span className="text-[8px] font-mono text-muted-foreground/50 ml-auto">7 STEPS</span>
-              </button>
-              {pipelineOpen && (
-                <div className="mt-1">
-                  {[
-                    { n: "1", name: "Parallel Analysis",  detail: "7 agents concurrent" },
-                    { n: "2", name: "Quant Validation",   detail: "Statistical edge check" },
-                    { n: "3", name: "Bull/Bear Debate",    detail: "Researcher debate" },
-                    { n: "4", name: "Trade Decision",      detail: "TraderAgent (Opus 4)" },
-                    { n: "5", name: "Risk Gate",           detail: "15 hard veto rules" },
-                    { n: "6", name: "Risk Check",          detail: "Kelly + exposure" },
-                    { n: "7", name: "Fund Manager",        detail: "Final approval" },
-                  ].map(({ n, name, detail }) => (
-                    <div key={n} className="flex items-center gap-1.5 mb-1">
-                      <div className="h-3.5 w-3.5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                        <span className="text-[7px] font-bold text-primary">{n}</span>
-                      </div>
-                      <span className="text-[10px] font-medium text-foreground leading-tight">{name}</span>
-                      <span className="text-[9px] text-muted-foreground/60 ml-auto">{detail}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Agent Scanner */}
-            <div className="border-t border-border">
-              <ScannerPanel />
-            </div>
-          </div>
-        </div>
+        {/* Right Pane (25% on desktop): 9-Agent Consensus Brain */}
+        <aside
+          className={cn(
+            "w-full lg:w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col",
+            mobileTab !== "agents" && "hidden lg:flex"
+          )}
+        >
+          <AgentConsensusHUD signal={selectedSignal} />
+        </aside>
       </div>
 
-      <UpgradeModal
-        isOpen={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
-        feature="Unlimited AI Analysis"
-        requiredTier="retail"
-        reason="Free accounts can run 2 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
-      />
+      {/* Upgrade Modal */}
+      {upgradeOpen && (
+        <UpgradeModal
+          isOpen={upgradeOpen}
+          onClose={() => setUpgradeOpen(false)}
+          feature="Pro Confluence Signals"
+          requiredTier="retail"
+        />
+      )}
     </div>
   );
 }
-
-const PLACEHOLDER_AGENTS: AgentStatus[] = [
-  { name: "FundamentalAnalyst",  role: "P/E, P/B, earnings momentum",    model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.2", "3.3"],            status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "TechnicalAnalyst",    role: "EMA, RSI, momentum, Z-score",    model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.1", "3.9", "3.11"],     status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "SentimentAnalyst",    role: "News NLP, social media",         model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["18.3"],                   status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "MacroAnalyst",        role: "GDP, CPI, Fed, carry",           model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["19.2", "8.2"],            status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "OrderFlowAnalyst",    role: "VPIN, bid/ask, dark pool",       model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["3.14", "3.15"],           status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "RegimeChangeAnalyst", role: "VIX, credit spreads, rotation",  model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["19.5"],                   status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "CorrelationAnalyst",  role: "Cross-asset, contagion, Kelly",  model: "claude-sonnet-4-6", tier: "standard", stage: "parallel", strategies: ["6.3", "6.5"],             status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "QuantAnalyst",        role: "Statistical edge validation",    model: "claude-sonnet-4-6", tier: "standard", stage: "quant",    strategies: ["3.17"],                   status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "RiskManager",         role: "Kelly, drawdown, correlation",   model: "claude-sonnet-4-6", tier: "standard", stage: "risk",     strategies: ["3.18", "6.5"],            status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "RiskGate",            role: "15 hard veto rules (no AI)",     model: "none",              tier: "system",   stage: "risk",     strategies: [],                          status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-  { name: "TraderAgent",         role: "Final decision & sizing",        model: "claude-opus-4-6",   tier: "premium",  stage: "decision", strategies: ["3.20"],                   status: "HEALTHY", avg_latency_ms: 0, signals_today: 0, accuracy_7d: null, last_active: new Date().toISOString() },
-];

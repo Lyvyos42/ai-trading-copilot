@@ -153,7 +153,8 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
       theme: "dark",
       style: "1",
       locale: "en",
-      backgroundColor: "#0a0a0a",
+      backgroundColor: "#080808",
+      gridColor: "rgba(255, 255, 255, 0.04)",
       hide_top_toolbar: false,
       hide_legend: false,
       hide_side_toolbar: false,
@@ -167,11 +168,7 @@ export function TradingViewChart({ ticker, interval = "1d", fillContainer }: Tra
     return () => {
       container.innerHTML = "";
     };
-  // Recreate the widget only when the TICKER changes.
-  // Interval is read from intervalRef at mount time; the TV widget has its own
-  // interval selector, so changing interval alone doesn't need a full recreate.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker]);
+  }, [ticker, interval]);
 
   return (
     <div
