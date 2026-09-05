@@ -41,6 +41,71 @@ A shared pipeline with `if asset_class == "futures"` branches would smear
 these differences across seven agents. A separate pipeline keeps the
 assumptions of each honest.
 
+## Solving the open-interest and curve problem — tested 2026-09-05
+
+The blocker was: Yahoo's free `=F` series gives no open interest and no term
+structure. Each candidate below was actually called, not assumed.
+
+| source | result | verdict |
+|---|---|---|
+| Yahoo individual contract months (`ESZ25.CME`, `CLF26.NYM`, `GCZ25.CMX`) | **no data** for every format tried; only the continuous `=F` resolves | no curve from Yahoo, confirmed |
+| CME Group settlements API | **HTTP 403** — "Use of scripts, software, spiders, robots... is strictly prohibited by CME Group's Data Terms of Use" | OFF THE TABLE. A legal prohibition, not a rate limit |
+| CFTC Commitments of Traders | **HTTP 200, 1.7 MB**, 9,502 rows, 191 columns including `Open_Interest_All` and `Change_in_Open_Interest_All`. Verified live: GOLD OI 415,196 and WTI CRUDE OI 767,357 as of report date 2026-09-01 | **USE THIS** — official, free, explicitly published, no key |
+
+### Recommendation
+
+**Open interest and positioning: CFTC COT.** Free, official, and legally
+unambiguous — it is published data, not scraped. Two files matter:
+`fut_disagg_txt_<year>.zip` for commodities (producer / swap / managed money)
+and `fut_fin_txt_<year>.zip` for financials (dealer / asset manager /
+leveraged funds). Weekly: Tuesday positions released Friday 15:30 ET.
+
+That cadence is the catch and it must shape the design. **A weekly figure
+cannot drive an intraday signal.** It is a positioning-extreme and
+crowding input — "managed money net long is at a two-year high" is a real,
+measurable, tradeable observation — not a scalping trigger. An agent built on
+it must state its own staleness, and abstain in the window before a release
+rather than pretend Tuesday's data describes Friday.
+
+**Term structure: still unsolved for free.** Ranked options:
+
+1. **Interactive Brokers API** — free with a funded account, gives the full
+   chain per contract with real OI and live quotes, and is entirely within
+   terms. Needs a running gateway process, which is real operational weight on
+   Render.
+2. **Databento** — paid, usage-based, clean licensed CME data, no scraping.
+   The straightforward answer if the futures page is meant to be commercial.
+3. **Barchart** free tier — limited symbols per day; workable for a handful of
+   contracts, not a universe.
+4. **tvDatafeed continuous contracts** (`ES1!`, `ES2!`, `ES3!`) would give the
+   curve directly — but it is an unofficial scraper of a service whose terms
+   forbid it, so it carries the same objection as CME. See the data-source
+   note below.
+
+**If none is adopted:** the futures pipeline should ship WITHOUT a term
+structure agent rather than inferring a curve from the front month. An
+inferred curve is exactly the class of fabrication this codebase spent two
+days removing.
+
+## A finding that affects the whole app, not just futures
+
+`tvDatafeed` is **not in `backend/requirements.txt`**, while `yfinance==0.2.48`
+is. `_get_tv_client()` swallowed the resulting ImportError with a bare
+`except Exception: pass`, so in production the client was always None,
+`_fetch_tvdatafeed` always returned None, and **every request fell through to
+yfinance**. TradingView was first in the fetch chain and never once ran.
+
+So every bar every agent has ever analysed came from Yahoo — while the price
+shown next to it came from TradingView's scanner API, which does work because
+it is a plain HTTP POST needing no package. Two different sources for the
+price and the analysis of it.
+
+That is now logged loudly on first failure, and `scripts/decision_report.py`
+prints which feed actually served each run. Before adding tvDatafeed as a
+dependency, note that it is an unofficial websocket scraper, TradingView's
+terms prohibit it, and it is as likely to be blocked from a datacentre IP as
+yfinance is.
+
 ## Decisions needed before building
 
 - **Data source.** Yahoo's `=F` continuous series is free but stitched and

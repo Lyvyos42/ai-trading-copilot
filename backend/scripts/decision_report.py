@@ -123,6 +123,20 @@ async def main() -> int:
             print("    WARNING: over 85% one direction. That is the signature of a")
             print("             structural bias, not a market view.")
 
+    # ── Which feed actually served the bars ──────────────────────────────────
+    print()
+    print("  DATA SOURCE  (which feed the agents actually analysed)")
+    for src, n in Counter(r.data_source or "?" for r in rows).most_common():
+        note = ""
+        if src == "yfinance":
+            note = "   <- Yahoo, not TradingView"
+        elif src == "unavailable":
+            note = "   <- no bars; these runs could not produce a signal"
+        print(f"    {src:<22}{n:5d}  {_pct(n, total)}{note}")
+    if not any((r.data_source or "").startswith("tradingview") for r in rows):
+        print("    No run used TradingView. If the fetch chain lists it first, it is")
+        print("    failing silently - check for tradingview_client_unavailable in the log.")
+
     # ── Analyst participation ────────────────────────────────────────────────
     print()
     print("  ANALYST PARTICIPATION")
