@@ -16,6 +16,8 @@ import {
   Terminal,
   Cpu,
   RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
@@ -59,7 +61,7 @@ export function AgentConsensusHUD({
   const matchingSignal =
     signal && signal.ticker.toUpperCase() === activeTicker.toUpperCase() ? signal : null;
 
-  // If no matching signal exists yet for this ticker, render the 2027 Active Neural Deliberation Scanner
+  // If no matching signal exists yet for this ticker, render the Active Neural Deliberation Scanner
   if (!matchingSignal) {
     return (
       <div className="flex flex-col h-full bg-surface-1 border-l border-border/40 p-4 justify-between overflow-y-auto">
@@ -72,14 +74,13 @@ export function AgentConsensusHUD({
                 9-AGENT AI BRAIN
               </span>
             </div>
-            <span className="text-[12px] font-mono px-1.5 py-0.2 rounded border border-primary/30 bg-primary/10 text-primary uppercase">
+            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary uppercase">
               STANDBY
             </span>
           </div>
 
-          {/* 2027 Futuristic Deliberation Scanner Matrix */}
+          {/* Deliberation Scanner Matrix */}
           <div className="p-4 rounded-md border border-border/60 bg-surface-2/40 text-center relative overflow-hidden">
-            {/* Animated SVG Radial Radar Rings */}
             <div className="relative w-28 h-28 mx-auto my-2 flex items-center justify-center">
               <svg className="w-full h-full animate-spin" style={{ animationDuration: "12s" }} viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 6" className="text-primary/30" />
@@ -94,7 +95,7 @@ export function AgentConsensusHUD({
             <div className="text-xs font-mono font-bold text-foreground mb-1">
               NEURAL CONSENSUS READY
             </div>
-            <p className="text-[12px] font-mono text-muted-foreground leading-relaxed max-w-xs mx-auto mb-3">
+            <p className="text-[11px] font-mono text-muted-foreground leading-relaxed max-w-xs mx-auto mb-3">
               No precomputed signal dossier cached for <strong className="text-primary">{activeTicker}</strong>. Initialize 9-agent consensus to evaluate CVD order flow, macro yield spread, and quantitative Z-scores.
             </p>
 
@@ -117,10 +118,10 @@ export function AgentConsensusHUD({
 
           {/* Institutional Telemetry Blueprint */}
           <div className="space-y-2">
-            <div className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">
+            <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
               Autonomous Deliberation Protocol
             </div>
-            <div className="space-y-1 text-[12px] font-mono">
+            <div className="space-y-1 text-[11px] font-mono">
               <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
                 <span className="text-muted-foreground">Technical & Momentum</span>
                 <span className="text-primary/70">15m Breakouts</span>
@@ -146,7 +147,7 @@ export function AgentConsensusHUD({
         </div>
 
         <div className="pt-3 border-t border-border/40 text-center">
-          <span className="text-[12px] font-mono text-muted-foreground">
+          <span className="text-[11px] font-mono text-muted-foreground">
             Zero-Fabrication Quantitative Architecture
           </span>
         </div>
@@ -155,11 +156,231 @@ export function AgentConsensusHUD({
   }
 
   const isNoSignal = matchingSignal.status === "NO_SIGNAL" || matchingSignal.direction === "NEUTRAL";
+
+  // Parse actual agent vote stances
+  const longVotes: string[] = [];
+  const shortVotes: string[] = [];
+  const abstainedAgents: { name: string; role: string; color: string }[] = [];
+
+  AGENTS.forEach((agent) => {
+    const raw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
+    if (raw && typeof raw === "object") {
+      const v = raw as { direction?: string; confidence?: number; abstained?: boolean };
+      if (!v.abstained && v.direction === "LONG") {
+        longVotes.push(`${agent.name} (${v.confidence ? Math.round(v.confidence * 100) : 50}%)`);
+      } else if (!v.abstained && v.direction === "SHORT") {
+        shortVotes.push(`${agent.name} (${v.confidence ? Math.round(v.confidence * 100) : 50}%)`);
+      } else {
+        abstainedAgents.push({ name: agent.name, role: agent.role, color: agent.color });
+      }
+    } else {
+      abstainedAgents.push({ name: agent.name, role: agent.role, color: agent.color });
+    }
+  });
+
+  // ── FIRST-CLASS ABSTENTION LAYOUT (Replacing lie-shaped dial and empty bars) ──
+  if (isNoSignal) {
+    return (
+      <div className="flex flex-col h-full bg-surface-1 border-l border-border/40 overflow-hidden select-none">
+        {/* Section 1: Disciplined Abstention Header */}
+        <div className="p-3 border-b border-border/40 bg-surface-2/40 shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-warn" />
+              <span className="text-[12px] font-mono font-bold tracking-wider text-foreground">
+                9-AGENT CONSENSUS
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase border bg-warn/10 text-warn border-warn/30">
+              DISCIPLINED ABSTENTION
+            </span>
+          </div>
+
+          {/* Consensus Gatekeeper Card */}
+          <div className="p-3 rounded border border-border/60 bg-surface-0 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-warn animate-pulse" />
+                <span className="text-xs font-mono font-bold text-foreground">
+                  DESK DECLINED TO TRADE
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-muted-foreground font-bold">
+                ALLOCATION: 0.0%
+              </span>
+            </div>
+
+            {/* Directional Vote Breakdown Matrix */}
+            <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px] text-center">
+              <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
+                <span className="block text-muted-foreground text-[11px]">BULL VOTES</span>
+                <span className={cn("text-xs font-bold", longVotes.length > 0 ? "text-bull" : "text-muted-foreground")}>
+                  {longVotes.length}
+                </span>
+              </div>
+              <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
+                <span className="block text-muted-foreground text-[11px]">BEAR VOTES</span>
+                <span className={cn("text-xs font-bold", shortVotes.length > 0 ? "text-bear" : "text-muted-foreground")}>
+                  {shortVotes.length}
+                </span>
+              </div>
+              <div className="p-1.5 rounded bg-surface-2/80 border border-border/30">
+                <span className="block text-muted-foreground text-[11px]">ABSTAINED</span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  {abstainedAgents.length} / {AGENTS.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Gate Rule Specification */}
+            <div className="text-[11px] font-mono text-muted-foreground border-t border-border/30 pt-1.5 flex items-center justify-between">
+              <span>HURDLE CRITERION:</span>
+              <span className="text-foreground font-semibold">≥2 CONCORDANT VOTES (CONVICTION ≥55%)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Composed Capital Preservation Statement */}
+        <div className="px-3 py-2.5 border-b border-border/40 bg-surface-1/90 space-y-2 shrink-0">
+          <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+            <span>PIPELINE TRUTH OBSERVATION</span>
+            <span className="text-warn text-[11px] font-bold">CAPITAL PRESERVED</span>
+          </div>
+
+          <div className="space-y-1.5 text-[11px] font-mono leading-relaxed">
+            {/* Primary pipeline reason */}
+            <div className="p-2 rounded bg-surface-2/60 border border-border/40 text-foreground/90 font-medium">
+              {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0
+                ? matchingSignal.status_reasons[0]
+                : "Fewer than 2 directional votes from specialist analysts; consensus withheld to protect portfolio risk limits."}
+            </div>
+
+            {/* Secondary reasons or detailed agent notes */}
+            {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 1 && (
+              <div className="space-y-1">
+                {matchingSignal.status_reasons.slice(1).map((r, i) => (
+                  <div key={i} className="text-[11px] text-muted-foreground pl-1.5 border-l-2 border-border/60">
+                    • {r}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* What unlocks the trade */}
+            <div className="p-2 rounded bg-surface-0 border border-border/30 text-[11px] text-muted-foreground">
+              <span className="text-primary font-bold mr-1">WHAT UNLOCKS A TRADE:</span>
+              {longVotes.length > 0
+                ? `A second confirming specialist aligned with ${longVotes.join(", ")} reaching conviction ≥ 55%.`
+                : shortVotes.length > 0
+                ? `A second confirming specialist aligned with ${shortVotes.join(", ")} reaching conviction ≥ 55%.`
+                : `A directional catalyst producing statistical Z-score divergence or CVD order book imbalance.`}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Live Bull vs Bear Debate Terminal */}
+        <div className="flex-1 flex flex-col min-h-0 border-b border-border/40 overflow-hidden">
+          <div
+            onClick={() => setDebaterOpen(!debaterOpen)}
+            className="px-3 py-1.5 bg-surface-2/60 border-b border-border/30 flex items-center justify-between cursor-pointer hover:bg-surface-2 transition-colors shrink-0"
+          >
+            <div className="flex items-center gap-1.5">
+              <Terminal className="h-3 w-3 text-primary" />
+              <span className="text-[11px] font-mono font-bold text-foreground tracking-wider uppercase">
+                DEBATE TRANSCRIPT & REASONING
+              </span>
+            </div>
+            {debaterOpen ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+          </div>
+
+          {debaterOpen && (
+            <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[11px] leading-relaxed">
+              {matchingSignal.reasoning_chain && matchingSignal.reasoning_chain.length > 0 ? (
+                matchingSignal.reasoning_chain.map((chain, i) => (
+                  <div key={i} className="p-1.5 rounded bg-surface-1/80 border border-border/30">
+                    <span className="text-primary font-bold mr-1.5">[STAGE_{i + 1}]</span>
+                    <span className="text-muted-foreground">{chain}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="p-1.5 rounded bg-surface-1/80 border border-border/30 text-muted-foreground">
+                  Specialist analysts abstained from publishing directional conviction due to conflicting momentum and neutral macro indicators.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Section 4: Specialist Analyst Roster */}
+        <div className="shrink-0 bg-surface-2/40">
+          <button
+            onClick={() => setRosterOpen(!rosterOpen)}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
+          >
+            <span>SPECIALIST ANALYST ROSTER ({AGENTS.length} AGENTS)</span>
+            {rosterOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+
+          {rosterOpen && (
+            <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[11px]">
+              {AGENTS.map((agent) => {
+                const voteRaw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
+                let direction = "ABSTAINED";
+                let confidence = 0;
+                if (voteRaw && typeof voteRaw === "object") {
+                  const v = voteRaw as { direction?: string; confidence?: number; abstained?: boolean };
+                  if (!v.abstained && v.direction && v.direction !== "NEUTRAL") {
+                    direction = v.direction.toUpperCase();
+                    confidence = v.confidence || 0;
+                  }
+                }
+
+                return (
+                  <div
+                    key={agent.key}
+                    className="flex items-center justify-between p-1 rounded bg-surface-1 border border-border/30"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: agent.color }}
+                      />
+                      <span className="font-bold text-foreground">{agent.name}</span>
+                      <span className="text-muted-foreground">({agent.role})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "px-1 py-0.5 rounded font-bold uppercase text-[10px]",
+                          direction === "LONG"
+                            ? "bg-bull/10 text-bull"
+                            : direction === "SHORT"
+                            ? "bg-bear/10 text-bear"
+                            : "bg-surface-3 text-muted-foreground"
+                        )}
+                      >
+                        {direction}
+                      </span>
+                      <span className="text-muted-foreground font-bold text-[11px]">
+                        {confidence > 0 ? `${(confidence * 100).toFixed(0)}%` : "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── ACTIVE SIGNAL DIRECTIONAL DOSSIER (Rendered ONLY when genuine edge exists) ──
   const prob = Math.round(matchingSignal.probability_score ?? matchingSignal.confidence_score ?? 50);
   const isBull = matchingSignal.direction === "LONG";
   const isBear = matchingSignal.direction === "SHORT";
-  const bullPct = isNoSignal ? 0 : matchingSignal.bullish_pct ?? prob;
-  const bearPct = isNoSignal ? 0 : matchingSignal.bearish_pct ?? 100 - bullPct;
+  const bullPct = matchingSignal.bullish_pct ?? prob;
+  const bearPct = matchingSignal.bearish_pct ?? 100 - bullPct;
 
   // SVG Radial Gauge Calculations
   const radius = 48;
@@ -168,11 +389,11 @@ export function AgentConsensusHUD({
 
   // 5 Institutional Telemetry Pillars
   const pillars = [
-    { label: "Technical", value: isNoSignal ? 0 : Math.min(95, Math.max(20, prob + 2)), color: "#f59e0b" },
-    { label: "Quant", value: isNoSignal ? 0 : Math.min(95, Math.max(20, prob - 3)), color: "#3b82f6" },
-    { label: "Macro", value: isNoSignal ? 0 : Math.min(90, Math.max(20, prob - 10)), color: "#D4A240" },
-    { label: "Order Flow", value: isNoSignal ? 0 : Math.min(95, Math.max(20, prob - 6)), color: "#ec4899" },
-    { label: "Regime", value: isNoSignal ? 0 : Math.min(95, Math.max(20, prob + 1)), color: "#8b5cf6" },
+    { label: "Technical", value: Math.min(95, Math.max(20, prob + 2)), color: "#f59e0b" },
+    { label: "Quant", value: Math.min(95, Math.max(20, prob - 3)), color: "#3b82f6" },
+    { label: "Macro", value: Math.min(90, Math.max(20, prob - 10)), color: "#D4A240" },
+    { label: "Order Flow", value: Math.min(95, Math.max(20, prob - 6)), color: "#ec4899" },
+    { label: "Regime", value: Math.min(95, Math.max(20, prob + 1)), color: "#8b5cf6" },
   ];
 
   return (
@@ -188,23 +409,20 @@ export function AgentConsensusHUD({
           </div>
           <span
             className={cn(
-              "px-2 py-0.5 rounded text-[12px] font-mono font-bold uppercase border",
-              isNoSignal
-                ? "bg-surface-3 text-muted-foreground border-border"
-                : isBull
+              "px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase border",
+              isBull
                 ? "bg-bull/15 text-bull border-bull/30"
                 : "bg-bear/15 text-bear border-bear/30"
             )}
           >
-            {isNoSignal ? "NO CLEAR EDGE" : `${matchingSignal.direction} @ ${prob}%`}
+            {matchingSignal.direction} @ {prob}%
           </span>
         </div>
 
-        {/* 2027 Circular Glowing Radial Dial */}
+        {/* Circular Glowing Radial Dial */}
         <div className="flex items-center justify-center my-2 relative">
           <div className="relative w-32 h-32 flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-              {/* Background Ring */}
               <circle
                 cx="60"
                 cy="60"
@@ -213,12 +431,11 @@ export function AgentConsensusHUD({
                 strokeWidth="8"
                 fill="transparent"
               />
-              {/* Glowing Progress Arc */}
               <circle
                 cx="60"
                 cy="60"
                 r={radius}
-                stroke={isBull ? "#22c55e" : isBear ? "#ef4444" : "#D4A240"}
+                stroke={isBull ? "#22c55e" : "#ef4444"}
                 strokeWidth="8"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
@@ -226,7 +443,7 @@ export function AgentConsensusHUD({
                 fill="transparent"
                 className="transition-all duration-1000 ease-out"
                 style={{
-                  filter: `drop-shadow(0 0 6px ${isBull ? "#22c55e" : isBear ? "#ef4444" : "#D4A240"}80)`,
+                  filter: `drop-shadow(0 0 6px ${isBull ? "#22c55e" : "#ef4444"}80)`,
                 }}
               />
             </svg>
@@ -234,42 +451,38 @@ export function AgentConsensusHUD({
             {/* Dial Center Info */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-2xl font-mono font-extrabold text-foreground tracking-tight">
-                {isNoSignal ? "—" : `${prob}%`}
+                {prob}%
               </span>
-              <div className="flex items-center gap-1 text-[12px] font-mono font-bold">
+              <div className="flex items-center gap-1 text-[11px] font-mono font-bold">
                 {isBull ? (
                   <TrendingUp className="h-3 w-3 text-bull" />
-                ) : isBear ? (
-                  <TrendingDown className="h-3 w-3 text-bear" />
                 ) : (
-                  <Scale className="h-3 w-3 text-muted-foreground" />
+                  <TrendingDown className="h-3 w-3 text-bear" />
                 )}
-                <span className={isBull ? "text-bull" : isBear ? "text-bear" : "text-muted-foreground"}>
-                  {isNoSignal ? "NEUTRAL" : isBull ? "BULLISH" : "BEARISH"}
+                <span className={isBull ? "text-bull" : "text-bear"}>
+                  {isBull ? "BULLISH EDGE" : "BEARISH EDGE"}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="text-center text-[12px] font-mono text-muted-foreground">
-          {isNoSignal
-            ? "Specialists abstained due to conflicting signals"
-            : `AI_CONSENSUS_${matchingSignal.direction}: ${prob}% CONFLUENCE`}
+        <div className="text-center text-[11px] font-mono text-muted-foreground">
+          AI_CONSENSUS_{matchingSignal.direction}: {prob}% CONFLUENCE
         </div>
       </div>
 
-      {/* 2027 Section 2: Neon Telemetry Meters */}
+      {/* Analytical Telemetry Meters */}
       <div className="px-3 py-2 border-b border-border/40 bg-surface-1/90 space-y-1.5 shrink-0">
-        <div className="text-[12px] font-mono text-muted-foreground uppercase tracking-widest">
+        <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
           Neon Analytical Telemetry
         </div>
         <div className="space-y-1.5">
           {pillars.map((pillar) => (
             <div key={pillar.label} className="space-y-0.5">
-              <div className="flex items-center justify-between text-[12px] font-mono">
+              <div className="flex items-center justify-between text-[11px] font-mono">
                 <span className="text-muted-foreground">{pillar.label}</span>
-                <span className="font-bold text-foreground">{pillar.value > 0 ? `${pillar.value}%` : "—"}</span>
+                <span className="font-bold text-foreground">{pillar.value}%</span>
               </div>
               <div className="h-1.5 w-full bg-surface-3 rounded-full overflow-hidden">
                 <div
@@ -286,7 +499,7 @@ export function AgentConsensusHUD({
         </div>
       </div>
 
-      {/* 2027 Section 3: Live Bull vs Bear Debate Terminal */}
+      {/* Live Bull vs Bear Debate Terminal */}
       <div className="flex-1 flex flex-col min-h-0 border-b border-border/40 overflow-hidden">
         <div
           onClick={() => setDebaterOpen(!debaterOpen)}
@@ -294,7 +507,7 @@ export function AgentConsensusHUD({
         >
           <div className="flex items-center gap-1.5">
             <Terminal className="h-3 w-3 text-primary" />
-            <span className="text-[12px] font-mono font-bold text-foreground tracking-wider uppercase">
+            <span className="text-[11px] font-mono font-bold text-foreground tracking-wider uppercase">
               LIVE BULL vs BEAR DEBATE TERMINAL
             </span>
           </div>
@@ -302,7 +515,7 @@ export function AgentConsensusHUD({
         </div>
 
         {debaterOpen && (
-          <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[12px] leading-relaxed">
+          <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[11px] leading-relaxed">
             {matchingSignal.reasoning_chain && matchingSignal.reasoning_chain.length > 0 ? (
               matchingSignal.reasoning_chain.map((chain, i) => (
                 <div key={i} className="p-1.5 rounded bg-surface-1/80 border border-border/30">
@@ -341,11 +554,11 @@ export function AgentConsensusHUD({
 
             {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0 && (
               <div className="mt-2 p-1.5 rounded border border-warn/30 bg-warn/5 space-y-0.5">
-                <div className="text-[12px] font-bold text-warn flex items-center gap-1">
-                  <AlertCircle className="h-2.5 w-2.5" /> PIPELINE TRUTH OBSERVATIONS
+                <div className="text-[11px] font-bold text-warn flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> PIPELINE TRUTH OBSERVATIONS
                 </div>
                 {matchingSignal.status_reasons.map((r, i) => (
-                  <div key={i} className="text-[12px] text-warn/90">• {r}</div>
+                  <div key={i} className="text-[11px] text-warn/90">• {r}</div>
                 ))}
               </div>
             )}
@@ -353,18 +566,18 @@ export function AgentConsensusHUD({
         )}
       </div>
 
-      {/* 2027 Section 4: Specialist Analyst Roster Toggle */}
+      {/* Specialist Analyst Roster */}
       <div className="shrink-0 bg-surface-2/40">
         <button
           onClick={() => setRosterOpen(!rosterOpen)}
-          className="w-full px-3 py-1.5 flex items-center justify-between text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
+          className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
         >
           <span>SPECIALIST ANALYST ROSTER ({AGENTS.length} AGENTS)</span>
           {rosterOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
 
         {rosterOpen && (
-          <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[12px]">
+          <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[11px]">
             {AGENTS.map((agent) => {
               const voteRaw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
               let direction = "ABSTAINED";
@@ -393,7 +606,7 @@ export function AgentConsensusHUD({
                   <div className="flex items-center gap-1.5">
                     <span
                       className={cn(
-                        "px-1 py-0.2 rounded font-bold uppercase",
+                        "px-1 py-0.5 rounded font-bold uppercase text-[10px]",
                         direction === "LONG"
                           ? "bg-bull/10 text-bull"
                           : direction === "SHORT"
