@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Target,
   ArrowUpRight,
@@ -12,12 +12,19 @@ import {
   Sparkles,
   TrendingUp,
   TrendingDown,
+  Plus,
+  X,
+  Search,
+  Zap,
+  Activity,
+  Play,
 } from "lucide-react";
 import { cn, formatPrice, formatPct, formatPositionSize } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
 
 interface TradingCanvasHUDProps {
   ticker: string;
+  onSelectTicker: (ticker: string) => void;
   signal: Signal | null;
   activeInterval: string;
   onIntervalChange: (interval: string) => void;
@@ -25,12 +32,32 @@ interface TradingCanvasHUDProps {
   onToggle3D: () => void;
   onAdoptSignal?: (signal: Signal) => void;
   isAdopted?: boolean;
+  onExecutePaperTrade?: (signal: Signal) => void;
+  onGenerate?: (ticker: string) => void;
+  analyzing?: boolean;
 }
 
-const INTERVALS = ["5m", "15m", "1h", "4h", "1d"];
+const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
+
+const DEFAULT_PINNED = ["AAPL", "BTC-USD", "NVDA", "XAUUSD", "EURUSD=X", "TSLA", "US500"];
+
+const ASSET_SUGGESTIONS = [
+  { ticker: "BTC-USD", name: "Bitcoin / USD", category: "crypto" },
+  { ticker: "ETH-USD", name: "Ethereum / USD", category: "crypto" },
+  { ticker: "SOL-USD", name: "Solana / USD", category: "crypto" },
+  { ticker: "NVDA", name: "NVIDIA Corp", category: "stocks" },
+  { ticker: "AAPL", name: "Apple Inc", category: "stocks" },
+  { ticker: "MSFT", name: "Microsoft Corp", category: "stocks" },
+  { ticker: "TSLA", name: "Tesla Inc", category: "stocks" },
+  { ticker: "XAUUSD", name: "Gold Spot / USD", category: "commodities" },
+  { ticker: "EURUSD=X", name: "EUR / USD Spot", category: "forex" },
+  { ticker: "USDJPY=X", name: "USD / JPY Spot", category: "forex" },
+  { ticker: "US500", name: "S&P 500 Index", category: "indices" },
+];
 
 export function TradingCanvasHUD({
   ticker,
+  onSelectTicker,
   signal,
   activeInterval,
   onIntervalChange,
@@ -38,47 +65,78 @@ export function TradingCanvasHUD({
   onToggle3D,
   onAdoptSignal,
   isAdopted = false,
+  onExecutePaperTrade,
+  onGenerate,
+  analyzing = false,
 }: TradingCanvasHUDProps) {
   const [copied, setCopied] = useState(false);
+  const [pinnedTabs, setPinnedTabs] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("cockpit_pinned_tabs");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return DEFAULT_PINNED;
+  });
 
-  if (!signal) {
-    return (
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/40 bg-surface-1/60 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono font-bold text-foreground">{ticker}</span>
-          <span className="text-[10px] font-mono text-muted-foreground">MONITORING MARKET</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {INTERVALS.map((inv) => (
-            <button
-              key={inv}
-              onClick={() => onIntervalChange(inv)}
-              className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-mono transition-colors",
-                activeInterval === inv
-                  ? "bg-primary text-primary-foreground font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-              )}
-            >
-              {inv.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Save pinned tabs to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("cockpit_pinned_tabs", JSON.stringify(pinnedTabs));
+    }
+  }, [pinnedTabs]);
+
+  // Ensure current active ticker is present in pinned tabs
+  useEffect(() => {
+    if (ticker && !pinnedTabs.includes(ticker)) {
+      setPinnedTabs((prev) => [...prev, ticker]);
+    }
+  }, [ticker, pinnedTabs]);
+
+  // Focus input on search open
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [searchOpen]);
+
+  function handleSelectSymbol(sym: string) {
+    const cleanSym = sym.trim().toUpperCase();
+    if (!cleanSym) return;
+    if (!pinnedTabs.includes(cleanSym)) {
+      setPinnedTabs((prev) => [...prev, cleanSym]);
+    }
+    onSelectTicker(cleanSym);
+    setSearchOpen(false);
+    setSearchQuery("");
   }
 
-  const isNoSignal = signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
-  const isShort = signal.direction === "SHORT";
-  const entry = signal.entry_price || signal.current_price;
-  const target = signal.research_target || signal.take_profit_1;
-  const inval = signal.invalidation_level || signal.stop_loss;
-  const spot = signal.current_price || entry;
+  function handleRemoveTab(e: React.MouseEvent, tab: string) {
+    e.stopPropagation();
+    if (pinnedTabs.length <= 1) return;
+    const remaining = pinnedTabs.filter((t) => t !== tab);
+    setPinnedTabs(remaining);
+    if (ticker === tab) {
+      onSelectTicker(remaining[0]);
+    }
+  }
 
-  // Price Journey calculation:
-  // If Long: 0% at Invalidation, Entry at mid, 100% at Target.
-  // If Short: 0% at Invalidation, Entry at mid, 100% at Target.
-  let journeyPct = 0;
+  const isNoSignal = !signal || signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
+  const isShort = signal?.direction === "SHORT";
+  const entry = signal?.entry_price || signal?.current_price || null;
+  const target = signal?.research_target || signal?.take_profit_1 || null;
+  const inval = signal?.invalidation_level || signal?.stop_loss || null;
+  const spot = signal?.current_price || entry;
+
+  let journeyPct = 50;
   if (entry && target && inval && spot) {
     if (isShort) {
       const totalDist = inval - target;
@@ -93,7 +151,6 @@ export function TradingCanvasHUD({
     }
   }
 
-  // Deltas
   const targetDelta =
     target && entry && entry > 0
       ? isShort
@@ -109,189 +166,305 @@ export function TradingCanvasHUD({
       : null;
 
   const handleCopy = () => {
+    if (!signal) return;
     const text = `${signal.ticker} ${signal.direction}\nEntry: ${entry || "Market"}\nTarget: ${target || "—"}\nInvalidation: ${inval || "—"}\nR:R: ${signal.risk_reward_ratio || "—"}\nSize: ${formatPositionSize(signal.position_size_pct)}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const filteredSuggestions = ASSET_SUGGESTIONS.filter(
+    (s) =>
+      s.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="border-b border-border/40 bg-surface-1/90 backdrop-blur-md px-3 py-2">
-      {/* Top row: Symbol, Timeframe pills, Action buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-base font-mono font-bold text-foreground tracking-tight">
-            {signal.ticker}
+    <div className="border-b border-border/40 bg-surface-1/95 backdrop-blur-md flex flex-col z-20 shrink-0">
+      {/* 2027 ROW 1: Interactive Multi-Asset Ribbon & Timeframes */}
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border/30 gap-2 overflow-x-auto scrollbar-none">
+        {/* Left: Ticker Switcher Ribbon Tabs */}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[9px] font-mono text-muted-foreground uppercase mr-1 hidden sm:inline">
+            WATCHLIST:
           </span>
-          <span
-            className={cn(
-              "px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase",
-              signal.direction === "LONG"
-                ? "bg-bull/15 text-bull border border-bull/30"
-                : signal.direction === "SHORT"
-                ? "bg-bear/15 text-bear border border-bear/30"
-                : "bg-muted text-muted-foreground border border-border"
-            )}
-          >
-            {signal.direction}
-          </span>
-          <span className="text-[10px] font-mono text-muted-foreground border border-border/40 px-1.5 py-0.5 rounded uppercase">
-            {signal.asset_class}
-          </span>
-          {signal.analytical_window && (
-            <span className="text-[10px] font-mono text-primary/80 border border-primary/20 px-1.5 py-0.5 rounded">
-              {signal.analytical_window}
-            </span>
-          )}
-        </div>
 
-        {/* Center: Timeframe selector */}
-        <div className="flex items-center gap-1 bg-surface-2 p-0.5 rounded border border-border/40">
-          {INTERVALS.map((inv) => (
+          {pinnedTabs.map((sym) => {
+            const isActive = ticker === sym;
+            return (
+              <div
+                key={sym}
+                onClick={() => onSelectTicker(sym)}
+                className={cn(
+                  "group flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer text-xs font-mono transition-all border",
+                  isActive
+                    ? "bg-primary/15 text-primary border-primary font-bold shadow-[0_0_10px_rgba(212,162,64,0.15)]"
+                    : "bg-surface-2/60 text-muted-foreground border-border/40 hover:text-foreground hover:bg-surface-3"
+                )}
+              >
+                <span>{sym}</span>
+                {pinnedTabs.length > 1 && (
+                  <button
+                    onClick={(e) => handleRemoveTab(e, sym)}
+                    className="opacity-0 group-hover:opacity-100 hover:text-bear transition-opacity p-0.5"
+                    title={`Close ${sym}`}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add Symbol / Search Dialog Button */}
+          <div className="relative">
             <button
-              key={inv}
-              onClick={() => onIntervalChange(inv)}
+              onClick={() => setSearchOpen(!searchOpen)}
               className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-mono transition-colors",
-                activeInterval === inv
-                  ? "bg-primary text-primary-foreground font-bold shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                "flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono border transition-colors",
+                searchOpen
+                  ? "bg-primary text-primary-foreground border-primary font-bold"
+                  : "bg-surface-2 text-muted-foreground border-border/40 hover:text-foreground hover:bg-surface-3"
               )}
+              title="Add or Switch Symbol"
             >
-              {inv.toUpperCase()}
+              <Plus className="h-3 w-3" />
+              <span className="text-[10px] font-bold">ADD SYMBOL</span>
             </button>
-          ))}
+
+            {/* Fast Symbol Search Palette Dropdown */}
+            {searchOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-72 rounded-md border border-border/80 bg-surface-3 shadow-2xl p-2 z-50 animate-fade-in">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-1 border border-border/50 mb-2">
+                  <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && searchQuery.trim()) {
+                        handleSelectSymbol(searchQuery.trim());
+                      } else if (e.key === "Escape") {
+                        setSearchOpen(false);
+                      }
+                    }}
+                    placeholder="Search ticker (e.g. BTC, NVDA, EURUSD)..."
+                    className="w-full bg-transparent text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-[9px] font-mono text-muted-foreground uppercase px-1 pb-1 border-b border-border/30 mb-1">
+                  Institutional Instruments
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                  {filteredSuggestions.length > 0 ? (
+                    filteredSuggestions.map((item) => (
+                      <button
+                        key={item.ticker}
+                        onClick={() => handleSelectSymbol(item.ticker)}
+                        className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs font-mono text-left hover:bg-surface-1 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-foreground">{item.ticker}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                            {item.name}
+                          </span>
+                        </div>
+                        <span className="text-[9px] px-1 py-0.2 rounded border border-border/40 bg-surface-2 text-muted-foreground uppercase">
+                          {item.category}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <button
+                      onClick={() => handleSelectSymbol(searchQuery)}
+                      className="w-full text-center py-2 text-xs font-mono text-primary hover:underline"
+                    >
+                      Load custom symbol: <strong>{searchQuery.toUpperCase()}</strong>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1.5">
+        {/* Right: Timeframe Interval Pills & 3D Order Flow Toggle */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-0.5 bg-surface-2 p-0.5 rounded border border-border/40">
+            {INTERVALS.map((inv) => (
+              <button
+                key={inv}
+                onClick={() => onIntervalChange(inv)}
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors",
+                  activeInterval === inv
+                    ? "bg-primary text-primary-foreground font-bold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {inv.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={onToggle3D}
             className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border transition-colors",
+              "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border transition-colors",
               show3D
                 ? "bg-primary text-primary-foreground font-bold border-primary"
                 : "border-border/40 hover:bg-surface-2 text-muted-foreground"
             )}
           >
             <Layers className="h-3 w-3" />
-            <span>ORDER FLOW 3D</span>
+            <span className="hidden sm:inline">ORDER FLOW 3D</span>
           </button>
+        </div>
+      </div>
 
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border border-border/40 hover:bg-surface-2 text-muted-foreground transition-colors"
-          >
-            {copied ? <Check className="h-3 w-3 text-bull" /> : <Copy className="h-3 w-3" />}
-            <span>{copied ? "COPIED" : "COPY LEVELS"}</span>
-          </button>
-
-          {onAdoptSignal && (
-            <button
-              onClick={() => onAdoptSignal(signal)}
-              disabled={isAdopted}
+      {/* 2027 ROW 2: Floating Glassmorphic Telemetry HUD & Target Rays */}
+      <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+        {/* Left Telemetry Cluster */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-base font-mono font-bold text-foreground tracking-tight">
+              {ticker}
+            </span>
+            <span
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
-                isAdopted
-                  ? "bg-bull/10 text-bull border-bull/30"
-                  : "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                "px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border",
+                signal && signal.direction === "LONG"
+                  ? "bg-bull/15 text-bull border-bull/30"
+                  : signal && signal.direction === "SHORT"
+                  ? "bg-bear/15 text-bear border-bear/30"
+                  : "bg-surface-2 text-muted-foreground border-border/40"
               )}
             >
-              <Sparkles className="h-3 w-3" />
-              <span>{isAdopted ? "TRACKING ACTIVE" : "ADOPT SIGNAL"}</span>
+              {signal ? signal.direction : "MONITORING"}
+            </span>
+            {signal?.asset_class && (
+              <span className="text-[9px] font-mono text-muted-foreground border border-border/40 px-1 py-0.2 rounded uppercase">
+                {signal.asset_class}
+              </span>
+            )}
+          </div>
+
+          {/* Key Floating Telemetry Chips */}
+          <div className="hidden lg:flex items-center gap-1.5 pl-2 border-l border-border/40">
+            <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono">
+              <span className="text-muted-foreground">ENTRY: </span>
+              <span className="font-bold text-foreground">{formatPrice(entry, ticker)}</span>
+            </div>
+
+            {target && (
+              <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
+                <Target className="h-2.5 w-2.5" />
+                <span>TP: {formatPrice(target, ticker)}</span>
+                {targetDelta !== null && (
+                  <span className="font-bold">({targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%)</span>
+                )}
+              </div>
+            )}
+
+            {inval && (
+              <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
+                <Shield className="h-2.5 w-2.5" />
+                <span>SL: {formatPrice(inval, ticker)}</span>
+                {invalDelta !== null && (
+                  <span className="font-bold">({invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%)</span>
+                )}
+              </div>
+            )}
+
+            {signal?.risk_reward_ratio && signal.risk_reward_ratio > 0 && (
+              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono text-primary font-bold">
+                R:R {signal.risk_reward_ratio.toFixed(1)}:1
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Action Cluster */}
+        <div className="flex items-center gap-1.5">
+          {onGenerate && (
+            <button
+              onClick={() => onGenerate(ticker)}
+              disabled={analyzing}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono font-bold border transition-colors",
+                analyzing
+                  ? "bg-primary/10 text-primary border-primary/30 cursor-wait animate-pulse"
+                  : "bg-primary text-primary-foreground border-primary hover:bg-primary/90 shadow-sm"
+              )}
+            >
+              <Zap className="h-3 w-3" />
+              <span>{analyzing ? "DELIBERATING..." : "ANALYZE NOW"}</span>
             </button>
+          )}
+
+          {signal && !isNoSignal && (
+            <>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border border-border/40 hover:bg-surface-2 text-muted-foreground transition-colors"
+                title="Copy Trade Blueprint"
+              >
+                {copied ? <Check className="h-3 w-3 text-bull" /> : <Copy className="h-3 w-3" />}
+                <span className="hidden sm:inline">{copied ? "COPIED" : "COPY PLAN"}</span>
+              </button>
+
+              {onAdoptSignal && (
+                <button
+                  onClick={() => onAdoptSignal(signal)}
+                  disabled={isAdopted}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
+                    isAdopted
+                      ? "bg-bull/10 text-bull border-bull/30"
+                      : "bg-surface-2 text-muted-foreground border-border/40 hover:text-foreground"
+                  )}
+                  title="Adopt to My Desk Watchlist"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span className="hidden sm:inline">{isAdopted ? "TRACKED" : "ADOPT"}</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Floating Level Projections & Price Journey Bar (only if tradeable signal) */}
-      {!isNoSignal && (
-        <div className="space-y-2 pt-1 border-t border-border/30">
-          {/* Level Cards Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <div className="p-1.5 rounded border border-border/40 bg-surface-2 text-center">
-              <div className="text-[9px] font-mono text-muted-foreground">ENTRY LEVEL</div>
-              <div className="text-xs font-mono font-bold text-foreground">
-                {formatPrice(entry, signal.ticker)}
-              </div>
-            </div>
-
-            <div className="p-1.5 rounded border border-bull/30 bg-bull/5 text-center">
-              <div className="text-[9px] font-mono text-bull flex items-center justify-center gap-0.5">
-                <ArrowUpRight className="h-2.5 w-2.5" /> TARGET
-              </div>
-              <div className="text-xs font-mono font-bold text-bull">
-                {formatPrice(target, signal.ticker)}
-              </div>
-              {targetDelta !== null && (
-                <div className="text-[9px] font-mono text-bull/80">
-                  {targetDelta >= 0 ? "+" : ""}
-                  {targetDelta.toFixed(1)}%
-                </div>
-              )}
-            </div>
-
-            <div className="p-1.5 rounded border border-bear/30 bg-bear/5 text-center">
-              <div className="text-[9px] font-mono text-bear flex items-center justify-center gap-0.5">
-                <ArrowDownRight className="h-2.5 w-2.5" /> INVALIDATION
-              </div>
-              <div className="text-xs font-mono font-bold text-bear">
-                {formatPrice(inval, signal.ticker)}
-              </div>
-              {invalDelta !== null && (
-                <div className="text-[9px] font-mono text-bear/80">
-                  {invalDelta >= 0 ? "+" : ""}
-                  {invalDelta.toFixed(1)}%
-                </div>
-              )}
-            </div>
-
-            <div className="p-1.5 rounded border border-border/40 bg-surface-2 text-center">
-              <div className="text-[9px] font-mono text-muted-foreground">R:R RATIO</div>
-              <div className="text-xs font-mono font-bold text-primary">
-                {signal.risk_reward_ratio && signal.risk_reward_ratio > 0
-                  ? `${signal.risk_reward_ratio.toFixed(1)}:1`
-                  : "—"}
-              </div>
-              <div className="text-[9px] font-mono text-muted-foreground">risk adjusted</div>
-            </div>
-
-            <div className="p-1.5 rounded border border-border/40 bg-surface-2 text-center">
-              <div className="text-[9px] font-mono text-muted-foreground">POSITION SIZE</div>
-              <div className="text-xs font-mono font-bold text-foreground">
-                {formatPositionSize(signal.position_size_pct)}
-              </div>
-              <div className="text-[9px] font-mono text-muted-foreground">
-                {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0
-                  ? "Kelly derived"
-                  : "uncalibrated"}
-              </div>
-            </div>
-          </div>
-
-          {/* Real-time Price Journey Bar */}
-          <div className="p-2 rounded border border-border/30 bg-surface-2/40">
-            <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1">
-              <span className="text-bear font-bold">STOP {formatPrice(inval, signal.ticker)}</span>
+      {/* Target Rays & Price Journey Bar (When active target exists) */}
+      {!isNoSignal && entry && target && inval && (
+        <div className="px-3 pb-1.5">
+          <div className="p-1.5 rounded border border-border/30 bg-surface-2/30">
+            <div className="flex items-center justify-between text-[9px] font-mono text-muted-foreground mb-1">
+              <span className="text-bear font-bold">STOP {formatPrice(inval, ticker)}</span>
               <span className="font-bold text-foreground">
-                SPOT {formatPrice(spot, signal.ticker)} ({journeyPct.toFixed(0)}% TO TARGET)
+                PRICE JOURNEY: {journeyPct.toFixed(0)}% TO TARGET
               </span>
-              <span className="text-bull font-bold">TARGET {formatPrice(target, signal.ticker)}</span>
+              <span className="text-bull font-bold">TARGET {formatPrice(target, ticker)}</span>
             </div>
-            <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden relative">
-              {/* Entry marker */}
+            <div className="h-1.5 w-full bg-surface-3 rounded-full overflow-hidden relative">
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-foreground/60 z-10"
-                style={{ left: "35%" }}
-                title="Entry Zone"
+                className="absolute top-0 bottom-0 w-0.5 bg-foreground/70 z-10"
+                style={{ left: "30%" }}
+                title="Entry Reference"
               />
-              {/* Fill progress */}
               <div
                 className={cn(
                   "h-full transition-all duration-500 rounded-full",
                   isShort
-                    ? "bg-gradient-to-r from-bear/70 via-warn/70 to-bull"
-                    : "bg-gradient-to-r from-bear/70 via-warn/70 to-bull"
+                    ? "bg-gradient-to-r from-bear via-warn to-bull"
+                    : "bg-gradient-to-r from-bear via-warn to-bull"
                 )}
                 style={{ width: `${journeyPct}%` }}
               />
@@ -302,3 +475,4 @@ export function TradingCanvasHUD({
     </div>
   );
 }
+

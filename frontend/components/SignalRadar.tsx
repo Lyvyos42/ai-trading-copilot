@@ -7,12 +7,11 @@ import {
   Bookmark,
   TrendingUp,
   TrendingDown,
-  Minus,
   Clock,
   Sparkles,
   ChevronRight,
-  ShieldAlert,
-  SlidersHorizontal,
+  Shield,
+  Layers,
 } from "lucide-react";
 import { cn, formatPrice, timeAgo } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
@@ -25,9 +24,78 @@ interface SignalRadarProps {
   onToggleAdopt: (signal: Signal) => void;
   onScanNow: () => void;
   scanning: boolean;
+  onSelectTicker?: (ticker: string) => void;
 }
 
 const ASSET_TABS = ["ALL", "CRYPTO", "FOREX", "STOCKS", "COMMODITIES", "INDICES"];
+
+function renderMiniSparkline(isBull: boolean, ticker: string) {
+  const points = isBull
+    ? [16, 13, 15, 10, 12, 7, 9, 3]
+    : [3, 7, 6, 11, 9, 14, 12, 17];
+
+  const d = `M 0,${points[0]} L 8,${points[1]} L 16,${points[2]} L 24,${points[3]} L 32,${points[4]} L 40,${points[5]} L 48,${points[6]} L 56,${points[7]}`;
+  const strokeColor = isBull ? "#22c55e" : "#ef4444";
+
+  return (
+    <svg className="w-14 h-4 overflow-visible shrink-0" viewBox="0 0 56 20">
+      <path
+        d={d}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RadarScannerDial({ count, scanning }: { count: number; scanning: boolean }) {
+  return (
+    <div className="p-2.5 bg-surface-2/80 border-b border-border/40 flex items-center gap-3 shrink-0">
+      {/* Animated Radar Dial SVG */}
+      <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+        <svg className="w-full h-full" viewBox="0 0 60 60">
+          <circle cx="30" cy="30" r="28" fill="none" stroke="currentColor" strokeWidth="1" className="text-primary/20" />
+          <circle cx="30" cy="30" r="19" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 3" className="text-primary/30" />
+          <circle cx="30" cy="30" r="10" fill="none" stroke="currentColor" strokeWidth="1" className="text-primary/40" />
+          <line x1="30" y1="2" x2="30" y2="58" stroke="currentColor" strokeWidth="0.75" className="text-primary/20" />
+          <line x1="2" y1="30" x2="58" y2="30" stroke="currentColor" strokeWidth="0.75" className="text-primary/20" />
+          <circle cx="38" cy="22" r="2" fill="#22c55e" className="animate-ping" style={{ animationDuration: "3s" }} />
+          <circle cx="38" cy="22" r="1.5" fill="#22c55e" />
+          <circle cx="20" cy="38" r="1.5" fill="#ef4444" />
+          <circle cx="22" cy="18" r="1.5" fill="#22c55e" />
+          <circle cx="44" cy="40" r="1.5" fill="#D4A240" />
+        </svg>
+
+        {/* Sweeping Radar Beam */}
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none animate-spin"
+          style={{
+            animationDuration: scanning ? "1.5s" : "4s",
+            background: "conic-gradient(from 0deg, transparent 0deg, rgba(34, 197, 94, 0.3) 60deg, transparent 65deg)",
+          }}
+        />
+      </div>
+
+      {/* Radar Telemetry Readout */}
+      <div className="flex-1 min-w-0 font-mono">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-primary font-bold tracking-wider">ALGO_CONF_RADAR</span>
+          <span className="text-bull font-bold">{scanning ? "SWEEPING..." : "92% ACTIVE"}</span>
+        </div>
+        <div className="text-[9px] text-muted-foreground truncate">
+          {scanning ? "Polling microstructure L2 books..." : `${count} institutional setups detected`}
+        </div>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-bull animate-pulse" />
+          <span className="text-[8px] text-muted-foreground uppercase">Liquidity Clusters Monitored</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function SignalRadar({
   signals,
@@ -37,6 +105,7 @@ export function SignalRadar({
   onToggleAdopt,
   onScanNow,
   scanning,
+  onSelectTicker,
 }: SignalRadarProps) {
   const [activeTab, setActiveTab] = useState("ALL");
   const [viewMode, setViewMode] = useState<"STREAM" | "MY_DESK">("STREAM");
@@ -61,16 +130,26 @@ export function SignalRadar({
     });
   }, [signals, adoptedSignals, viewMode, activeTab, searchQuery]);
 
+  function handleCardClick(sig: Signal) {
+    onSelectSignal(sig);
+    if (onSelectTicker) {
+      onSelectTicker(sig.ticker);
+    }
+  }
+
   return (
-    <div className="flex flex-col h-full bg-surface-1 border-r border-border/40 overflow-hidden">
+    <div className="flex flex-col h-full bg-surface-1 border-r border-border/40 overflow-hidden select-none">
+      {/* 2027 Circular Radar Scanner Dial at Top */}
+      <RadarScannerDial count={signals.length} scanning={scanning} />
+
       {/* Top Header: View Mode Switcher + Scan Action */}
-      <div className="p-3 border-b border-border/40 space-y-2">
+      <div className="p-2.5 border-b border-border/40 space-y-2 shrink-0 bg-surface-1/90">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 bg-surface-2 p-0.5 rounded border border-border/40">
             <button
               onClick={() => setViewMode("STREAM")}
               className={cn(
-                "px-2.5 py-1 rounded text-xs font-mono font-bold transition-colors flex items-center gap-1",
+                "px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors flex items-center gap-1",
                 viewMode === "STREAM"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -78,12 +157,12 @@ export function SignalRadar({
             >
               <Radar className="h-3 w-3" />
               <span>RADAR</span>
-              <span className="text-[10px] opacity-75">({signals.length})</span>
+              <span className="text-[9px] opacity-75">({signals.length})</span>
             </button>
             <button
               onClick={() => setViewMode("MY_DESK")}
               className={cn(
-                "px-2.5 py-1 rounded text-xs font-mono font-bold transition-colors flex items-center gap-1",
+                "px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors flex items-center gap-1",
                 viewMode === "MY_DESK"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -91,14 +170,14 @@ export function SignalRadar({
             >
               <Bookmark className="h-3 w-3" />
               <span>MY DESK</span>
-              <span className="text-[10px] opacity-75">({adoptedSignals.length})</span>
+              <span className="text-[9px] opacity-75">({adoptedSignals.length})</span>
             </button>
           </div>
 
           <button
             onClick={onScanNow}
             disabled={scanning}
-            className="flex items-center gap-1 px-2.5 py-1 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-mono font-bold transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-mono font-bold transition-colors disabled:opacity-50"
           >
             <Sparkles className={cn("h-3 w-3", scanning && "animate-spin")} />
             <span>{scanning ? "SCANNING" : "SCAN NOW"}</span>
@@ -107,13 +186,13 @@ export function SignalRadar({
 
         {/* Search input */}
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search ticker (e.g. AAPL, BTC, EURUSD)..."
+            placeholder="Filter radar setups..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 rounded border border-border/40 bg-surface-2 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary"
+            className="w-full pl-7 pr-3 py-1 rounded border border-border/40 bg-surface-2 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary"
           />
         </div>
 
@@ -124,9 +203,9 @@ export function SignalRadar({
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-mono whitespace-nowrap transition-colors",
+                "px-1.5 py-0.5 rounded text-[9px] font-mono whitespace-nowrap transition-colors",
                 activeTab === tab
-                  ? "bg-surface-3 text-foreground font-bold border border-border/60"
+                  ? "bg-surface-3 text-primary font-bold border border-border/60"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -144,7 +223,7 @@ export function SignalRadar({
             <div className="text-xs font-mono font-bold text-muted-foreground">
               {viewMode === "MY_DESK" ? "NO ADOPTED TRADES YET" : "NO SIGNALS MATCH FILTER"}
             </div>
-            <p className="text-[11px] font-mono text-muted-foreground/70 max-w-xs mx-auto">
+            <p className="text-[10px] font-mono text-muted-foreground/70 max-w-xs mx-auto">
               {viewMode === "MY_DESK"
                 ? "Click 'Adopt Signal' on any setup to monitor live price action and distance to target here."
                 : "Trigger 'SCAN NOW' to run multi-agent confluence screening across the market catalogue."}
@@ -164,36 +243,39 @@ export function SignalRadar({
             return (
               <div
                 key={sig.signal_id}
-                onClick={() => onSelectSignal(sig)}
+                onClick={() => handleCardClick(sig)}
                 className={cn(
-                  "p-3 cursor-pointer transition-all hover:bg-surface-2/70 select-none group",
-                  isSelected ? "bg-surface-2 border-l-2 border-l-primary" : ""
+                  "p-2.5 cursor-pointer transition-all hover:bg-surface-2/70 select-none group",
+                  isSelected ? "bg-surface-2/90 border-l-2 border-l-primary" : ""
                 )}
               >
-                {/* Line 1: Ticker, Direction badge, State badge */}
-                <div className="flex items-center justify-between mb-1.5">
+                {/* Line 1: Ticker, Direction badge, Mini Sparkline, Bookmark */}
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-sm text-foreground tracking-tight">
+                    <span className="font-mono font-bold text-xs text-foreground tracking-tight">
                       {sig.ticker}
                     </span>
                     <span
                       className={cn(
-                        "px-1 py-0.2 rounded text-[9px] font-mono font-bold uppercase",
+                        "px-1 py-0.2 rounded text-[8px] font-mono font-bold uppercase",
                         isBull
                           ? "bg-bull/15 text-bull border border-bull/30"
                           : isShort
                           ? "bg-bear/15 text-bear border border-bear/30"
-                          : "bg-muted text-muted-foreground border border-border"
+                          : "bg-surface-3 text-muted-foreground border border-border"
                       )}
                     >
                       {sig.direction}
                     </span>
-                    <span className="text-[9px] font-mono text-muted-foreground uppercase">
+                    <span className="text-[8px] font-mono text-muted-foreground uppercase">
                       {sig.timeframe || "1D"}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    {/* SVG Mini Sparkline */}
+                    {!isNoSignal && renderMiniSparkline(isBull, sig.ticker)}
+
                     {/* Adopt star/bookmark button */}
                     <button
                       onClick={(e) => {
@@ -202,43 +284,23 @@ export function SignalRadar({
                       }}
                       className={cn(
                         "p-1 rounded hover:bg-surface-3 transition-colors",
-                        isAdopted ? "text-primary font-bold" : "text-muted-foreground/50 hover:text-muted-foreground"
+                        isAdopted ? "text-primary font-bold" : "text-muted-foreground/40 hover:text-muted-foreground"
                       )}
                       title={isAdopted ? "Remove from My Desk" : "Adopt to My Desk"}
                     >
                       <Bookmark className={cn("h-3 w-3", isAdopted && "fill-primary text-primary")} />
                     </button>
-
-                    {/* State badge */}
-                    {isNoSignal ? (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-border/40 bg-surface-3 text-muted-foreground">
-                        RESTRAINT
-                      </span>
-                    ) : sig.outcome === "WIN" ? (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-bull/40 bg-bull/10 text-bull font-bold">
-                        WIN
-                      </span>
-                    ) : sig.outcome === "LOSS" ? (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-bear/40 bg-bear/10 text-bear font-bold">
-                        STOPPED
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-bull/30 bg-bull/5 text-bull flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-bull animate-pulse" />
-                        ACTIVE
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 {/* Line 2: Levels & Geometry */}
                 {!isNoSignal && (
-                  <div className="flex items-center justify-between text-[11px] font-mono mb-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono mb-1">
                     <span className="text-muted-foreground">
-                      Entry: <span className="text-foreground font-semibold">{formatPrice(entry, sig.ticker)}</span>
+                      E: <span className="text-foreground font-semibold">{formatPrice(entry, sig.ticker)}</span>
                     </span>
                     <span className="text-bull">
-                      Target: <span className="font-semibold">{formatPrice(target, sig.ticker)}</span>
+                      TP: <span className="font-semibold">{formatPrice(target, sig.ticker)}</span>
                     </span>
                     {sig.risk_reward_ratio && sig.risk_reward_ratio > 0 && (
                       <span className="text-primary font-semibold">
@@ -248,17 +310,15 @@ export function SignalRadar({
                   </div>
                 )}
 
-                {/* Line 3: Mini Confluence Bar & Time */}
-                <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/20 text-[10px] font-mono text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <span className={cn("font-bold", isBull ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground")}>
-                      {prob.toFixed(0)}% {isBull ? "BULL" : isShort ? "BEAR" : "CONSENSUS"}
-                    </span>
-                  </div>
+                {/* Line 3: Confluence Bar & Time */}
+                <div className="flex items-center justify-between pt-1 border-t border-border/20 text-[9px] font-mono text-muted-foreground">
+                  <span className={cn("font-bold", isBull ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground")}>
+                    {prob.toFixed(0)}% {isBull ? "BULL" : isShort ? "BEAR" : "CONFLUENCE"}
+                  </span>
                   <div className="flex items-center gap-1">
                     <Clock className="h-2.5 w-2.5" />
                     <span>{timeAgo(sig.timestamp)}</span>
-                    <ChevronRight className="h-3 w-3 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="h-2.5 w-2.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               </div>
@@ -269,3 +329,4 @@ export function SignalRadar({
     </div>
   );
 }
+

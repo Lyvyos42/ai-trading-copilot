@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [briefingOpen, setBriefingOpen] = useState(false);
 
   // Mobile View Tab: "radar" | "chart" | "agents"
   const [mobileTab, setMobileTab] = useState<"radar" | "chart" | "agents">("chart");
@@ -197,12 +198,32 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [isLoggedIn, loadData]);
 
-  // Handle Signal Selection
+  // Handle Signal Selection from radar or list
   function handleSelectSignal(sig: Signal) {
     setSelectedSignal(sig);
     setActiveTicker(sig.ticker);
     setAnalysisError(null);
     setMobileTab("chart");
+  }
+
+  // Handle direct Ticker Selection from Ribbon or Search
+  function handleSelectTicker(tickerName: string) {
+    const clean = tickerName.trim().toUpperCase();
+    if (!clean) return;
+    setActiveTicker(clean);
+    setAnalysisError(null);
+    setMobileTab("chart");
+
+    // Check if we have an active, non-expired cached signal for this symbol
+    const existing = signals.find(
+      (s) => s.ticker.toUpperCase() === clean && s.status === "ACTIVE" && !_isExpired(s)
+    );
+    if (existing) {
+      setSelectedSignal(existing);
+    } else {
+      setSelectedSignal(null);
+      handleGenerate(clean);
+    }
   }
 
   // Toggle Adopt Signal (Pins to My Desk)
@@ -258,7 +279,7 @@ export default function DashboardPage() {
 
   // Generate on-demand signal for ticker
   async function handleGenerate(t?: string) {
-    const tickerToGen = t || activeTicker;
+    const tickerToGen = (t || activeTicker).trim().toUpperCase();
     setLoading(true);
     setAnalysisError(null);
     setActiveTicker(tickerToGen);
@@ -276,7 +297,6 @@ export default function DashboardPage() {
           `${signal.ticker}: ${String(signal.status).replace(/_/g, " ").toLowerCase()}` +
             (why?.length ? ` — ${why[0]}` : "")
         );
-        return;
       }
 
       setSignals((prev) => {
@@ -307,21 +327,23 @@ export default function DashboardPage() {
   if (!isLoggedIn) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-65px)] bg-background overflow-hidden">
-      {/* Top Header: Kill Zones, Clocks, Regime Status, Strategy Profile */}
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background overflow-hidden">
+      {/* Top Header: Kill Zones, Clocks, Regime Status, Strategy Profile, Briefing Drawer Toggle */}
       <CockpitHeader
         activeProfile={activeProfile}
         onProfileChange={handleProfileChange}
         regimeText="VOL EXPANSION"
         regimeState="NEUTRAL"
+        onToggleBriefing={() => setBriefingOpen(!briefingOpen)}
+        briefingOpen={briefingOpen}
       />
 
-      {/* Collapsible Daily Regime Briefing */}
-      <PreMarketBriefing />
+      {/* Slide-over Daily Regime Briefing Modal */}
+      <PreMarketBriefing isOpen={briefingOpen} onClose={() => setBriefingOpen(false)} />
 
       {/* Analysis Error Notification Banner */}
       {analysisError && (
-        <div className="px-4 py-2 bg-warn/10 border-b border-warn/30 text-warn text-xs font-mono flex items-center justify-between">
+        <div className="px-4 py-1.5 bg-warn/10 border-b border-warn/30 text-warn text-xs font-mono flex items-center justify-between z-30">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{analysisError}</span>
@@ -340,7 +362,7 @@ export default function DashboardPage() {
         <button
           onClick={() => setMobileTab("radar")}
           className={cn(
-            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
+            "flex-1 py-1.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
             mobileTab === "radar" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
           )}
         >
@@ -350,7 +372,7 @@ export default function DashboardPage() {
         <button
           onClick={() => setMobileTab("chart")}
           className={cn(
-            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
+            "flex-1 py-1.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5 border-r border-border/30",
             mobileTab === "chart" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
           )}
         >
@@ -360,7 +382,7 @@ export default function DashboardPage() {
         <button
           onClick={() => setMobileTab("agents")}
           className={cn(
-            "flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5",
+            "flex-1 py-1.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5",
             mobileTab === "agents" ? "text-primary bg-surface-1 border-b-2 border-b-primary" : "text-muted-foreground"
           )}
         >
@@ -371,7 +393,7 @@ export default function DashboardPage() {
 
       {/* Main 3-Pane Tactical Command Cockpit */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left Pane (25% on desktop): Confluence Radar & Signal Stream */}
+        {/* Left Pane: Confluence Radar & Signal Stream */}
         <aside
           className={cn(
             "w-full lg:w-[320px] xl:w-[360px] shrink-0 h-full flex flex-col",
@@ -386,10 +408,11 @@ export default function DashboardPage() {
             onToggleAdopt={handleToggleAdopt}
             onScanNow={handleScanNow}
             scanning={scanning}
+            onSelectTicker={handleSelectTicker}
           />
         </aside>
 
-        {/* Center Pane (50% on desktop): Deep Canvas Viewport */}
+        {/* Center Pane: Deep Canvas Viewport */}
         <main
           className={cn(
             "flex-1 h-full flex flex-col min-w-0 overflow-hidden bg-surface-0",
@@ -399,6 +422,7 @@ export default function DashboardPage() {
           {/* Floating Canvas HUD */}
           <TradingCanvasHUD
             ticker={activeTicker}
+            onSelectTicker={handleSelectTicker}
             signal={selectedSignal}
             activeInterval={chartInterval}
             onIntervalChange={setChartInterval}
@@ -406,6 +430,8 @@ export default function DashboardPage() {
             onToggle3D={() => setShow3D(!show3D)}
             onAdoptSignal={selectedSignal ? handleToggleAdopt : undefined}
             isAdopted={selectedSignal ? adoptedSignals.some((s) => s.signal_id === selectedSignal.signal_id) : false}
+            onGenerate={handleGenerate}
+            analyzing={loading}
           />
 
           {/* Chart / 3D Canvas Area */}
@@ -444,14 +470,19 @@ export default function DashboardPage() {
           </div>
         </main>
 
-        {/* Right Pane (25% on desktop): 9-Agent Consensus Brain */}
+        {/* Right Pane: 9-Agent Consensus Brain */}
         <aside
           className={cn(
             "w-full lg:w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col",
             mobileTab !== "agents" && "hidden lg:flex"
           )}
         >
-          <AgentConsensusHUD signal={selectedSignal} />
+          <AgentConsensusHUD
+            signal={selectedSignal}
+            activeTicker={activeTicker}
+            onGenerate={handleGenerate}
+            loading={loading}
+          />
         </aside>
       </div>
 
