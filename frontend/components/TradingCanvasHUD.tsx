@@ -402,15 +402,19 @@ export function TradingCanvasHUD({
               </div>
             ) : matchingSignal && isNoSignal ? (
               <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
-                <span className="font-bold text-foreground">REGIME: RANGE-BOUND</span>
+                <span className="font-bold text-warn">NEUTRAL PIPELINE STANCE</span>
                 <span>•</span>
-                <span>SPECIALISTS ABSTAINED (NO DIRECTIONAL EDGE)</span>
+                <span className="truncate max-w-md text-foreground/80">
+                  {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0
+                    ? matchingSignal.status_reasons[0]
+                    : "Fewer than 2 directional votes from specialist analysts; consensus withheld"}
+                </span>
               </div>
             ) : (
               <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
                 <span>TELEMETRY: STANDBY</span>
                 <span>•</span>
-                <span>CLICK &apos;ANALYZE NOW&apos; FOR MULTI-AGENT SYNTHESIS</span>
+                <span>NO ACTIVE DOSSIER FOR {ticker} — INITIALIZE 9-AGENT SYNTHESIS</span>
               </div>
             )}
           </div>
