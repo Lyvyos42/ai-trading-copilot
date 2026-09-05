@@ -116,6 +116,34 @@ def check(name, ok, detail=""):
         FAILURES.append(name)
 
 
+def test_source_rules():
+    """Source-level rules that no runtime test can reach.
+
+    These failures appear only when a specific agent abstains on a specific
+    symbol with a specific source down - a combination no reachable unit test
+    enumerates - so they are asserted against the source instead. See
+    scripts/_source_rules.py for what each rule is and which production
+    incident motivated it.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import _source_rules as rules
+
+    print("")
+    print("STRUCTURAL - source rules")
+
+    # market_data._mock_market_data is the one permitted generator: gated
+    # behind ALLOW_SYNTHETIC_MARKET_DATA and tagged data_source="mock", which
+    # the trader refuses outright.
+    rng = [x for x in rules.find_rng() if not x.startswith("market_data.py")]
+    check("no rng/random outside the gated offline generator", not rng, ", ".join(rng[:6]))
+
+    gti = rules.find_get_then_index()
+    check("no `.get(k, default)[...]` in the signal path", not gti, ", ".join(gti[:6]))
+
+    eag = rules.find_eager_arithmetic_default()
+    check("no eagerly-evaluated arithmetic default in .get()", not eag, ", ".join(eag[:6]))
+
+
 def test_no_rng_in_agents():
     """AST walk: no executable reference to random/rng anywhere in the agents."""
     print("\nSTRUCTURAL — no randomness in agent code")
@@ -325,6 +353,7 @@ def test_asset_class_routing():
 
 
 async def main():
+    test_source_rules()
     test_no_rng_in_agents()
     test_asset_class_routing()
     await test_abstentions()

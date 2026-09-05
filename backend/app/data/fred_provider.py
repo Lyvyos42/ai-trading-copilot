@@ -155,7 +155,7 @@ async def get_upcoming_releases(limit: int = 15) -> list[dict]:
             data = resp.json()
         releases = []
         seen = set()
-        for r in data.get("release_dates", [])[:limit * 2]:
+        for r in (data.get("release_dates") or [])[:limit * 2]:
             name = r.get("release_name", "")
             date = r.get("date", "")
             key_str = f"{name}|{date}"

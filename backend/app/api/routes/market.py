@@ -751,7 +751,10 @@ async def get_ohlcv(
                 h = quotes["high"][i]
                 l = quotes["low"][i]
                 c = quotes["close"][i]
-                v = quotes.get("volume", [None] * len(timestamps))[i]
+                # Yahoo returns "volume": null for some symbols and ranges.
+                # `.get("volume", default)` does not help there - the key EXISTS
+                # with value None, so the default never fires and None[i] raises.
+                v = (quotes.get("volume") or [None] * len(timestamps))[i]
                 if o is None or c is None:
                     continue
                 candles.append({

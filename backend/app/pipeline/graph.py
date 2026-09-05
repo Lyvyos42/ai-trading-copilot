@@ -115,7 +115,7 @@ async def run_debate(state: TradingState) -> TradingState:
     bear_points = []
     for name, analysis in analysts.items():
         direction = analysis.get("direction", "NEUTRAL")
-        reasoning = analysis.get("reasoning", "")[:150]
+        reasoning = (analysis.get("reasoning") or "")[:150]
         if direction == "LONG":
             bull_points.append(f"{name}: {reasoning}")
         elif direction == "SHORT":
@@ -146,14 +146,14 @@ async def run_debate(state: TradingState) -> TradingState:
     # Inject top live headlines into reasoning chain
     news_ctx = state.get("news_context", {})
     if news_ctx.get("has_news"):
-        top_hl = news_ctx.get("ticker_headlines", [])[:2] or news_ctx.get("market_headlines", [])[:2]
+        top_hl = (news_ctx.get("ticker_headlines") or [])[:2] or (news_ctx.get("market_headlines") or [])[:2]
         for hl in top_hl:
             reasoning.append(f"Live intel: {hl[:180]}")
         sent = state.get("sentiment_analysis", {})
-        for hl in sent.get("top_headlines", [])[:1]:
+        for hl in (sent.get("top_headlines") or [])[:1]:
             reasoning.append(f"Sentiment driver: {hl[:180]}")
         macro = state.get("macro_analysis", {})
-        for hl in macro.get("key_news_drivers", [])[:1]:
+        for hl in (macro.get("key_news_drivers") or [])[:1]:
             reasoning.append(f"Macro driver: {hl[:180]}")
 
     return {**state, "bull_case": bull_case, "bear_case": bear_case, "reasoning_chain": reasoning}
@@ -173,7 +173,7 @@ async def run_trader(state: TradingState) -> TradingState:
 async def run_risk(state: TradingState) -> TradingState:
     risk = await _risk.analyze(state)
     reasoning = state.get("reasoning_chain", [])
-    reasoning.append(f"Risk Manager: {risk.get('reasoning', '')[:200]}")
+    reasoning.append(f"Risk Manager: {(risk.get('reasoning') or '')[:200]}")
     return {**state, "risk_assessment": risk, "reasoning_chain": reasoning}
 
 
@@ -320,7 +320,7 @@ def _build_attribution(state: TradingState) -> list[dict]:
                 "confidence": analysis.get("confidence", 50),
                 "bullish_contribution": analysis.get("bullish_contribution", 0),
                 "bearish_contribution": analysis.get("bearish_contribution", 0),
-                "reasoning": analysis.get("reasoning", "")[:200],
+                "reasoning": (analysis.get("reasoning") or "")[:200],
             })
     return attribution
 

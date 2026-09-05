@@ -21,8 +21,8 @@ class SessionSentiment(BaseAgent):
     async def analyze(self, state: SessionState) -> dict:
         news = state.get("news_context", {})
         timer = state.get("timer_analysis", {})
-        headlines = news.get("ticker_headlines", [])[:10]
-        market_headlines = news.get("market_headlines", [])[:5]
+        headlines = (news.get("ticker_headlines") or [])[:10]
+        market_headlines = (news.get("market_headlines") or [])[:5]
         user_msg = (
             f"Ticker: {state.get('ticker', 'UNKNOWN')}\n"
             f"Session Phase: {timer.get('market_phase', 'UNKNOWN')}\n"

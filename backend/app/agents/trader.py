@@ -171,13 +171,13 @@ Base your research_target and invalidation_level on this exact current price.
 Set analytical_window appropriate for the {timeframe} timeframe.
 
 ANALYST CONSENSUS (7 agents):
-- Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {fund.get('reasoning', '')[:200]}
-- Technical: {tech.get('direction')} ({tech.get('confidence', 0):.0f}%) — {tech.get('reasoning', '')[:200]}
-- Sentiment: {sent.get('direction')} ({sent.get('confidence', 0):.0f}%) — {sent.get('reasoning', '')[:200]}
-- Macro: {macro.get('direction')} ({macro.get('confidence', 0):.0f}%) — {macro.get('reasoning', '')[:200]}
-- OrderFlow: {oflow.get('direction')} ({oflow.get('confidence', 0):.0f}%) — {oflow.get('reasoning', '')[:200]}
-- RegimeChange: {regime.get('direction')} ({regime.get('confidence', 0):.0f}%) — {regime.get('reasoning', '')[:200]}
-- Correlation: {corr.get('direction')} ({corr.get('confidence', 0):.0f}%) — {corr.get('reasoning', '')[:200]}
+- Fundamental: {fund.get('direction')} ({fund.get('confidence', 0):.0f}%) — {(fund.get('reasoning') or '')[:200]}
+- Technical: {tech.get('direction')} ({tech.get('confidence', 0):.0f}%) — {(tech.get('reasoning') or '')[:200]}
+- Sentiment: {sent.get('direction')} ({sent.get('confidence', 0):.0f}%) — {(sent.get('reasoning') or '')[:200]}
+- Macro: {macro.get('direction')} ({macro.get('confidence', 0):.0f}%) — {(macro.get('reasoning') or '')[:200]}
+- OrderFlow: {oflow.get('direction')} ({oflow.get('confidence', 0):.0f}%) — {(oflow.get('reasoning') or '')[:200]}
+- RegimeChange: {regime.get('direction')} ({regime.get('confidence', 0):.0f}%) — {(regime.get('reasoning') or '')[:200]}
+- Correlation: {corr.get('direction')} ({corr.get('confidence', 0):.0f}%) — {(corr.get('reasoning') or '')[:200]}
 
 QUANT VALIDATION:
 - Statistical edge: {quant.get('statistical_edge', 'N/A')}
@@ -536,8 +536,8 @@ Output JSON only."""
             "invalidation_level": round(invalidation_level, dec),
             "risk_reward_ratio": risk_reward_ratio,
             "analytical_window": analytical_window,
-            "bull_case": f"{fund.get('reasoning', '')[:150]}. {sent.get('reasoning', '')[:100]}",
-            "bear_case": f"{macro.get('reasoning', '')[:150]}. {tech.get('reasoning', '')[:100]}",
+            "bull_case": f"{(fund.get('reasoning') or '')[:150]}. {(sent.get('reasoning') or '')[:100]}",
+            "bear_case": f"{(macro.get('reasoning') or '')[:150]}. {(tech.get('reasoning') or '')[:100]}",
             # Backward compat fields (DB model still uses these)
             "direction": direction,
             "entry_price": round(entry, dec),

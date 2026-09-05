@@ -73,8 +73,15 @@ class SessionTrader(BaseAgent):
     def _mock_signal(self, state: SessionState) -> dict:
         ticker = state.get("ticker", "X")
         seed = int(hashlib.md5(f"{ticker}_session_trader".encode()).hexdigest()[:8], 16)
-        price = state.get("market_data", {}).get("close", 100)
-        atr = state.get("market_data", {}).get("atr", price * 0.01)
+        # `.get("atr", price * 0.01)` evaluated the default eagerly, so it
+        # raised when close was None - and `.get("close", 100)` silently priced
+        # a dead feed at 100 for every symbol.
+        _md = state.get("market_data") or {}
+        price = _md.get("close")
+        if not price:
+            return {"direction": "NEUTRAL", "confidence": 0.0, "abstained": True,
+                    "reasoning": f"No live price for {ticker}; session trader abstains."}
+        atr = _md.get("atr") or (price * 0.01)
         direction = ["LONG", "SHORT", "NEUTRAL"][seed % 3]
         sl = round(price - atr * 0.8, 2) if direction == "LONG" else round(price + atr * 0.8, 2)
         tp1 = round(price + atr * 1.0, 2) if direction == "LONG" else round(price - atr * 1.0, 2)

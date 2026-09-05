@@ -183,6 +183,11 @@ async def agent_status(
             if agreed == signal_paid:
                 tally[key][0] += 1
 
+    def _sample(key: str | None) -> int:
+        """How many resolved signals this agent's accuracy is computed from."""
+        counts = tally.get(key or "")
+        return counts[1] if counts else 0
+
     def _acc(key: str | None):
         """None means UNMEASURED. Never 0.0, which reads as 'measured, and bad'."""
         if key is None or key not in tally:
@@ -209,7 +214,7 @@ async def agent_status(
             "accuracy_7d": (_acc(_VOTE_KEY.get(a["name"]))
                             if a["name"] in _VOTE_KEY
                             else (overall_acc if a["name"] == "TraderAgent" else None)),
-            "accuracy_sample": (tally.get(_VOTE_KEY.get(a["name"], ""), [0, 0])[1]
+            "accuracy_sample": (_sample(_VOTE_KEY.get(a["name"]))
                                 if a["name"] in _VOTE_KEY
                                 else (overall_total if a["name"] == "TraderAgent" else 0)),
             "last_active": now,

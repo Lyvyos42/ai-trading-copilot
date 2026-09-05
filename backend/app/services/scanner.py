@@ -60,7 +60,7 @@ async def _screen_symbol(ticker: str, news_headlines: list[str]) -> dict | None:
         price      = data.get("close", 0)
         change_pct = data.get("price_change_pct", 0)
         atr        = data.get("atr", 0)
-        closes     = data.get("closes", [])[-10:]
+        closes     = (data.get("closes") or [])[-10:]
 
         # Simple direction hint from recent momentum
         direction_hint = "LONG" if change_pct >= 0 else "SHORT"
@@ -87,7 +87,7 @@ async def _screen_symbol(ticker: str, news_headlines: list[str]) -> dict | None:
 
         score     = int(result.get("score", 0))
         direction = result.get("direction", "LONG").upper()
-        summary   = result.get("summary", "")[:200]
+        summary   = (result.get("summary") or "")[:200]
 
         if score < CONFIDENCE_THRESHOLD or direction not in ("LONG", "SHORT"):
             return None

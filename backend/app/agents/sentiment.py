@@ -120,7 +120,7 @@ class SentimentAnalyst(BaseAgent):
         avg_sent   = news_ctx.get("avg_sentiment", 0.0)
         pos_pct    = news_ctx.get("positive_pct", 50.0)
         neg_pct    = news_ctx.get("negative_pct", 50.0)
-        art_count  = news_ctx.get("article_count", len(ticker_hl) + len(market_hl))
+        art_count  = news_ctx.get("article_count") or (len(ticker_hl) + len(market_hl))
 
         # Build the headline section for the prompt
         ticker_section = ""
