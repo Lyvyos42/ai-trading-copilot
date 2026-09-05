@@ -362,7 +362,7 @@ Output JSON only."""
         # a synthetic ATR around a synthetic price.
         #
         # The tag was already being recorded and simply never checked.
-        if market_data.get("data_source") == "mock":
+        if market_data.get("data_source") in ("mock", "unavailable"):
             return {
                 "direction": "NEUTRAL",
                 "status": "NO_SIGNAL",
@@ -376,7 +376,7 @@ Output JSON only."""
                 "position_size_pct": None,
                 "status_reasons": [
                     "Live price feed unavailable - both TradingView and Yahoo failed.",
-                    "Bars for this symbol are synthetic, so no tradeable level can be quoted.",
+                    "No real bars for this symbol, so no tradeable level can be quoted.",
                 ],
                 "reasoning_chain": [
                     f"{ticker}: no live market data.",

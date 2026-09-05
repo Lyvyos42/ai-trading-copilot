@@ -74,7 +74,7 @@ def test_no_rng_in_agents():
     """AST walk: no executable reference to random/rng anywhere in the agents."""
     print("\nSTRUCTURAL — no randomness in agent code")
     root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "app", "agents")
+                        "app")
     offenders = []
     for path in sorted(glob.glob(os.path.join(root, "**", "*.py"), recursive=True)):
         tree = ast.parse(io.open(path, encoding="utf-8").read())
@@ -82,7 +82,12 @@ def test_no_rng_in_agents():
             if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
                     and node.value.id in ("rng", "random")):
                 offenders.append(f"{os.path.basename(path)}:{node.lineno}")
-    check("no rng/random call in any agent", not offenders, ", ".join(offenders))
+    # market_data._mock_market_data is the one permitted generator: it is gated
+    # behind ALLOW_SYNTHETIC_MARKET_DATA and tagged data_source="mock", which
+    # the trader refuses. Everything else in the signal path must be clean.
+    offenders = [o for o in offenders if not o.startswith("market_data.py")]
+    check("no rng/random call outside the gated offline generator",
+          not offenders, ", ".join(offenders))
 
 
 async def test_abstentions():
@@ -161,12 +166,13 @@ async def test_trader_gates():
           r2.get("status") != "NO_SIGNAL" and r2.get("research_target") is not None,
           f"{r2.get('direction')} target={r2.get('research_target')}")
 
-    r3 = await TraderAgent().analyze(
-        state({"close": 181.48, "atr": 0.9, "data_source": "mock"},
-              order_flow_analysis={"direction": "SHORT", "confidence": 55}))
-    check("synthetic bars never become a signal",
-          r3.get("status") == "NO_SIGNAL" and r3.get("entry_price") is None,
-          f"status={r3.get('status')} entry={r3.get('entry_price')}")
+    for src in ("mock", "unavailable"):
+        r3 = await TraderAgent().analyze(
+            state({"close": 181.48, "atr": 0.9, "data_source": src},
+                  order_flow_analysis={"direction": "SHORT", "confidence": 55}))
+        check(f"data_source={src} never becomes a signal",
+              r3.get("status") == "NO_SIGNAL" and r3.get("entry_price") is None,
+              f"status={r3.get('status')} entry={r3.get('entry_price')}")
 
     check("no signal ever quotes a position size it did not derive",
           r.get("position_size_pct") is None and r3.get("position_size_pct") is None)

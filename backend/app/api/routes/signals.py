@@ -205,7 +205,17 @@ async def generate_signal(
     # prices off a stale print, sizes off yesterday's ATR, and sets an
     # invalidation level nothing can reach. The risk gate did catch these, but
     # only after nine agents had run and a row had been written.
-    _session = market_status(body.ticker, body.asset_class)
+    # Resolve the asset class from the SYMBOL before anything reads it.
+    #
+    # body.asset_class is whichever UI tab happened to be open, so EURJPY=X
+    # generated from the STOCKS tab arrived labelled "stocks". That label then
+    # drove three separate decisions: the market-hours check here (a currency
+    # pair judged against US equity hours, 14:30-21:00 UTC, so every FX signal
+    # raised outside those hours was refused or later voided), the response
+    # payload, and the memory record. resolve_asset_class reads the ticker,
+    # which is strong evidence, instead of the tab, which is none.
+    resolved_asset_class = resolve_asset_class(body.ticker, body.asset_class)
+    _session = market_status(body.ticker, resolved_asset_class)
     if not _session["open"]:
         raise HTTPException(
             status_code=409,
@@ -290,7 +300,6 @@ async def generate_signal(
     # Free tier & visitors: real Python analysis with market data (no AI cost)
     # Paid tiers: full AI-powered multi-agent pipeline
     is_free = tier not in _PAID_TIERS
-    resolved_asset_class = resolve_asset_class(ticker, body.asset_class)
     state = await run_pipeline(
         ticker=ticker,
         asset_class=resolved_asset_class,
@@ -427,7 +436,7 @@ async def generate_signal(
     result = _signal_to_dict(signal, state, current_price=live_spot if live_spot and live_spot > 0 else None) if _persist and signal.id else {
         "signal_id": signal_id,
         "ticker": ticker,
-        "asset_class": body.asset_class,
+        "asset_class": resolved_asset_class,
         "timeframe": body.timeframe,
         "direction": direction,
 
@@ -500,7 +509,7 @@ async def generate_signal(
             asyncio.create_task(_mm.extract_memories_from_session(
                 user_id=_uid,
                 session_data={
-                    "instrument": ticker, "asset_class": body.asset_class,
+                    "instrument": ticker, "asset_class": resolved_asset_class,
                     "timeframe": body.timeframe, "direction": direction,
                     "probability_score": final.get("probability_score"),
                     "conviction_tier": final.get("conviction_tier"),

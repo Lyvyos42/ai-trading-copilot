@@ -786,111 +786,31 @@ async def get_ohlcv(
         import logging
         logging.warning(f"Yahoo REST OHLCV also failed for {ticker}: {rest_err}")
 
-    # ── 4. Mock fallback ─────────────────────────────────────────────────────
-    try:
-        # Deterministic mock fallback with realistic price ranges per asset type
-        _MOCK_BASES = {
-            # Crypto
-            "BTC-USD":83000,"ETH-USD":2000, "SOL-USD":130,  "BNB-USD":590,
-            "XRP-USD":2.5,  "ADA-USD":0.45, "DOGE-USD":0.18,"AVAX-USD":28,
-            "MATIC-USD":0.5,"DOT-USD":5.5,  "LINK-USD":15,  "UNI-USD":7.5,
-            "ATOM-USD":6.5, "LTC-USD":95,   "BCH-USD":440,  "NEAR-USD":3.8,
-            "APT-USD":7.5,  "OP-USD":1.0,   "ARB-USD":0.42, "SUI-USD":2.8,
-            "SHIB-USD":0.0000135,"PEPE-USD":0.0000085,"WIF-USD":1.5,
-            # FX
-            "EURUSD=X":1.085,"GBPUSD=X":1.295,"USDJPY=X":148.5,"AUDUSD=X":0.635,
-            "USDCAD=X":1.355,"USDCHF=X":0.895,"NZDUSD=X":0.583,
-            "EURGBP=X":0.855,"EURJPY=X":161.0,"GBPJPY=X":192.0,"EURCHF=X":0.955,
-            "EURAUD=X":1.715,"GBPAUD=X":2.040,"AUDJPY=X":94.5, "CADJPY=X":109.5,
-            "USDTRY=X":38.5,"USDZAR=X":18.5, "USDMXN=X":17.8,"USDSGD=X":1.335,
-            # FX display name aliases (TV-style, without =X suffix)
-            "EURUSD":1.085, "GBPUSD":1.295, "USDJPY":148.5, "AUDUSD":0.635,
-            "USDCAD":1.355, "USDCHF":0.895, "NZDUSD":0.583,
-            "EURGBP":0.855, "EURJPY":161.0, "GBPJPY":192.0, "EURCHF":0.955,
-            "EURAUD":1.715, "EURCAD":1.565, "EURNZD":1.860, "GBPAUD":2.040,
-            "GBPCAD":1.830, "GBPCHF":1.140, "GBPNZD":2.215, "AUDJPY":94.5,
-            "AUDCAD":0.860, "AUDCHF":0.568, "AUDNZD":1.090, "CADJPY":109.5,
-            "CADCHF":0.661, "CHFJPY":165.5, "NZDJPY":86.5,  "NZDCAD":0.788,
-            "NZDCHF":0.523, "USDTRY":38.5,  "USDZAR":18.5,  "USDMXN":17.8,
-            "USDSEK":10.45, "USDNOK":10.85, "USDSGD":1.335, "USDHKD":7.782,
-            "USDCNH":7.25,  "USDINR":84.5,  "USDBRL":5.85,  "USDKRW":1360.0,
-            # Metals & Commodities
-            "GC=F":3100,  "SI=F":34.5,   "HG=F":4.55,  "PL=F":990,  "PA=F":950,
-            "CL=F":68,    "BZ=F":72,     "NG=F":4.2,   "RB=F":2.15, "HO=F":2.45,
-            "ZC=F":480,   "ZW=F":555,    "ZS=F":975,   "KC=F":380,  "CT=F":82,
-            "CC=F":9100,  "SB=F":18.5,
-            # Display name aliases (resolved by _TICKER_ALIAS at fetch time)
-            "XAUUSD":4050,"XAGUSD":32.5,"USOIL":68,"UKOIL":72,"NATGAS":4.2,
-            "CORN":480,   "WHEAT":555,  "SOYBEAN":975,
-            # Indices
-            "^GSPC":5700, "^NDX":20100, "^DJI":42800,"^RUT":2175,  "^VIX":19,
-            "^FTSE":8250, "^GDAXI":22500,"^FCHI":8050,"^N225":38500,
-            "^HSI":19800, "^AXJO":8100, "^KS11":2700,"^BVSP":130000,
-            "US500":5700, "US100":20100,"US30":42800, "UK100":8250,
-            "GER40":22500,"FRA40":8050, "JPN225":38500,"HK50":19800,
-            # Futures
-            "ES=F":5700,  "NQ=F":20100, "YM=F":42800,"RTY=F":2175,
-            "ZN=F":108.5, "ZB=F":117,   "ZT=F":101.5,
-            # ETFs
-            "SPY":560,  "QQQ":475,  "IWM":215,  "DIA":425,  "VTI":245,
-            "VOO":515,  "GLD":265,  "IAU":57,   "SLV":27,   "TLT":93,
-            "IEF":96,   "AGG":95,   "BND":73,   "HYG":77,   "LQD":108,
-            "XLK":225,  "XLE":88,   "XLF":49,   "XLV":148,  "XLI":135,
-            "GDX":43,   "SOXX":210, "SMH":225,  "EEM":42,   "VWO":43,
-            "EFA":78,   "VGK":66,   "EWJ":70,   "EWZ":28,   "FXI":28,
-            # US Stocks
-            "AAPL":225, "MSFT":415, "NVDA":115, "GOOGL":175,"AMZN":200,
-            "META":600, "TSLA":195, "JPM":240,  "V":290,    "MA":490,
-            "BRK.B":460,"XOM":115,  "CVX":155,  "WMT":95,   "HD":380,
-            "GS":580,   "BAC":44,   "MS":130,   "NFLX":980, "AMD":125,
-            "INTC":22,  "PYPL":75,  "COST":920, "SBUX":95,  "TGT":135,
-            "NKE":93,   "DIS":112,  "PG":161,   "KO":62,    "PEP":172,
-            "JNJ":158,  "UNH":510,  "LLY":840,  "PFE":27,   "ABBV":182,
-            "MRK":128,  "TMO":495,  "ABT":125,  "AMGN":285, "GILD":105,
-            "BA":188,   "CAT":358,  "GE":162,   "LMT":490,  "RTX":125,
-            "IBM":190,  "ORCL":160, "CRM":295,  "ADBE":480, "NOW":980,
-            "SNOW":155, "DDOG":120, "CRWD":390, "PANW":185, "NET":125,
-            "PLTR":92,  "COIN":225, "AVGO":195, "QCOM":155, "TXN":195,
-            "MU":105,   "ARM":125,  "C":68,     "WFC":78,   "BLK":985,
-            "SCHW":75,  "AXP":280,  "HOOD":42,  "SQ":75,    "SHOP":115,
-            "BABA":95,  "JD":35,    "PDD":155,  "NIO":4.5,  "RIVN":11,
-            "SLB":45,   "EOG":130,  "COP":115,
-            # UK Stocks
-            "AZN.L":11500,"HSBA.L":720,"BP.L":430,"SHEL.L":2530,"RIO.L":4900,
-            "GSK.L":1580,"LLOY.L":55, "BARC.L":235,"VOD.L":70,
-            # European Stocks
-            "ASML.AS":680,"MC.PA":780,"SAP.DE":225,"SIE.DE":190,"ALV.DE":310,
-            "BMW.DE":80, "VOW3.DE":95,"NESN.SW":95,"NOVN.SW":95,"ROG.SW":250,
-            # Japanese Stocks
-            "7203.T":3200,"9984.T":9500,"6758.T":2800,"7974.T":8500,
-        }
-        base = _MOCK_BASES.get(ticker, _MOCK_BASES.get(ticker.upper(), 100.0))
-        # For forex use tighter volatility, crypto use wider
-        is_forex = "=X" in ticker
-        is_crypto = "-USD" in ticker and ticker not in ("GLD", "SLV")
-        daily_vol = 0.003 if is_forex else (0.028 if is_crypto else 0.014)
-
-        rng = random.Random(sum(ord(c) for c in ticker))
-        now = int(datetime.utcnow().timestamp())
-        _PERIOD_BARS = {"1d": 390, "5d": 120, "1mo": 720, "3mo": 90, "6mo": 130, "1y": 252, "2y": 504}
-        n_bars = _PERIOD_BARS.get(period, 130)
-        _INTERVAL_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1wk": 604800}
-        bar_seconds = _INTERVAL_SECONDS.get(interval, 86400)
-        DAY = bar_seconds
-        candles = []
-        price = base
-        for i in range(n_bars, 0, -1):
-            o = price
-            change = rng.gauss(0.0002, daily_vol)
-            c = round(o * (1 + change), 4 if is_forex else 2)
-            h = round(max(o, c) * (1 + abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
-            l = round(min(o, c) * (1 - abs(rng.gauss(0, daily_vol * 0.4))), 4 if is_forex else 2)
-            vol = int(rng.uniform(5e5, 8e6) if not is_forex else rng.uniform(1e4, 5e5))
-            candles.append({"time": now - i * DAY, "open": round(o, 4 if is_forex else 2), "high": h, "low": l, "close": c, "volume": vol})
-            price = c
-        return _cache_and_return({"ticker": ticker, "candles": candles})
-    except Exception:
-        return {"ticker": ticker, "candles": []}
+    # ── 4. No data ───────────────────────────────────────────────────────────
+    #
+    # A mock fallback lived here. When TradingView, yfinance and the Yahoo REST
+    # API had all failed it generated the chart from a hardcoded base price per
+    # ticker and a random walk:
+    #
+    #     rng    = random.Random(sum(ord(c) for c in ticker))
+    #     change = rng.gauss(0.0002, daily_vol)
+    #     vol    = rng.uniform(5e5, 8e6)
+    #
+    # and returned it through the normal response shape, so the UI drew invented
+    # candles as a price chart with no indication they were not real. A trader
+    # reading support, resistance or a pattern off that chart is reading noise
+    # seeded by the spelling of the symbol.
+    #
+    # An empty candle list is returned instead, with the reason attached, and
+    # the chart shows that the feed is unavailable.
+    return {
+        "ticker": ticker,
+        "candles": [],
+        "error": "no_data",
+        "detail": (f"No price data available for {ticker} - TradingView, yfinance "
+                   f"and the Yahoo REST API all failed. No chart is drawn rather "
+                   f"than a simulated one."),
+    }
 
 
 # ── 3D Microstructure Surface endpoints ──────────────────────────────────────

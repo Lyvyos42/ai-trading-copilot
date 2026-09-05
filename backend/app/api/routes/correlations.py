@@ -37,7 +37,7 @@ def _compute_matrix(tickers: list[str], period_days: int) -> dict:
         import yfinance as yf
         import pandas as pd
     except ImportError:
-        return _synthetic_matrix(tickers)
+        return _unavailable_matrix(tickers, "price library not installed")
 
     symbols = [_resolve_symbol(t) for t in tickers]
     try:
@@ -46,7 +46,7 @@ def _compute_matrix(tickers: list[str], period_days: int) -> dict:
             auto_adjust=True, progress=False, threads=True,
         )
         if data.empty:
-            return _synthetic_matrix(tickers)
+            return _unavailable_matrix(tickers, "the price feed returned no data")
 
         # Extract close prices
         if isinstance(data.columns, pd.MultiIndex):
@@ -58,7 +58,8 @@ def _compute_matrix(tickers: list[str], period_days: int) -> dict:
         # Compute returns and correlation
         returns = closes.pct_change().dropna()
         if len(returns) < 10:
-            return _synthetic_matrix(tickers)
+            return _unavailable_matrix(
+                tickers, f"only {len(returns)} overlapping days of returns - too few to correlate")
 
         corr = returns.corr()
 
@@ -77,34 +78,34 @@ def _compute_matrix(tickers: list[str], period_days: int) -> dict:
             "period_days": period_days,
             "data_points": len(returns),
         }
-    except Exception:
-        return _synthetic_matrix(tickers)
+    except Exception as exc:
+        return _unavailable_matrix(tickers, f"price fetch failed ({type(exc).__name__})")
 
 
-def _synthetic_matrix(tickers: list[str]) -> dict:
-    """Fallback: generate plausible synthetic correlations."""
-    import random
-    random.seed(42)
+def _unavailable_matrix(tickers: list[str], reason: str) -> dict:
+    """No correlation data. Says so, rather than inventing a matrix.
+
+    This replaced _synthetic_matrix, which built the whole grid from
+    random.uniform inside hand-drawn bands - 0.75-0.95 for equity pairs,
+    -0.5 to -0.1 for equity against safe havens, -0.3 to 0.5 for everything
+    else - seeded on 42 so it looked stable between refreshes. It was
+    returned through the normal response shape with data_points: 0, and the
+    correlation map rendered it identically to a measured one.
+
+    A correlation map exists to show which positions actually move together.
+    Plausible-looking numbers are worse than none, because a diversification
+    decision made against them feels informed.
+    """
     n = len(tickers)
-    matrix = [[0.0] * n for _ in range(n)]
-    # Known correlation clusters
-    _equity = {"SPY", "QQQ", "IWM"}
-    _safe = {"TLT", "GLD"}
-    for i in range(n):
-        matrix[i][i] = 1.0
-        for j in range(i + 1, n):
-            ti, tj = tickers[i].upper().replace("-USD", "").replace("=X", ""), tickers[j].upper().replace("-USD", "").replace("=X", "")
-            if ti in _equity and tj in _equity:
-                val = round(random.uniform(0.75, 0.95), 3)
-            elif ti in _safe and tj in _safe:
-                val = round(random.uniform(0.1, 0.4), 3)
-            elif (ti in _equity and tj in _safe) or (ti in _safe and tj in _equity):
-                val = round(random.uniform(-0.5, -0.1), 3)
-            else:
-                val = round(random.uniform(-0.3, 0.5), 3)
-            matrix[i][j] = val
-            matrix[j][i] = val
-    return {"tickers": tickers, "matrix": matrix, "period_days": 90, "data_points": 0}
+    matrix = [[1.0 if i == j else None for j in range(n)] for i in range(n)]
+    return {
+        "tickers": tickers,
+        "matrix": matrix,
+        "period_days": 90,
+        "data_points": 0,
+        "error": "no_data",
+        "detail": f"Correlations unavailable: {reason}. No values are estimated.",
+    }
 
 
 def _compute_pair(t1: str, t2: str, period_days: int) -> dict:

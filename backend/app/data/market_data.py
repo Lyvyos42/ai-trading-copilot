@@ -1,11 +1,19 @@
 """
-Market data provider — fetches from Yahoo Finance via yfinance (free, no API key),
-and falls back to realistic deterministic mock data when offline or ticker not found.
+Market data provider — fetches from Yahoo Finance via yfinance (free, no API key)
+and the TradingView scanner.
+
+Synthetic bars exist for offline development only and are DISABLED unless
+ALLOW_SYNTHETIC_MARKET_DATA is set. With every feed down this module returns
+None rather than a random walk; see the note at the fallback.
 """
 import asyncio
+import os
 import random
+import structlog
 from datetime import datetime, timedelta
 from app.config import settings
+
+log = structlog.get_logger()
 
 
 def _price_decimals(price: float) -> int:
@@ -462,10 +470,44 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
             except Exception:
                 pass
 
-    # 3. Mock fallback
+    # 3. Synthetic bars - OFF unless explicitly enabled.
+    #
+    # _mock_market_data builds 260 bars from rng.gauss(0.0001, 0.012), a random
+    # walk around a hardcoded base price. Everything downstream then computes
+    # correctly on invented data: the technical agent's EMA, RSI and ATR are
+    # real arithmetic on fictional prices, and the levels quoted to the user
+    # are derived from them.
+    #
+    # The trader refuses to publish a signal when data_source == "mock", so no
+    # signal was reaching a user this way. But that is one guard standing
+    # between fabricated bars and the product, and this generator exists for
+    # offline development, not for production. It is now reachable only when
+    # ALLOW_SYNTHETIC_MARKET_DATA is explicitly set; otherwise a dead feed
+    # returns nothing and each caller has to handle the absence.
     if not data:
-        data = _mock_market_data(ticker, asset_class)
-        data_source = "mock"
+        if os.getenv("ALLOW_SYNTHETIC_MARKET_DATA", "").lower() in ("1", "true", "yes"):
+            data = _mock_market_data(ticker, asset_class)
+            data_source = "mock"
+        else:
+            # Returning None would break every caller - graph.py, session.py and
+            # the scanners all treat the result as a dict. So the absence is
+            # returned IN the contract: no bars, and data_source "unavailable".
+            #
+            # That routes straight into machinery that already exists. The
+            # technical agent abstains when `closes` is empty, which drops the
+            # pipeline below MIN_DIRECTIONAL_VOTES, and the trader refuses this
+            # data_source outright - so a dead feed produces NO_SIGNAL rather
+            # than a signal priced off nothing.
+            log.warning("market_data_unavailable", ticker=ticker,
+                        detail="all feeds failed; synthetic bars disabled")
+            return {
+                "ticker": ticker,
+                "asset_class": asset_class,
+                "data_source": "unavailable",
+                "closes": [], "highs": [], "lows": [], "volumes": [],
+                "close": None, "atr": 0.0,
+                "pe_ratio": None, "eps_growth": None, "revenue_growth": None,
+            }
 
     # Inject live spot price — prefer TradingView scanner (true spot for
     # FX/metals), fall back to Yahoo REST for stocks/indices.

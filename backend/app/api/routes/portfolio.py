@@ -5,7 +5,6 @@ POST /api/v1/portfolio/close/{id} — close a position (paper)
 GET  /api/v1/portfolio/summary    — portfolio-level stats
 """
 import uuid
-import random
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -41,21 +40,27 @@ async def get_positions(
 
     enriched = []
     for p in positions:
-        # Simulate current price drift for paper positions
-        mock_price = _simulate_price(p.entry_price, p.ticker, p.opened_at)
-        pnl = _calc_pnl(p.direction, p.entry_price, mock_price, p.quantity)
+        # Real spot. When the feed is down the position reports its entry with
+        # current_price None and pnl None, so the UI shows an em dash rather
+        # than an invented gain.
+        live = await _live_price(p.ticker)
+        pnl = _calc_pnl(p.direction, p.entry_price, live, p.quantity) if live is not None else None
         enriched.append({
             "id": str(p.id),
             "ticker": p.ticker,
             "asset_class": p.asset_class,
             "direction": p.direction,
             "entry_price": p.entry_price,
-            "current_price": mock_price,
+            "current_price": live,
             "quantity": p.quantity,
             "stop_loss": p.stop_loss,
             "take_profit_1": p.take_profit_1,
-            "unrealized_pnl": round(pnl, 2),
-            "unrealized_pnl_pct": round(pnl / (p.entry_price * p.quantity) * 100, 2),
+            # None, not 0. A position whose price could not be fetched has an
+            # UNKNOWN P&L, and zero would read as flat.
+            "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
+            "unrealized_pnl_pct": (round(pnl / (p.entry_price * p.quantity) * 100, 2)
+                                   if pnl is not None and p.entry_price and p.quantity else None),
+            "price_unavailable": live is None,
             "status": p.status,
             "opened_at": (p.opened_at.isoformat() + "Z") if p.opened_at else None,
             "is_paper": p.is_paper,
@@ -119,7 +124,16 @@ async def close_position(
     if position.status != "OPEN":
         raise HTTPException(status_code=400, detail="Position is not open")
 
-    close_price = _simulate_price(position.entry_price, position.ticker, position.opened_at)
+    close_price = await _live_price(position.ticker)
+    if close_price is None:
+        # Refuse rather than book a made-up realised result. This value is
+        # written to realized_pnl and synced back to the linked signal as a
+        # WIN or LOSS, so a guess here corrupts the track record permanently.
+        raise HTTPException(
+            status_code=503,
+            detail=(f"No live price for {position.ticker}, so this position cannot be "
+                    f"closed at a real level. Try again when the feed recovers."),
+        )
     realized = _calc_pnl(position.direction, position.entry_price, close_price, position.quantity)
 
     position.status = "CLOSED"
@@ -195,12 +209,33 @@ async def portfolio_summary(
     }
 
 
-def _simulate_price(entry: float, ticker: str, opened_at: datetime) -> float:
-    """Deterministic mock price based on time elapsed."""
-    rng = random.Random(sum(ord(c) for c in ticker))
-    seconds = (datetime.now(timezone.utc) - opened_at.replace(tzinfo=timezone.utc)).total_seconds()
-    drift = rng.gauss(0.0001, 0.015) * (seconds / 86400)
-    return round(entry * (1 + drift), 2)
+async def _live_price(ticker: str) -> float | None:
+    """Real spot price for a paper position, or None if the feed is down.
+
+    This replaces _simulate_price, which invented one:
+
+        rng   = random.Random(sum(ord(c) for c in ticker))
+        drift = rng.gauss(0.0001, 0.015) * (seconds / 86400)
+        return entry * (1 + drift)
+
+    Paper trading exists to tell you whether the signals work. A position
+    whose current price is a random walk seeded by the spelling of its ticker
+    produces a P&L, an equity curve and a realised result that are all
+    fiction - and closing a position wrote that fiction into realized_pnl and
+    synced a WIN or LOSS back onto the linked signal, which is the very
+    number the track record is built from.
+
+    Paper money is fine. Paper prices are not.
+    """
+    from app.data.market_data import _fetch_tv_ta_spot, _fetch_rest_spot_price, resolve_ticker
+    try:
+        price = await _fetch_tv_ta_spot(ticker)
+        if price and price > 0:
+            return float(price)
+        price = await _fetch_rest_spot_price(resolve_ticker(ticker))
+        return float(price) if price and price > 0 else None
+    except Exception:
+        return None
 
 
 def _calc_pnl(direction: str, entry: float, current: float, qty: float) -> float:
