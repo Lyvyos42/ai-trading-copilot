@@ -5,14 +5,59 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
 
 export { API_URL, WS_URL };
 
-export async function getToken(): Promise<string | null> {
-  // Prefer live Supabase session (handles refresh automatically)
+/** localStorage token, if any. The fallback for every getToken failure path. */
+function storedToken(): string | null {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getToken(): Promise<string | null> {
+  // Prefer live Supabase session (handles refresh automatically).
+  //
+  // Raced against a timeout because getSession() is NOT reliably quick. It
+  // takes a navigator.locks lock, so concurrent tabs serialise on it, and when
+  // the stored session has expired it makes a network call to refresh. Either
+  // can hang - and this runs BEFORE apiFetch's retry loop, so a hang here
+  // stalls the request with no error, no retry and no timeout, which from the
+  // outside is indistinguishable from a dead endpoint. 8s is far longer than a
+  // healthy refresh needs; past that, fall through to the stored token.
+  try {
+    const session = await Promise.race([
+      supabase.auth.getSession().then(r => r.data.session),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 8_000)),
+    ]);
     if (session?.access_token) return session.access_token;
   } catch {}
   // Fallback: manually stored token (demo user / legacy)
-  return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  return storedToken();
+}
+
+/** Turn an opaque fetch TypeError into a message that names a cause.
+ *
+ *  "Failed to fetch" is the browser's single word for offline, DNS failure,
+ *  TLS failure, a blocked request, a CORS rejection and a killed connection.
+ *  It names none of them, so it reads like a broken endpoint - which cost two
+ *  rounds of investigating a server that was answering in 0.3s the whole time.
+ */
+function networkErrorMessage(path: string, err: unknown): string {
+  const detail = err instanceof Error ? err.message : String(err);
+
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "You are offline - the browser reports no network connection.";
+  }
+  if (API_URL.startsWith("http://localhost")) {
+    return `NEXT_PUBLIC_API_URL is not set on this deployment, so the page is `
+         + `calling ${API_URL}. Set it in the Vercel environment and redeploy.`;
+  }
+
+  let host = API_URL;
+  try { host = new URL(API_URL).host; } catch {}
+  return `Cannot reach ${host}${path} - 6 attempts over ~74s, no reply. `
+       + `The API answers from outside the browser, so this is local: a blocking `
+       + `extension (adblocker / privacy shield), a VPN or proxy, or DNS. [${detail}]`;
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -36,10 +81,18 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   let lastError: unknown;
   for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
     try {
-      const res = await fetch(`${API_URL}${path}`, reqOptions);
+      // A hung connection had no timeout at all, so it could sit forever and
+      // consume the whole retry budget without ever producing an error.
+      const res = await fetch(`${API_URL}${path}`, {
+        ...reqOptions,
+        signal: (reqOptions as any).signal ?? AbortSignal.timeout(45_000),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Request failed" }));
-        const msg = err.detail || `HTTP ${res.status}`;
+        let msg = err.detail || `HTTP ${res.status}`;
+        // This page can be browsed signed-out, but writes cannot be done
+        // signed-out. Say which it is rather than repeating the bare detail.
+        if (res.status === 401) msg = `${msg} - sign in again, your session has expired.`;
         // Tag HTTP errors so we can distinguish from network failures
         const httpErr = new Error(msg);
         (httpErr as any)._httpStatus = res.status;
@@ -54,6 +107,9 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
         await new Promise(r => setTimeout(r, DELAYS[attempt]));
         continue;
       }
+      // Every retry is spent. Replace the browser's opaque wording with
+      // something that names what was tried and where.
+      if (!isHttpError) throw new Error(networkErrorMessage(path, err));
       throw err;
     }
   }

@@ -694,7 +694,15 @@ export default function SignalsPage() {
               </span>
               {resetMsg && (
                 <span
-                  className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded"
+                  // A failure now carries a diagnosis, and a diagnosis has to be
+                  // readable: 7px on one clipped line was fine for "deleted 12"
+                  // and useless for the reason something did not work.
+                  className={
+                    "ml-2 font-bold px-1.5 py-0.5 rounded " +
+                    (resetMsg.ok
+                      ? "text-[7px]"
+                      : "text-[9px] inline-block max-w-[440px] whitespace-normal leading-snug align-top")
+                  }
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                     color: resetMsg.ok ? "hsl(var(--bull))" : "hsl(var(--bear))",
@@ -719,10 +727,14 @@ export default function SignalsPage() {
                         ok: true,
                         text: `deleted ${r?.deleted ?? 0}${left.length ? `, ${left.length} left` : ""}`,
                       });
+                      // Success is self-evident and can clear itself.
+                      setTimeout(() => setResetMsg(null), 6000);
                     } catch (e) {
+                      // A failure must NOT clear itself. The old 6s timer wiped
+                      // the reason off the screen before it could be read, which
+                      // is why every report of this was just "it failed".
                       setResetMsg({ ok: false, text: e instanceof Error ? e.message : "reset failed" });
                     }
-                    setTimeout(() => setResetMsg(null), 6000);
                   }}
                   className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded border transition-colors"
                   style={{
