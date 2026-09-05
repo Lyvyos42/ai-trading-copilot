@@ -55,8 +55,12 @@ export function AgentConsensusHUD({
   const [debaterOpen, setDebaterOpen] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
 
-  // If no signal exists yet for this ticker, render the 2027 Active Neural Deliberation Scanner
-  if (!signal) {
+  // STRICT SYMBOL MATCH: Ensure the consensus dossier belongs to the active instrument
+  const matchingSignal =
+    signal && signal.ticker.toUpperCase() === activeTicker.toUpperCase() ? signal : null;
+
+  // If no matching signal exists yet for this ticker, render the 2027 Active Neural Deliberation Scanner
+  if (!matchingSignal) {
     return (
       <div className="flex flex-col h-full bg-surface-1 border-l border-border/40 p-4 justify-between overflow-y-auto">
         <div className="space-y-4">
@@ -150,12 +154,12 @@ export function AgentConsensusHUD({
     );
   }
 
-  const isNoSignal = signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
-  const prob = Math.round(signal.probability_score ?? signal.confidence_score ?? 50);
-  const isBull = signal.direction === "LONG";
-  const isBear = signal.direction === "SHORT";
-  const bullPct = isNoSignal ? 0 : signal.bullish_pct ?? prob;
-  const bearPct = isNoSignal ? 0 : signal.bearish_pct ?? 100 - bullPct;
+  const isNoSignal = matchingSignal.status === "NO_SIGNAL" || matchingSignal.direction === "NEUTRAL";
+  const prob = Math.round(matchingSignal.probability_score ?? matchingSignal.confidence_score ?? 50);
+  const isBull = matchingSignal.direction === "LONG";
+  const isBear = matchingSignal.direction === "SHORT";
+  const bullPct = isNoSignal ? 0 : matchingSignal.bullish_pct ?? prob;
+  const bearPct = isNoSignal ? 0 : matchingSignal.bearish_pct ?? 100 - bullPct;
 
   // SVG Radial Gauge Calculations
   const radius = 48;
@@ -192,7 +196,7 @@ export function AgentConsensusHUD({
                 : "bg-bear/15 text-bear border-bear/30"
             )}
           >
-            {isNoSignal ? "NO CLEAR EDGE" : `${signal.direction} @ ${prob}%`}
+            {isNoSignal ? "NO CLEAR EDGE" : `${matchingSignal.direction} @ ${prob}%`}
           </span>
         </div>
 
@@ -251,7 +255,7 @@ export function AgentConsensusHUD({
         <div className="text-center text-[10px] font-mono text-muted-foreground">
           {isNoSignal
             ? "Specialists abstained due to conflicting signals"
-            : `AI_CONSENSUS_${signal.direction}: ${prob}% CONFLUENCE`}
+            : `AI_CONSENSUS_${matchingSignal.direction}: ${prob}% CONFLUENCE`}
         </div>
       </div>
 
@@ -299,8 +303,8 @@ export function AgentConsensusHUD({
 
         {debaterOpen && (
           <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[10px] leading-relaxed">
-            {signal.reasoning_chain && signal.reasoning_chain.length > 0 ? (
-              signal.reasoning_chain.map((chain, i) => (
+            {matchingSignal.reasoning_chain && matchingSignal.reasoning_chain.length > 0 ? (
+              matchingSignal.reasoning_chain.map((chain, i) => (
                 <div key={i} className="p-1.5 rounded bg-surface-1/80 border border-border/30">
                   <span className="text-primary font-bold mr-1.5">[ARG_{i + 1}]</span>
                   <span className="text-muted-foreground">{chain}</span>
@@ -335,12 +339,12 @@ export function AgentConsensusHUD({
               </>
             )}
 
-            {signal.status_reasons && signal.status_reasons.length > 0 && (
+            {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0 && (
               <div className="mt-2 p-1.5 rounded border border-warn/30 bg-warn/5 space-y-0.5">
                 <div className="text-[9px] font-bold text-warn flex items-center gap-1">
                   <AlertCircle className="h-2.5 w-2.5" /> PIPELINE TRUTH OBSERVATIONS
                 </div>
-                {signal.status_reasons.map((r, i) => (
+                {matchingSignal.status_reasons.map((r, i) => (
                   <div key={i} className="text-[9px] text-warn/90">• {r}</div>
                 ))}
               </div>
@@ -362,7 +366,7 @@ export function AgentConsensusHUD({
         {rosterOpen && (
           <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[9px]">
             {AGENTS.map((agent) => {
-              const voteRaw = signal.agent_votes ? signal.agent_votes[agent.key] : null;
+              const voteRaw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
               let direction = "ABSTAINED";
               let confidence = 0;
               if (voteRaw && typeof voteRaw === "object") {

@@ -129,12 +129,19 @@ export function TradingCanvasHUD({
     }
   }
 
-  const isNoSignal = !signal || signal.status === "NO_SIGNAL" || signal.direction === "NEUTRAL";
-  const isShort = signal?.direction === "SHORT";
-  const entry = signal?.entry_price || signal?.current_price || null;
-  const target = signal?.research_target || signal?.take_profit_1 || null;
-  const inval = signal?.invalidation_level || signal?.stop_loss || null;
-  const spot = signal?.current_price || entry;
+  // STRICT SYMBOL MATCH: Ensure the signal belongs to the active ticker
+  const matchingSignal =
+    signal && signal.ticker.toUpperCase() === ticker.toUpperCase() ? signal : null;
+
+  const isNoSignal =
+    !matchingSignal ||
+    matchingSignal.status === "NO_SIGNAL" ||
+    matchingSignal.direction === "NEUTRAL";
+  const isShort = matchingSignal?.direction === "SHORT";
+  const entry = matchingSignal?.entry_price || matchingSignal?.current_price || null;
+  const target = matchingSignal?.research_target || matchingSignal?.take_profit_1 || null;
+  const inval = matchingSignal?.invalidation_level || matchingSignal?.stop_loss || null;
+  const spot = matchingSignal?.current_price || entry;
 
   let journeyPct = 50;
   if (entry && target && inval && spot) {
@@ -166,8 +173,8 @@ export function TradingCanvasHUD({
       : null;
 
   const handleCopy = () => {
-    if (!signal) return;
-    const text = `${signal.ticker} ${signal.direction}\nEntry: ${entry || "Market"}\nTarget: ${target || "—"}\nInvalidation: ${inval || "—"}\nR:R: ${signal.risk_reward_ratio || "—"}\nSize: ${formatPositionSize(signal.position_size_pct)}`;
+    if (!matchingSignal) return;
+    const text = `${matchingSignal.ticker} ${matchingSignal.direction}\nEntry: ${entry || "Market"}\nTarget: ${target || "—"}\nInvalidation: ${inval || "—"}\nR:R: ${matchingSignal.risk_reward_ratio || "—"}\nSize: ${formatPositionSize(matchingSignal.position_size_pct)}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -341,52 +348,60 @@ export function TradingCanvasHUD({
             <span
               className={cn(
                 "px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border",
-                signal && signal.direction === "LONG"
+                matchingSignal && matchingSignal.direction === "LONG"
                   ? "bg-bull/15 text-bull border-bull/30"
-                  : signal && signal.direction === "SHORT"
+                  : matchingSignal && matchingSignal.direction === "SHORT"
                   ? "bg-bear/15 text-bear border-bear/30"
                   : "bg-surface-2 text-muted-foreground border-border/40"
               )}
             >
-              {signal ? signal.direction : "MONITORING"}
+              {matchingSignal ? matchingSignal.direction : "MONITORING"}
             </span>
-            {signal?.asset_class && (
+            {matchingSignal?.asset_class && (
               <span className="text-[9px] font-mono text-muted-foreground border border-border/40 px-1 py-0.2 rounded uppercase">
-                {signal.asset_class}
+                {matchingSignal.asset_class}
               </span>
             )}
           </div>
 
           {/* Key Floating Telemetry Chips */}
           <div className="hidden lg:flex items-center gap-1.5 pl-2 border-l border-border/40">
-            <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono">
-              <span className="text-muted-foreground">ENTRY: </span>
-              <span className="font-bold text-foreground">{formatPrice(entry, ticker)}</span>
-            </div>
+            {matchingSignal ? (
+              <>
+                <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono">
+                  <span className="text-muted-foreground">ENTRY: </span>
+                  <span className="font-bold text-foreground">{formatPrice(entry, ticker)}</span>
+                </div>
 
-            {target && (
-              <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
-                <Target className="h-2.5 w-2.5" />
-                <span>TP: {formatPrice(target, ticker)}</span>
-                {targetDelta !== null && (
-                  <span className="font-bold">({targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%)</span>
+                {target && (
+                  <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
+                    <Target className="h-2.5 w-2.5" />
+                    <span>TP: {formatPrice(target, ticker)}</span>
+                    {targetDelta !== null && (
+                      <span className="font-bold">({targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%)</span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            {inval && (
-              <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
-                <Shield className="h-2.5 w-2.5" />
-                <span>SL: {formatPrice(inval, ticker)}</span>
-                {invalDelta !== null && (
-                  <span className="font-bold">({invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%)</span>
+                {inval && (
+                  <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
+                    <Shield className="h-2.5 w-2.5" />
+                    <span>SL: {formatPrice(inval, ticker)}</span>
+                    {invalDelta !== null && (
+                      <span className="font-bold">({invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%)</span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            {signal?.risk_reward_ratio && signal.risk_reward_ratio > 0 && (
-              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono text-primary font-bold">
-                R:R {signal.risk_reward_ratio.toFixed(1)}:1
+                {matchingSignal.risk_reward_ratio && matchingSignal.risk_reward_ratio > 0 && (
+                  <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono text-primary font-bold">
+                    R:R {matchingSignal.risk_reward_ratio.toFixed(1)}:1
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="px-2 py-0.5 rounded bg-surface-2/60 border border-border/30 text-[10px] font-mono text-muted-foreground">
+                NO DOSSIER FOR {ticker} — CLICK &apos;ANALYZE NOW&apos; FOR 9-AGENT SYNTHESIS
               </div>
             )}
           </div>
@@ -410,7 +425,7 @@ export function TradingCanvasHUD({
             </button>
           )}
 
-          {signal && !isNoSignal && (
+          {matchingSignal && !isNoSignal && (
             <>
               <button
                 onClick={handleCopy}
@@ -423,7 +438,7 @@ export function TradingCanvasHUD({
 
               {onAdoptSignal && (
                 <button
-                  onClick={() => onAdoptSignal(signal)}
+                  onClick={() => onAdoptSignal(matchingSignal)}
                   disabled={isAdopted}
                   className={cn(
                     "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono font-bold border transition-colors",

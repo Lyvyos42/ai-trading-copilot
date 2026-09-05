@@ -180,14 +180,19 @@ export default function DashboardPage() {
       });
 
       if (activeOnly.length > 0 && !selectedSignal) {
-        setSelectedSignal(activeOnly[0]);
-        setActiveTicker(activeOnly[0].ticker);
+        const matchActive = activeOnly.find((s) => s.ticker.toUpperCase() === activeTicker.toUpperCase());
+        if (matchActive) {
+          setSelectedSignal(matchActive);
+        } else {
+          setSelectedSignal(activeOnly[0]);
+          setActiveTicker(activeOnly[0].ticker);
+        }
       }
     }
     if (agentData.status === "fulfilled") {
       setAgents(agentData.value.agents);
     }
-  }, [selectedSignal]);
+  }, [selectedSignal, activeTicker]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -470,6 +475,8 @@ export default function DashboardPage() {
                   signal={selectedSignal}
                   ticker={activeTicker}
                   interval={chartInterval}
+                  onGenerate={handleGenerate}
+                  loading={loading}
                 />
               </div>
             )}
