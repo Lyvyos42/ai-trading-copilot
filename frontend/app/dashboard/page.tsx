@@ -42,8 +42,13 @@ const PROFILE_TIMEFRAMES: Record<string, { timeframe: string; chart: string }> =
   news_catalyst: { timeframe: "1h",  chart: "1h" },
 };
 
-const WATCHLIST = [
-  "AAPL", "NVDA", "BTC-USD", "EURUSD=X", "XAUUSD", "US500", "USDJPY=X", "MSFT", "TSLA"
+// Seed only. The live list is whatever the user has pinned in the watchlist
+// bar; TradingCanvasHUD owns it and reports changes through onWatchlistChange.
+// This was a hardcoded const that SCAN NOW sent regardless of what the bar
+// showed - it scanned MSFT and USDJPY=X, which were not pinned, and skipped
+// EURJPY=X, which was.
+const WATCHLIST_SEED = [
+  "AAPL", "BTC-USD", "NVDA", "XAUUSD", "EURUSD=X", "TSLA", "US500"
 ];
 
 function _isExpired(s: Signal): boolean {
@@ -103,7 +108,24 @@ export default function DashboardPage() {
     return PROFILE_TIMEFRAMES[saved || "balanced"]?.chart || "1d";
   });
 
-  const [show3D, setShow3D] = useState(false);
+  // Mirrors the pinned watchlist bar. Seeded from the key the HUD persists to
+  // so the very first SCAN NOW - before any pin changes - already targets what
+  // is on screen rather than a hardcoded list.
+  const [watchlist, setWatchlist] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("cockpit_pinned_tabs");
+        const parsed = saved ? JSON.parse(saved) : null;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return WATCHLIST_SEED;
+  });
+
+  // Chart canvas mode. Was a boolean that made the 3D surfaces REPLACE the
+  // chart, so order flow and price could never be read together.
+  const [canvasMode, setCanvasMode] = useState<"chart" | "split" | "flow">("chart");
+  const show3D = canvasMode === "flow";
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -248,7 +270,7 @@ export default function DashboardPage() {
     setScanning(true);
     setAnalysisError(null);
     try {
-      const res = await scanNow(WATCHLIST, true);
+      const res = await scanNow(watchlist, true);
       if (res.signals && res.signals.length > 0) {
         setSignals((prev) => {
           const map = new Map(prev.map((s) => [s.ticker, s]));
@@ -432,44 +454,65 @@ export default function DashboardPage() {
             activeInterval={chartInterval}
             onIntervalChange={setChartInterval}
             show3D={show3D}
-            onToggle3D={() => setShow3D(!show3D)}
+            canvasMode={canvasMode}
+            onToggle3D={() =>
+              setCanvasMode((m) => (m === "chart" ? "split" : m === "split" ? "flow" : "chart"))
+            }
             onAdoptSignal={selectedSignal ? handleToggleAdopt : undefined}
             isAdopted={selectedSignal ? adoptedSignals.some((s) => s.signal_id === selectedSignal.signal_id) : false}
             onGenerate={handleGenerate}
             analyzing={loading}
+            onWatchlistChange={setWatchlist}
           />
 
-          {/* Chart / 3D Canvas Area */}
-          <div className="flex-1 w-full h-full relative overflow-hidden bg-background">
-            {show3D ? (
-              <div className="h-full w-full flex flex-col p-3 space-y-3 overflow-y-auto">
-                <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                  <span className="text-xs font-mono font-bold text-primary">
-                    MICROSTRUCTURE 3D ORDER FLOW DENSITY
-                  </span>
-                  <button
-                    onClick={() => setShow3D(false)}
-                    className="text-[12px] font-mono px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-muted-foreground hover:text-foreground"
-                  >
-                    RETURN TO CANDLE VIEW
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 h-[500px]">
-                  <div className="rounded border border-border/40 overflow-hidden">
-                    <DepthSurface3D ticker={activeTicker} />
-                  </div>
-                  <div className="rounded border border-border/40 overflow-hidden">
-                    <LiquiditySurface3D ticker={activeTicker} />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full w-full relative">
+          {/* Chart / Order-flow canvas.
+              Three modes rather than a boolean. The 3D surfaces used to
+              REPLACE the chart, so price action and order-flow density could
+              never be read against each other - which is the only reason to
+              look at either. Split stacks them vertically: candles need width
+              far more than height, depth surfaces read well short and wide. */}
+          <div className="flex-1 w-full h-full relative overflow-hidden bg-background flex flex-col">
+            {canvasMode !== "flow" && (
+              <div className={cn(
+                "relative w-full min-h-0",
+                canvasMode === "split" ? "h-[58%] border-b border-border/40" : "flex-1"
+              )}>
                 <TradingViewChart
                   ticker={activeTicker}
                   interval={chartInterval}
                   fillContainer={true}
                 />
+              </div>
+            )}
+
+            {canvasMode !== "chart" && (
+              <div className={cn(
+                "w-full min-h-0 flex flex-col bg-background",
+                canvasMode === "split" ? "flex-1" : "h-full"
+              )}>
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 shrink-0">
+                  <span className="text-xs font-mono font-bold text-primary">
+                    MICROSTRUCTURE 3D ORDER FLOW DENSITY
+                    <span className="ml-2 text-muted-foreground font-normal">{activeTicker}</span>
+                  </span>
+                  <button
+                    onClick={() => setCanvasMode("chart")}
+                    className="text-[12px] font-mono px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-muted-foreground hover:text-foreground"
+                  >
+                    RETURN TO CANDLE VIEW
+                  </button>
+                </div>
+                {/* min-h-0 on both the row and each cell: without it the canvas
+                    children refuse to shrink and push the page taller than the
+                    viewport, which is the scroll defect fixed in 596e79d. */}
+                <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-2 gap-2 p-2">
+                  <div className="rounded border border-border/40 overflow-hidden min-h-0">
+                    <DepthSurface3D ticker={activeTicker} />
+                  </div>
+                  <div className="rounded border border-border/40 overflow-hidden min-h-0">
+                    <LiquiditySurface3D ticker={activeTicker} />
+                  </div>
+                </div>
               </div>
             )}
           </div>

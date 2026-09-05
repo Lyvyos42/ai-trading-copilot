@@ -35,6 +35,13 @@ interface TradingCanvasHUDProps {
   onExecutePaperTrade?: (signal: Signal) => void;
   onGenerate?: (ticker: string) => void;
   analyzing?: boolean;
+  /** Emitted whenever the pinned watchlist changes, so callers that need to
+   *  ACT on it - SCAN NOW - operate on the list the user can actually see.
+   *  This component stays the owner; consumers mirror it. */
+  onWatchlistChange?: (symbols: string[]) => void;
+  /** "chart" | "split" | "flow" - the toggle cycles through all three, so the
+   *  label has to say which one the next press gives you. */
+  canvasMode?: "chart" | "split" | "flow";
 }
 
 const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -68,6 +75,8 @@ export function TradingCanvasHUD({
   onExecutePaperTrade,
   onGenerate,
   analyzing = false,
+  onWatchlistChange,
+  canvasMode = "chart",
 }: TradingCanvasHUDProps) {
   const [copied, setCopied] = useState(false);
   const [pinnedTabs, setPinnedTabs] = useState<string[]>(() => {
@@ -87,12 +96,18 @@ export function TradingCanvasHUD({
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Save pinned tabs to localStorage
+  // Save pinned tabs to localStorage, and tell the parent.
+  //
+  // SCAN NOW used to scan a list hardcoded in dashboard/page.tsx that neither
+  // matched this bar nor the background scanner's config - three unconnected
+  // symbol lists, so the button scanned symbols the user could not see and
+  // skipped one that was right in front of them.
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("cockpit_pinned_tabs", JSON.stringify(pinnedTabs));
     }
-  }, [pinnedTabs]);
+    onWatchlistChange?.(pinnedTabs);
+  }, [pinnedTabs, onWatchlistChange]);
 
   // Ensure current active ticker is present in pinned tabs
   useEffect(() => {
@@ -326,13 +341,22 @@ export function TradingCanvasHUD({
             onClick={onToggle3D}
             className={cn(
               "flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono border transition-colors",
-              show3D
+              canvasMode !== "chart"
                 ? "bg-primary text-primary-foreground font-bold border-primary"
                 : "border-border/40 hover:bg-surface-2 text-muted-foreground"
             )}
+            title={
+              canvasMode === "chart" ? "Show order flow beneath the chart"
+              : canvasMode === "split" ? "Order flow only"
+              : "Back to the chart"
+            }
           >
             <Layers className="h-3 w-3" />
-            <span className="hidden sm:inline">ORDER FLOW 3D</span>
+            <span className="hidden sm:inline">
+              {canvasMode === "chart" ? "ORDER FLOW 3D"
+               : canvasMode === "split" ? "SPLIT: CHART + FLOW"
+               : "FLOW ONLY"}
+            </span>
           </button>
         </div>
       </div>
