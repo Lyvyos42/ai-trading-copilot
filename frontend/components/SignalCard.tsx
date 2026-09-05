@@ -3,7 +3,7 @@
 import { useState, memo } from "react";
 import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
 import { type Signal, executePosition, resolveSignal } from "@/lib/api";
-import { formatPrice, timeAgo } from "@/lib/utils";
+import { formatPrice, timeAgo, formatPositionSize } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const AGENT_LABELS: Record<string, string> = {
@@ -204,6 +204,9 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
               R:R <span className="text-foreground font-semibold">{typeof rrRatio === 'number' ? rrRatio.toFixed(1) : rrRatio}:1</span>
             </span>
           )}
+          <span className="text-[13px] font-mono text-muted-foreground">
+            Size <span className="text-foreground font-semibold">{formatPositionSize(signal.position_size_pct)}</span>
+          </span>
         </div>
 
         {/* Row 3: Bull/Bear bar + Meta */}
@@ -492,8 +495,8 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           <ProbabilityBar bullPct={bullPct} bearPct={bearPct} tall />
         </div>
 
-        {/* Research Target + Invalidation Level + R:R */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        {/* Research Target + Invalidation Level + R:R + Position Size */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
           <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30">
             <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
               <Target className="h-3 w-3 text-primary" /> {isActive && signal.current_price ? "MARKET PRICE" : "ENTRY PRICE"}
@@ -554,6 +557,15 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             </div>
             <div className="text-[13px] font-mono text-muted-foreground mt-0.5">
               risk/reward
+            </div>
+          </div>
+          <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30 col-span-2 sm:col-span-1">
+            <div className="terminal-label mb-0.5">POSITION SIZE</div>
+            <div className="text-xs font-mono font-bold text-primary">
+              {formatPositionSize(signal.position_size_pct)}
+            </div>
+            <div className="text-[13px] font-mono text-muted-foreground mt-0.5">
+              {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "Kelly-adjusted" : "uncalibrated"}
             </div>
           </div>
         </div>

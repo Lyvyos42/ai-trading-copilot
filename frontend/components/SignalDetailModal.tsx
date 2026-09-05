@@ -1,8 +1,7 @@
 "use client";
 
 import { X, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatPrice } from "@/lib/utils";
+import { cn, formatPrice, formatPositionSize } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
 
 interface SignalDetailModalProps {
@@ -96,8 +95,8 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
               </div>
             </div>
 
-            {/* Research Target + Invalidation + R:R */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            {/* Research Target + Invalidation + R:R + Position Size */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="data-cell">
                 <span className="data-cell-label flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
@@ -127,6 +126,15 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
               <div className="data-cell">
                 <span className="data-cell-label">POTENTIAL R:R</span>
                 <span className="data-cell-value text-[hsl(var(--foreground))]">{rrRatio > 0 ? `${rrRatio.toFixed(1)}:1` : "N/A"}</span>
+              </div>
+              <div className="data-cell">
+                <span className="data-cell-label">POSITION SIZE</span>
+                <span className="data-cell-value text-[hsl(var(--foreground))]">
+                  {formatPositionSize(signal.position_size_pct)}
+                </span>
+                <span className="text-[12px] font-mono text-muted-foreground mt-0.5">
+                  {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "Kelly-adjusted" : "uncalibrated"}
+                </span>
               </div>
             </div>
           </>

@@ -5,7 +5,7 @@ import { SignalCard } from "@/components/SignalCard";
 import { generateSignal, listSignals, resolveSignal, apiFetch, resetSignals, wakeBackend, API_URL, type Signal } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
-import { formatPrice, timeAgo } from "@/lib/utils";
+import { formatPrice, timeAgo, formatPositionSize } from "@/lib/utils";
 import {
   IconSignal,
   IconLock,
@@ -947,6 +947,12 @@ export default function SignalsPage() {
                               {Math.min(sig.risk_reward_ratio, 10).toFixed(1)}:1
                             </span>
                           )}
+                          <span
+                            className="text-[8px]"
+                            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.8)" }}
+                          >
+                            {formatPositionSize(sig.position_size_pct)}
+                          </span>
                         </div>
                         <span
                           className="text-[8px]"

@@ -1,7 +1,7 @@
 "use client";
 
 import { TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldX } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatPositionSize } from "@/lib/utils";
 import type { SessionSignal } from "@/lib/api";
 
 interface SessionSignalCardProps {
@@ -76,7 +76,7 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
           R:R <span className="text-foreground font-bold">{signal.risk_reward_ratio?.toFixed(1) || "—"}</span>
         </span>
         <span className="text-[8px] font-mono text-muted-foreground">
-          Size <span className="text-foreground font-bold">{signal.position_size_pct?.toFixed(1)}%</span>
+          Size <span className="text-foreground font-bold">{formatPositionSize(signal.position_size_pct)}</span>
         </span>
         <span className="text-[8px] font-mono text-muted-foreground">
           Agree <span className="text-foreground font-bold">{signal.agent_agreement}/5</span>

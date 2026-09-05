@@ -230,6 +230,7 @@ export interface Signal {
   research_target?: number | null;
   invalidation_level?: number | null;
   risk_reward_ratio?: number | null;
+  position_size_pct?: number | null;
   analytical_window?: string | null;
   bull_case?: string | null;
   bear_case?: string | null;
@@ -479,7 +480,7 @@ export interface SessionSignal {
   stop_loss: number;
   take_profit_1: number;
   take_profit_2: number;
-  position_size_pct: number;
+  position_size_pct?: number | null;
   trade_type: string;
   urgency: string;
   agent_agreement: number;

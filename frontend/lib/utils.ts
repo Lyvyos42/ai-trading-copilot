@@ -50,6 +50,13 @@ export function formatPnl(pnl: number | null | undefined): string {
   return `${sign}${formatPrice(pnl)}`;
 }
 
+export function formatPositionSize(sizePct: number | null | undefined): string {
+  if (sizePct == null || typeof sizePct !== "number" || !Number.isFinite(sizePct) || sizePct <= 0) {
+    return "size manually";
+  }
+  return `${sizePct.toFixed(1)}%`;
+}
+
 export function timeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const mins = Math.floor(diff / 60_000);

@@ -410,12 +410,14 @@ async def scrape_all_feeds() -> int:
         _scrape_alpaca(),
     )
 
-    # Always fetch RSS as well to maximize coverage (verify=False ensures no Windows root CA blockage)
+    # Strict TLS verification by default in production. Only bypassed if explicitly set for local dev TLS proxies.
+    insecure_tls = os.getenv("PREFLIGHT_INSECURE_TLS", "").lower() in ("1", "true", "yes") or \
+                   os.getenv("SCRAPER_INSECURE_TLS", "").lower() in ("1", "true", "yes")
     async with httpx.AsyncClient(
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"},
         timeout=httpx.Timeout(20.0, connect=8.0),
         follow_redirects=True,
-        verify=False,
+        verify=not insecure_tls,
     ) as client:
         results = await asyncio.gather(*[_fetch_feed(client, f) for f in FEEDS], return_exceptions=True)
     # Filter out exceptions (individual feed failures should not crash the whole batch)
