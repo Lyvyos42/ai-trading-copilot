@@ -331,6 +331,8 @@ async def generate_signal(
         _reasons = (final.get("status_reasons")
                     or final.get("risk_gate_reasons")
                     or ["The pipeline did not reach a directional view."])
+        (_decision_votes, _decision_abstained,
+         _decision_directional) = decision_log.summarise_votes(state)
         # Record the decline. This is the case that used to vanish entirely -
         # the pipeline did full work, declined, and left nothing to measure.
         await decision_log.record(
@@ -347,6 +349,19 @@ async def generate_signal(
             "direction": "NEUTRAL",
             "status": final.get("status", "NO_SIGNAL"),
             "status_reasons": _reasons,
+            # The votes THIS decision was made from.
+            #
+            # They were omitted here, and the consequence was visible in the
+            # UI: with agent_votes absent every lookup returned null, the HUD
+            # bucketed all nine specialists as "NO DATA FEED", and the card
+            # read "NO DATA 9" directly above a line saying only fundamental
+            # had abstained. The panel contradicted itself because the payload
+            # that a decline produces was thinner than the one a signal
+            # produces - and a decline is exactly when the reader most needs
+            # to see who said what.
+            "agent_votes": _decision_votes,
+            "abstained": _decision_abstained,
+            "directional_votes": _decision_directional,
             "probability_score": final.get("probability_score"),
             "confidence_score": 0.0,
             "entry_price": None,
@@ -416,6 +431,14 @@ async def generate_signal(
         }
     agent_votes["risk_approved"] = state.get("risk_assessment", {}).get("approved", True)
     agent_votes["quant_validated"] = state.get("quant_validation", {}).get("statistical_edge")
+    # quant and risk_manager as OBJECTS as well, matching the shape of the
+    # seven analysts. They were only ever the two booleans above, so a
+    # consumer reading the roster by name found nothing for them and showed
+    # "NO DATA" on every signal - including good ones. The booleans stay for
+    # existing readers; these are the roster entries.
+    _sv, _, _ = decision_log.summarise_votes(state)
+    agent_votes["quant"] = _sv.get("quant")
+    agent_votes["risk_manager"] = _sv.get("risk_manager")
 
     user_id = (user.get("sub") or user.get("id") or user.get("user_id")) if user else None
 

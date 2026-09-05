@@ -54,6 +54,33 @@ def summarise_votes(state: dict) -> tuple[dict, list, int]:
         }
         if d in ("LONG", "SHORT") and (c or 0) > 0:
             directional += 1
+
+    # quant and risk_manager are part of the 9-agent roster the UI renders, but
+    # they were only ever written as the bare booleans `quant_validated` and
+    # `risk_approved`. A consumer looking them up by name found nothing and
+    # reported them as NO DATA on every signal, including good ones - which is
+    # not what "no data" means. They cast no DIRECTIONAL vote by design, and
+    # that is a different statement from having no feed.
+    q = state.get("quant_validation") or {}
+    votes["quant"] = {
+        "direction": None, "confidence": q.get("confidence"),
+        "abstained": bool(q.get("abstained")),
+        "symbol_specific": True,
+        "note": ("no backtest for this setup" if q.get("backtest_win_rate") is None
+                 else f"win rate {q.get('backtest_win_rate')}"),
+    }
+    if q.get("abstained"):
+        abstained.append("quant")
+
+    r = state.get("risk_assessment") or {}
+    votes["risk_manager"] = {
+        "direction": None, "confidence": None,
+        "abstained": False,          # it always runs; it just never picks a side
+        "symbol_specific": True,
+        "note": ("approved" if r.get("approved") else "limits breached"),
+        "position_size_pct": r.get("position_size_pct"),
+    }
+
     return votes, abstained, directional
 
 
