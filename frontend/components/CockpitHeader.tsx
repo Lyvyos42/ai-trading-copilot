@@ -64,15 +64,15 @@ export function CockpitHeader({
       <div className="flex items-center gap-2.5">
         <div className="flex items-center gap-2 pr-2.5 border-r border-border/40">
           <span className="live-dot" />
-          <span className="text-[11px] font-mono font-bold tracking-widest text-primary">
+          <span className="text-[12px] font-mono font-bold tracking-widest text-primary">
             QUANTNEURAL
           </span>
-          <span className="text-[9px] font-mono px-1 py-0.2 rounded border border-border/50 bg-surface-2 text-muted-foreground uppercase">
+          <span className="text-[12px] font-mono px-1 py-0.2 rounded border border-border/50 bg-surface-2 text-muted-foreground uppercase">
             2027 HUD
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-[12px] font-mono text-muted-foreground">
           <Clock className="h-3 w-3 text-primary/70" />
           <span className="font-bold text-foreground">{now ? formatTime(now) : "— UTC"}</span>
         </div>
@@ -82,7 +82,7 @@ export function CockpitHeader({
           <button
             onClick={onToggleBriefing}
             className={cn(
-              "ml-1 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono transition-colors border",
+              "ml-1 flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono transition-colors border",
               briefingOpen
                 ? "bg-primary/20 text-primary border-primary/40 font-bold"
                 : "bg-surface-2/70 text-muted-foreground border-border/30 hover:text-foreground hover:bg-surface-3"
@@ -97,7 +97,7 @@ export function CockpitHeader({
 
       {/* Center segment: Institutional Kill Zones & Market Clocks */}
       <div className="hidden md:flex items-center gap-2">
-        <span className="text-[9px] font-mono text-muted-foreground uppercase">
+        <span className="text-[12px] font-mono text-muted-foreground uppercase">
           KILL ZONES:
         </span>
         <div className="flex items-center gap-1">
@@ -111,7 +111,7 @@ export function CockpitHeader({
               <div
                 key={s.code}
                 className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border transition-colors",
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-mono border transition-colors",
                   isOpen
                     ? "bg-bull/10 text-bull border-bull/30 font-bold"
                     : "bg-surface-2/40 text-muted-foreground/80 border-border/20"
@@ -136,12 +136,12 @@ export function CockpitHeader({
       {/* Right segment: Regime Flag & Profile Selector */}
       <div className="flex items-center gap-2">
         {/* Regime Badge */}
-        <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-[10px] font-mono">
+        <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-[12px] font-mono">
           <Activity className="h-2.5 w-2.5 text-primary" />
-          <span className="text-muted-foreground text-[9px]">REGIME:</span>
+          <span className="text-muted-foreground text-[12px]">REGIME:</span>
           <span
             className={cn(
-              "font-bold text-[9px]",
+              "font-bold text-[12px]",
               regimeState === "BULL"
                 ? "text-bull"
                 : regimeState === "BEAR"
@@ -157,7 +157,7 @@ export function CockpitHeader({
         <div className="relative">
           <button
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="flex items-center gap-1 px-2 py-0.5 rounded border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-mono font-bold transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary text-[12px] font-mono font-bold transition-colors"
           >
             <Zap className="h-3 w-3" />
             <span>
@@ -169,7 +169,7 @@ export function CockpitHeader({
 
           {profileDropdownOpen && (
             <div className="absolute right-0 mt-1 w-56 rounded border border-border/60 bg-surface-2 p-1 shadow-2xl z-50 animate-fade-in">
-              <div className="text-[9px] font-mono uppercase text-muted-foreground px-2 py-1 border-b border-border/30">
+              <div className="text-[12px] font-mono uppercase text-muted-foreground px-2 py-1 border-b border-border/30">
                 Select Strategy Profile
               </div>
               {PROFILES.map((p) => (
@@ -186,9 +186,9 @@ export function CockpitHeader({
                 >
                   <div>
                     <div>{p.label}</div>
-                    <div className="text-[9px] text-muted-foreground font-normal">{p.desc}</div>
+                    <div className="text-[12px] text-muted-foreground font-normal">{p.desc}</div>
                   </div>
-                  <span className="text-[9px] px-1 py-0.2 rounded border border-border/40 bg-surface-1 text-muted-foreground">
+                  <span className="text-[12px] px-1 py-0.2 rounded border border-border/40 bg-surface-1 text-muted-foreground">
                     {p.tf}
                   </span>
                 </button>

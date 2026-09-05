@@ -355,7 +355,7 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => setAnalysisError(null)}
-            className="text-[10px] uppercase font-bold hover:text-foreground"
+            className="text-[12px] uppercase font-bold hover:text-foreground"
           >
             DISMISS
           </button>
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                   </span>
                   <button
                     onClick={() => setShow3D(false)}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-muted-foreground hover:text-foreground"
+                    className="text-[12px] font-mono px-2 py-0.5 rounded border border-border/40 bg-surface-2 text-muted-foreground hover:text-foreground"
                   >
                     RETURN TO CANDLE VIEW
                   </button>

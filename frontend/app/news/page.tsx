@@ -335,7 +335,7 @@ export default function NewsPage() {
               {cat === "ALL" ? "ALL INTEL" : meta?.label}
               {count !== undefined && (
                 <span className={cn(
-                  "text-[8px] font-mono px-1 rounded",
+                  "text-[11px] font-mono px-1 rounded",
                   activeCategory === cat ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 )}>
                   {count}
@@ -422,8 +422,8 @@ export default function NewsPage() {
                       return (
                         <div key={cat.category}>
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className={cn("text-[8px] font-mono font-bold", meta.color.split(" ")[0])}>{meta.label}</span>
-                            <span className="text-[8px] font-mono text-muted-foreground">{cat.count}</span>
+                            <span className={cn("text-[11px] font-mono font-bold", meta.color.split(" ")[0])}>{meta.label}</span>
+                            <span className="text-[11px] font-mono text-muted-foreground">{cat.count}</span>
                           </div>
                           <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
                             <div
@@ -460,7 +460,7 @@ export default function NewsPage() {
                         )}
                       >
                         <span className="text-[13px] font-bold">{ticker}</span>
-                        <span className="text-[7px] opacity-60">{count}</span>
+                        <span className="text-[11px] opacity-60">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -528,13 +528,13 @@ export default function NewsPage() {
                           const isPercent = ["gdp_growth", "fed_funds", "unemployment", "yield_10y", "yield_2y", "yield_curve_spread"].includes(key);
                           return (
                             <div key={key} className="rounded border border-border/60 bg-background p-3">
-                              <div className="text-[8px] font-mono text-muted-foreground tracking-widest mb-1">
+                              <div className="text-[11px] font-mono text-muted-foreground tracking-widest mb-1">
                                 {labels[key] || key.toUpperCase()}
                               </div>
                               <div className="text-[14px] font-mono font-bold text-foreground">
                                 {isPercent ? `${ind.value.toFixed(2)}%` : key === "initial_claims" ? ind.value.toLocaleString() : ind.value.toFixed(1)}
                               </div>
-                              <div className={cn("text-[8px] font-mono font-bold mt-0.5", trendColor)}>
+                              <div className={cn("text-[11px] font-mono font-bold mt-0.5", trendColor)}>
                                 {ind.trend} <span className="text-muted-foreground font-normal">· {ind.date}</span>
                               </div>
                             </div>
@@ -587,7 +587,7 @@ export default function NewsPage() {
                     <div className="flex items-center gap-1.5 mb-3">
                       <Building2 className="h-3 w-3 text-warn" />
                       <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">CONGRESSIONAL TRADES</span>
-                      <span className="text-[8px] font-mono text-warn/60 ml-1">QUIVERQUANT</span>
+                      <span className="text-[11px] font-mono text-warn/60 ml-1">QUIVERQUANT</span>
                     </div>
                     {congressTrades.length === 0 ? (
                       <div className="text-[13px] font-mono text-muted-foreground/50 py-4 text-center">
@@ -600,14 +600,14 @@ export default function NewsPage() {
                           return (
                             <div key={`congress-${i}`} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 hover:border-primary/20 transition-colors">
                               <span className={cn(
-                                "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                "text-[11px] font-mono font-bold px-1.5 py-0.5 rounded",
                                 isBuy ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
                               )}>
                                 {isBuy ? "BUY" : "SELL"}
                               </span>
                               <span className="text-[13px] font-mono text-primary font-bold w-14 shrink-0">{t.ticker}</span>
                               <span className="text-[13px] font-mono text-foreground flex-1 truncate">{t.representative}</span>
-                              <span className="text-[8px] font-mono text-muted-foreground shrink-0">
+                              <span className="text-[11px] font-mono text-muted-foreground shrink-0">
                                 ({t.party}) {t.amount}
                               </span>
                               <span className="text-[13px] font-mono text-muted-foreground shrink-0">{t.date}</span>
@@ -623,7 +623,7 @@ export default function NewsPage() {
                     <div className="flex items-center gap-1.5 mb-3">
                       <Users className="h-3 w-3 text-warn" />
                       <span className="text-[13px] font-mono font-bold text-muted-foreground tracking-widest">INSIDER TRANSACTIONS</span>
-                      <span className="text-[8px] font-mono text-warn/60 ml-1">SEC FILINGS</span>
+                      <span className="text-[11px] font-mono text-warn/60 ml-1">SEC FILINGS</span>
                     </div>
                     {insiderTrades.length === 0 ? (
                       <div className="text-[13px] font-mono text-muted-foreground/50 py-4 text-center">
@@ -636,7 +636,7 @@ export default function NewsPage() {
                           return (
                             <div key={`insider-${i}`} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 hover:border-primary/20 transition-colors">
                               <span className={cn(
-                                "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded",
+                                "text-[11px] font-mono font-bold px-1.5 py-0.5 rounded",
                                 isBuy ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
                               )}>
                                 {isBuy ? "BUY" : "SELL"}
@@ -669,14 +669,14 @@ export default function NewsPage() {
             <BellRing className="h-2.5 w-2.5 text-primary" />
             <span className="terminal-label ml-1">AGENT ALERTS</span>
             {scanAlerts.filter(a => !a.read).length > 0 && (
-              <span className="ml-auto text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              <span className="ml-auto text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                 {scanAlerts.filter(a => !a.read).length} NEW
               </span>
             )}
           </div>
 
           {scanAlerts.length === 0 ? (
-            <div className="px-3 py-3 text-[8px] font-mono text-muted-foreground/60">
+            <div className="px-3 py-3 text-[11px] font-mono text-muted-foreground/60">
               No alerts yet. Configure the scanner below.
             </div>
           ) : (
@@ -685,7 +685,7 @@ export default function NewsPage() {
                 const isLong = alert.direction === "LONG";
                 return (
                   <div key={alert.id} className={cn(
-                    "px-3 py-2 border-b border-border/40 text-[8px] font-mono",
+                    "px-3 py-2 border-b border-border/40 text-[11px] font-mono",
                     !alert.read && "bg-primary/[0.03]"
                   )}>
                     <div className="flex items-center justify-between mb-0.5">
@@ -750,7 +750,7 @@ function ArticleCard({ article }: { article: Article }) {
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           {catMeta && (
             <span className={cn(
-              "text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border",
+              "text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border",
               catMeta.color
             )}>
               {catMeta.label.toUpperCase()}
@@ -784,7 +784,7 @@ function ArticleCard({ article }: { article: Article }) {
         {/* Bottom row: tickers + external link */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {article.tickers.slice(0, 4).map(t => (
-            <span key={t} className="text-[8px] font-mono text-primary border border-primary/20 px-1.5 py-0.5 rounded bg-primary/5 font-bold">
+            <span key={t} className="text-[11px] font-mono text-primary border border-primary/20 px-1.5 py-0.5 rounded bg-primary/5 font-bold">
               {t}
             </span>
           ))}
@@ -823,7 +823,7 @@ function SentimentDonut({ positive, neutral, negative }: { positive: number; neu
       <div className="absolute inset-[5px] rounded-full bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="text-[13px] font-mono font-bold text-foreground">{dominantPct}%</div>
-          <div className="text-[7px] font-mono text-muted-foreground">{dominantLabel}</div>
+          <div className="text-[11px] font-mono text-muted-foreground">{dominantLabel}</div>
         </div>
       </div>
     </div>

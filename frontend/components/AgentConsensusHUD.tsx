@@ -72,7 +72,7 @@ export function AgentConsensusHUD({
                 9-AGENT AI BRAIN
               </span>
             </div>
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border border-primary/30 bg-primary/10 text-primary uppercase">
+            <span className="text-[12px] font-mono px-1.5 py-0.2 rounded border border-primary/30 bg-primary/10 text-primary uppercase">
               STANDBY
             </span>
           </div>
@@ -94,7 +94,7 @@ export function AgentConsensusHUD({
             <div className="text-xs font-mono font-bold text-foreground mb-1">
               NEURAL CONSENSUS READY
             </div>
-            <p className="text-[10px] font-mono text-muted-foreground leading-relaxed max-w-xs mx-auto mb-3">
+            <p className="text-[12px] font-mono text-muted-foreground leading-relaxed max-w-xs mx-auto mb-3">
               No precomputed signal dossier cached for <strong className="text-primary">{activeTicker}</strong>. Initialize 9-agent consensus to evaluate CVD order flow, macro yield spread, and quantitative Z-scores.
             </p>
 
@@ -117,10 +117,10 @@ export function AgentConsensusHUD({
 
           {/* Institutional Telemetry Blueprint */}
           <div className="space-y-2">
-            <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
+            <div className="text-[12px] font-mono text-muted-foreground uppercase tracking-wider">
               Autonomous Deliberation Protocol
             </div>
-            <div className="space-y-1 text-[10px] font-mono">
+            <div className="space-y-1 text-[12px] font-mono">
               <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
                 <span className="text-muted-foreground">Technical & Momentum</span>
                 <span className="text-primary/70">15m Breakouts</span>
@@ -146,7 +146,7 @@ export function AgentConsensusHUD({
         </div>
 
         <div className="pt-3 border-t border-border/40 text-center">
-          <span className="text-[9px] font-mono text-muted-foreground">
+          <span className="text-[12px] font-mono text-muted-foreground">
             Zero-Fabrication Quantitative Architecture
           </span>
         </div>
@@ -182,13 +182,13 @@ export function AgentConsensusHUD({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <Brain className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[11px] font-mono font-bold tracking-wider text-foreground">
+            <span className="text-[12px] font-mono font-bold tracking-wider text-foreground">
               9-AGENT CONSENSUS
             </span>
           </div>
           <span
             className={cn(
-              "px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border",
+              "px-2 py-0.5 rounded text-[12px] font-mono font-bold uppercase border",
               isNoSignal
                 ? "bg-surface-3 text-muted-foreground border-border"
                 : isBull
@@ -236,7 +236,7 @@ export function AgentConsensusHUD({
               <span className="text-2xl font-mono font-extrabold text-foreground tracking-tight">
                 {isNoSignal ? "—" : `${prob}%`}
               </span>
-              <div className="flex items-center gap-1 text-[9px] font-mono font-bold">
+              <div className="flex items-center gap-1 text-[12px] font-mono font-bold">
                 {isBull ? (
                   <TrendingUp className="h-3 w-3 text-bull" />
                 ) : isBear ? (
@@ -252,7 +252,7 @@ export function AgentConsensusHUD({
           </div>
         </div>
 
-        <div className="text-center text-[10px] font-mono text-muted-foreground">
+        <div className="text-center text-[12px] font-mono text-muted-foreground">
           {isNoSignal
             ? "Specialists abstained due to conflicting signals"
             : `AI_CONSENSUS_${matchingSignal.direction}: ${prob}% CONFLUENCE`}
@@ -261,13 +261,13 @@ export function AgentConsensusHUD({
 
       {/* 2027 Section 2: Neon Telemetry Meters */}
       <div className="px-3 py-2 border-b border-border/40 bg-surface-1/90 space-y-1.5 shrink-0">
-        <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">
+        <div className="text-[12px] font-mono text-muted-foreground uppercase tracking-widest">
           Neon Analytical Telemetry
         </div>
         <div className="space-y-1.5">
           {pillars.map((pillar) => (
             <div key={pillar.label} className="space-y-0.5">
-              <div className="flex items-center justify-between text-[10px] font-mono">
+              <div className="flex items-center justify-between text-[12px] font-mono">
                 <span className="text-muted-foreground">{pillar.label}</span>
                 <span className="font-bold text-foreground">{pillar.value > 0 ? `${pillar.value}%` : "—"}</span>
               </div>
@@ -294,7 +294,7 @@ export function AgentConsensusHUD({
         >
           <div className="flex items-center gap-1.5">
             <Terminal className="h-3 w-3 text-primary" />
-            <span className="text-[10px] font-mono font-bold text-foreground tracking-wider uppercase">
+            <span className="text-[12px] font-mono font-bold text-foreground tracking-wider uppercase">
               LIVE BULL vs BEAR DEBATE TERMINAL
             </span>
           </div>
@@ -302,7 +302,7 @@ export function AgentConsensusHUD({
         </div>
 
         {debaterOpen && (
-          <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[10px] leading-relaxed">
+          <div className="flex-1 p-2.5 bg-surface-0 overflow-y-auto space-y-1.5 font-mono text-[12px] leading-relaxed">
             {matchingSignal.reasoning_chain && matchingSignal.reasoning_chain.length > 0 ? (
               matchingSignal.reasoning_chain.map((chain, i) => (
                 <div key={i} className="p-1.5 rounded bg-surface-1/80 border border-border/30">
@@ -341,11 +341,11 @@ export function AgentConsensusHUD({
 
             {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0 && (
               <div className="mt-2 p-1.5 rounded border border-warn/30 bg-warn/5 space-y-0.5">
-                <div className="text-[9px] font-bold text-warn flex items-center gap-1">
+                <div className="text-[12px] font-bold text-warn flex items-center gap-1">
                   <AlertCircle className="h-2.5 w-2.5" /> PIPELINE TRUTH OBSERVATIONS
                 </div>
                 {matchingSignal.status_reasons.map((r, i) => (
-                  <div key={i} className="text-[9px] text-warn/90">• {r}</div>
+                  <div key={i} className="text-[12px] text-warn/90">• {r}</div>
                 ))}
               </div>
             )}
@@ -357,14 +357,14 @@ export function AgentConsensusHUD({
       <div className="shrink-0 bg-surface-2/40">
         <button
           onClick={() => setRosterOpen(!rosterOpen)}
-          className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
+          className="w-full px-3 py-1.5 flex items-center justify-between text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
         >
           <span>SPECIALIST ANALYST ROSTER ({AGENTS.length} AGENTS)</span>
           {rosterOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
 
         {rosterOpen && (
-          <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[9px]">
+          <div className="max-h-36 overflow-y-auto p-2 border-t border-border/30 space-y-1 font-mono text-[12px]">
             {AGENTS.map((agent) => {
               const voteRaw = matchingSignal.agent_votes ? matchingSignal.agent_votes[agent.key] : null;
               let direction = "ABSTAINED";

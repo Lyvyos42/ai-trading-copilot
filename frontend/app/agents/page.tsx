@@ -105,13 +105,13 @@ function PipelineDiagram() {
                 }}
               >
                 <span
-                  className="text-[7px] font-bold"
+                  className="text-[11px] font-bold"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
                 >
                   {s.seq}
                 </span>
                 <span
-                  className="text-[8px] font-bold tracking-[0.08em] whitespace-nowrap"
+                  className="text-[11px] font-bold tracking-[0.08em] whitespace-nowrap"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
                 >
                   {s.label}
@@ -175,13 +175,13 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
       >
         <div className="flex items-center gap-2">
           <span
-            className="text-[8px] font-bold tracking-[0.14em]"
+            className="text-[11px] font-bold tracking-[0.14em]"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
           >
             {String(meta.seq).padStart(2, "0")}
           </span>
           <span
-            className="text-[8px] font-bold tracking-[0.1em] uppercase"
+            className="text-[11px] font-bold tracking-[0.1em] uppercase"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
           >
             {agent.name.replace("Analyst", " ANALYST").replace("Agent", " AGENT").replace("Manager", " MGR").toUpperCase()}
@@ -198,7 +198,7 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
             }}
           />
           <span
-            className="text-[8px] font-bold tracking-[0.1em]"
+            className="text-[11px] font-bold tracking-[0.1em]"
             style={{
               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
               color: agent.status === "HEALTHY" ? "hsl(var(--bull))" : "hsl(var(--bear))",
@@ -310,7 +310,7 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
           {agent.strategies.slice(0, 3).map((s) => (
             <span
               key={s}
-              className="text-[8px] px-1.5 py-0.5"
+              className="text-[11px] px-1.5 py-0.5"
               style={{
                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                 color: "hsl(var(--muted-foreground))",
@@ -324,7 +324,7 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
           ))}
           {agent.strategies.length > 3 && (
             <span
-              className="text-[8px] px-1.5 py-0.5"
+              className="text-[11px] px-1.5 py-0.5"
               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
             >
               +{agent.strategies.length - 3} more
@@ -441,7 +441,7 @@ export default function AgentsPage() {
           <IconSignal size={12} color="hsl(var(--warn))" />
           <span className="terminal-label">Force Bull / Bear Debate</span>
           <div
-            className="ml-2 text-[8px] font-bold px-1.5 py-0.5"
+            className="ml-2 text-[11px] font-bold px-1.5 py-0.5"
             style={{
               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
               color: "hsl(var(--warn) / 0.8)",

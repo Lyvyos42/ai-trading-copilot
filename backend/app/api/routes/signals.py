@@ -314,9 +314,44 @@ async def generate_signal(
     if not final:
         raise HTTPException(status_code=503, detail="Pipeline failed to generate signal")
 
-    direction = final.get("direction", "LONG")
+    # A NEUTRAL result is NOT a LONG.
+    #
+    # This coerced anything non-directional to "LONG", which is how a
+    # NO_SIGNAL for BTC-USD - the pipeline explicitly declining for lack of a
+    # price - was published to the UI as "LONG @ 0%". The app was showing a
+    # buy recommendation for a signal it had just refused to make.
+    #
+    # The coercion existed because Signal.direction is non-nullable and every
+    # pipeline run used to produce a direction. Now that NO_SIGNAL exists, the
+    # honest handling is to return it immediately: nothing downstream should
+    # price, size, persist or relabel a result the trader declined to make.
+    direction = final.get("direction")
     if direction not in ("LONG", "SHORT"):
-        direction = "LONG"
+        _reasons = (final.get("status_reasons")
+                    or final.get("risk_gate_reasons")
+                    or ["The pipeline did not reach a directional view."])
+        return {
+            "signal_id": None,
+            "ticker": ticker,
+            "asset_class": resolved_asset_class,
+            "timeframe": body.timeframe,
+            "direction": "NEUTRAL",
+            "status": final.get("status", "NO_SIGNAL"),
+            "status_reasons": _reasons,
+            "probability_score": final.get("probability_score"),
+            "confidence_score": 0.0,
+            "entry_price": None,
+            "research_target": None,
+            "invalidation_level": None,
+            "risk_reward_ratio": None,
+            "position_size_pct": None,
+            "reasoning_chain": state.get("reasoning_chain", []),
+            "agent_detail": _build_agent_detail(state),
+            "strategy_sources": [],
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "pipeline_latency_ms": state.get("pipeline_latency_ms"),
+            "degraded_sources": state.get("degraded_sources", []),
+        }
 
     # Fetch live spot price so the signal always uses the current market price,
     # not whatever stale close fetch_market_data may have returned.

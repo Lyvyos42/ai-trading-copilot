@@ -70,7 +70,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
               </p>
               {signal.status_reasons && signal.status_reasons.length > 0 && (
                 <div className="mt-2 space-y-1.5 pt-2 border-t border-border/30">
-                  <div className="text-[11px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
+                  <div className="text-[12px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
                   {signal.status_reasons.map((r, i) => (
                     <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                       <span className="text-primary font-bold">•</span>
@@ -105,7 +105,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                   {target ? formatPrice(target, signal.ticker) : "—"}
                 </span>
                 {targetDelta !== null && (
-                  <span className="text-[12px] font-mono text-bull/70 mt-0.5">
+                  <span className="text-[13px] font-mono text-bull/70 mt-0.5">
                     {targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%
                   </span>
                 )}
@@ -118,7 +118,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                   {inval ? formatPrice(inval, signal.ticker) : "—"}
                 </span>
                 {invalDelta !== null && (
-                  <span className="text-[12px] font-mono text-bear/70 mt-0.5">
+                  <span className="text-[13px] font-mono text-bear/70 mt-0.5">
                     {invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%
                   </span>
                 )}
@@ -132,7 +132,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                 <span className="data-cell-value text-[hsl(var(--foreground))]">
                   {formatPositionSize(signal.position_size_pct)}
                 </span>
-                <span className="text-[12px] font-mono text-muted-foreground mt-0.5">
+                <span className="text-[13px] font-mono text-muted-foreground mt-0.5">
                   {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "Kelly-adjusted" : "uncalibrated"}
                 </span>
               </div>

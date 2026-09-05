@@ -1329,7 +1329,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       )}
       {feedUnavailable && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20 font-mono" style={{ background: "rgba(6,11,22,0.95)" }}>
-          <div className="text-[11px] tracking-widest text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
+          <div className="text-[12px] tracking-widest text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
             FEED UNAVAILABLE
           </div>
           <div className="text-sm font-semibold text-foreground mb-1">
@@ -1338,7 +1338,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
           <div className="text-xs text-muted-foreground max-w-md leading-relaxed">
             {feedUnavailable}
           </div>
-          <div className="text-[10px] text-muted-foreground/60 mt-3">
+          <div className="text-[12px] text-muted-foreground/60 mt-3">
             Institutional restraint: abstaining from simulating synthetic order flow.
           </div>
         </div>

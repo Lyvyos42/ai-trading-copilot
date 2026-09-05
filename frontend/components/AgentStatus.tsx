@@ -67,21 +67,21 @@ export const AgentStatusPanel = memo(function AgentStatusPanel({ agents, compact
               {/* Name + stats inline */}
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 <span className={cn(
-                  "text-[11px] font-mono font-bold truncate",
+                  "text-[12px] font-mono font-bold truncate",
                   isTrader ? "text-primary" : "text-foreground"
                 )}>
                   {AGENT_SHORT[agent.name] || agent.name.toUpperCase()}
                 </span>
                 {isTrader && (
-                  <span className="text-[7px] font-mono text-primary/60 border border-primary/20 rounded px-0.5">OPUS</span>
+                  <span className="text-[11px] font-mono text-primary/60 border border-primary/20 rounded px-0.5">OPUS</span>
                 )}
-                <span className="text-[9px] font-mono text-muted-foreground/60 ml-auto mr-1">{agent.avg_latency_ms}ms {agent.signals_today} sig</span>
+                <span className="text-[12px] font-mono text-muted-foreground/60 ml-auto mr-1">{agent.avg_latency_ms}ms {agent.signals_today} sig</span>
               </div>
 
               {/* Status + accuracy */}
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={cn(
-                  "text-[11px] font-mono font-bold",
+                  "text-[12px] font-mono font-bold",
                   agent.accuracy_7d != null
                     ? (agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear")
                     : "text-muted-foreground"
@@ -95,7 +95,7 @@ export const AgentStatusPanel = memo(function AgentStatusPanel({ agents, compact
                     "h-1 w-1 rounded-full",
                     healthy ? "bg-bull animate-pulse" : "bg-bear"
                   )} />
-                  <span className="text-[7px] font-mono text-muted-foreground">
+                  <span className="text-[11px] font-mono text-muted-foreground">
                     {healthy ? "LIVE" : "DOWN"}
                   </span>
                 </div>

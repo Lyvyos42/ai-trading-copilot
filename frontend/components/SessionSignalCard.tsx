@@ -61,7 +61,7 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
             { label: "TP2", value: signal.take_profit_2, color: "text-bull" },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-background px-3 py-2 text-center">
-              <div className="text-[8px] font-mono text-muted-foreground">{label}</div>
+              <div className="text-[11px] font-mono text-muted-foreground">{label}</div>
               <div className={cn("text-[14px] font-mono font-bold", color)}>
                 {typeof value === "number" ? value.toFixed(2) : "—"}
               </div>
@@ -72,13 +72,13 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
 
       {/* Footer stats */}
       <div className="flex items-center gap-3 px-4 py-2 border-t border-border/30">
-        <span className="text-[8px] font-mono text-muted-foreground">
+        <span className="text-[11px] font-mono text-muted-foreground">
           R:R <span className="text-foreground font-bold">{signal.risk_reward_ratio?.toFixed(1) || "—"}</span>
         </span>
-        <span className="text-[8px] font-mono text-muted-foreground">
+        <span className="text-[11px] font-mono text-muted-foreground">
           Size <span className="text-foreground font-bold">{formatPositionSize(signal.position_size_pct)}</span>
         </span>
-        <span className="text-[8px] font-mono text-muted-foreground">
+        <span className="text-[11px] font-mono text-muted-foreground">
           Agree <span className="text-foreground font-bold">{signal.agent_agreement}/5</span>
         </span>
         <div className="ml-auto flex items-center gap-1">
@@ -88,7 +88,7 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
             <ShieldX className="h-3 w-3 text-bear" />
           )}
           <span className={cn(
-            "text-[8px] font-mono font-bold",
+            "text-[11px] font-mono font-bold",
             signal.risk_gate_passed ? "text-bull" : "text-bear"
           )}>
             {signal.risk_gate_mode}
@@ -102,7 +102,7 @@ export function SessionSignalCard({ signal }: SessionSignalCardProps) {
           <span
             key={vote.agent}
             className={cn(
-              "text-[7px] font-mono font-bold px-1.5 py-0.5 rounded border",
+              "text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border",
               vote.direction === "LONG" ? "text-bull border-bull/20 bg-bull/5" :
               vote.direction === "SHORT" ? "text-bear border-bear/20 bg-bear/5" :
               "text-muted-foreground border-border/30"

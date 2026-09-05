@@ -425,6 +425,69 @@ async def _fetch_rest_spot_price(yf_sym: str) -> float | None:
     return await asyncio.to_thread(_sync)
 
 
+async def _fetch_rest_bars(yf_sym: str, asset_class: str, ticker: str) -> dict | None:
+    """OHLCV straight from Yahoo's chart REST endpoint, via urllib.
+
+    Added because the fetch chain was TradingView -> yfinance -> futures ->
+    give up, with no plain-REST bar fetch anywhere - while the plain-REST SPOT
+    call in _fetch_rest_spot_price works reliably from the same host, which is
+    what feeds the market ticker bar.
+
+    That gap is what produced "BTC-USD: no live quote for this symbol" on a
+    page whose own header was showing BTC at 79,792 at the same moment. The
+    yfinance library adds a session layer, its own headers and a cookie/crumb
+    handshake that Yahoo rate-limits from datacentre IPs; the bare REST call
+    has none of that and answers.
+
+    Verified against this endpoint: BTC-USD returns 366 daily bars.
+    """
+    import urllib.request as _urlreq
+    import urllib.parse as _urlpar
+    import json as _json
+
+    def _sync():
+        try:
+            safe = _urlpar.quote(yf_sym, safe="=^.-")
+            url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{safe}"
+                   f"?interval=1d&range=1y")
+            req = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with _urlreq.urlopen(req, timeout=10) as r:
+                payload = _json.loads(r.read())
+            res = ((payload or {}).get("chart") or {}).get("result")
+            if not res:
+                return None
+            q = res[0]["indicators"]["quote"][0]
+            closes = [float(x) for x in (q.get("close") or []) if x is not None]
+            highs = [float(x) for x in (q.get("high") or []) if x is not None]
+            lows = [float(x) for x in (q.get("low") or []) if x is not None]
+            vols = [float(x or 0) for x in (q.get("volume") or [])]
+            if len(closes) < 60 or len(highs) < 60 or len(lows) < 60:
+                return None
+            dec = _price_decimals(closes[-1])
+            prev = closes[-2] if len(closes) > 1 else closes[-1]
+            return {
+                "ticker": ticker,
+                "asset_class": asset_class,
+                "closes": [round(c, dec) for c in closes],
+                "highs": [round(h, dec) for h in highs],
+                "lows": [round(l, dec) for l in lows],
+                "volumes": vols,
+                "close": round(closes[-1], dec),
+                "previous_close": round(prev, dec),
+                "price_change_pct": round((closes[-1] - prev) / prev * 100, 2) if prev else 0.0,
+                "atr": _compute_atr(highs, lows, closes),
+                "volume": vols[-1] if vols else 0,
+                "avg_volume": (sum(vols[-20:]) / 20) if len(vols) >= 20 else (vols[-1] if vols else 0),
+                "pe_ratio": None,
+                "eps_growth": None,
+                "revenue_growth": None,
+            }
+        except Exception:
+            return None
+
+    return await asyncio.to_thread(_sync)
+
+
 async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     """Main entry point. TradingView → yfinance → mock fallback chain.
 
@@ -469,6 +532,14 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
                 data_source = "yfinance-futures"
             except Exception:
                 pass
+
+    # 2c. Bare Yahoo REST. The library path above can be rate-limited from a
+    # datacentre IP while this one answers - see _fetch_rest_bars.
+    if not data:
+        rest = await _fetch_rest_bars(yf_sym, asset_class, ticker)
+        if rest:
+            data = rest
+            data_source = "yahoo-rest"
 
     # 3. Synthetic bars - OFF unless explicitly enabled.
     #

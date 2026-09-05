@@ -38,7 +38,7 @@ export function CoachPanel({ tiltDetected, tiltType, tiltSeverity, message, reco
         <Brain className="h-3.5 w-3.5 text-primary" />
         <span className="text-[14px] font-mono font-bold text-muted-foreground tracking-widest">SESSION COACH</span>
         {tiltDetected && (
-          <span className="ml-auto text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-bear/10 text-bear border border-bear/30">
+          <span className="ml-auto text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-bear/10 text-bear border border-bear/30">
             TILT {tiltSeverity}/10
           </span>
         )}
@@ -57,7 +57,7 @@ export function CoachPanel({ tiltDetected, tiltType, tiltSeverity, message, reco
 
       {/* Recommendation badge */}
       <div className={cn(
-        "inline-flex items-center gap-1 px-2 py-1 rounded border text-[8px] font-mono font-bold",
+        "inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-mono font-bold",
         RECOMMENDATION_COLORS[recommendation] || RECOMMENDATION_COLORS.CONTINUE
       )}>
         {recommendation.replace(/_/g, " ")}

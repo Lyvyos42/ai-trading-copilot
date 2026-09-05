@@ -173,7 +173,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
             QuantNeural
           </span>
           <span
-            className="hidden lg:block text-[8px] font-medium tracking-[0.12em] uppercase px-1.5 py-0.5"
+            className="hidden lg:block text-[11px] font-medium tracking-[0.12em] uppercase px-1.5 py-0.5"
             style={{
               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
               color: "hsl(var(--muted-foreground))",
@@ -190,7 +190,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           <Link
             href="/dashboard"
             className={cn(
-              "px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] rounded transition-colors",
+              "px-2 py-0.5 text-[11px] font-bold tracking-[0.1em] rounded transition-colors",
               !pathname?.startsWith("/session")
                 ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
                 : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
@@ -202,7 +202,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           <Link
             href="/session"
             className={cn(
-              "px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] rounded transition-colors flex items-center gap-1",
+              "px-2 py-0.5 text-[11px] font-bold tracking-[0.1em] rounded transition-colors flex items-center gap-1",
               pathname?.startsWith("/session")
                 ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
                 : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
@@ -210,7 +210,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace" }}
           >
             SESSION
-            <span className="text-[6px] text-amber-400 border border-amber-400/30 rounded px-0.5 leading-tight">PRO</span>
+            <span className="text-[10px] text-amber-400 border border-amber-400/30 rounded px-0.5 leading-tight">PRO</span>
           </Link>
         </div>
 
@@ -225,7 +225,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 href={href}
                 className={cn(
                   "relative flex items-center gap-0.5 px-1.5 lg:px-2 h-10 transition-colors shrink-0",
-                  "text-[10px] font-bold tracking-[0.06em] lg:tracking-[0.1em] uppercase",
+                  "text-[12px] font-bold tracking-[0.06em] lg:tracking-[0.1em] uppercase",
                   "border-b-[1.5px]",
                 )}
                 style={{
@@ -261,7 +261,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           <div className="hidden sm:flex items-center gap-1.5">
             <span className="live-dot" />
             <span
-              className="text-[8px] font-bold tracking-[0.12em]"
+              className="text-[11px] font-bold tracking-[0.12em]"
               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
             >
               LIVE
@@ -313,7 +313,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                 >
                   {/* Avatar mark */}
                   <span
-                    className="h-4 w-4 flex items-center justify-center text-[8px] font-bold shrink-0"
+                    className="h-4 w-4 flex items-center justify-center text-[11px] font-bold shrink-0"
                     style={{
                       background: "hsl(var(--primary) / 0.15)",
                       border: "1px solid hsl(var(--primary) / 0.3)",
@@ -381,7 +381,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                           </div>
                           <div
                             className={cn(
-                              "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 border mt-1",
+                              "inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 border mt-1",
                               TIER_COLOR[tier]
                             )}
                             style={{ borderRadius: "2px", fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace" }}
@@ -428,7 +428,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                         </div>
                         {usagePct >= 100 && (
                           <p
-                            className="text-[8px] mt-1"
+                            className="text-[11px] mt-1"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bear))" }}
                           >
                             Quota reached — resets at midnight UTC
@@ -460,7 +460,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
                               UPGRADE TO RETAIL
                             </div>
                             <div
-                              className="text-[8px] mt-0.5"
+                              className="text-[11px] mt-0.5"
                               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
                             >
                               Unlimited · All asset classes

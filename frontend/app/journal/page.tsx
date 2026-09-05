@@ -64,7 +64,7 @@ export default function JournalPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
-          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
+          <span className="text-[13px] font-mono tracking-widest text-muted-foreground uppercase">
             AUTHENTICATING...
           </span>
         </div>

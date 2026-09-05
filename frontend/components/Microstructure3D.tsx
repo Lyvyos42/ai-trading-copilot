@@ -456,7 +456,7 @@ export function DepthSurface3D({ ticker, className }: Surface3DProps) {
     <div className={`flex flex-col bg-background ${className ?? ""}`}>
       <div className="terminal-header shrink-0">
         <span className="terminal-label">3D ORDER BOOK DEPTH</span>
-        <div ref={infoRef} className="ml-auto text-[11px] font-mono" />
+        <div ref={infoRef} className="ml-auto text-[12px] font-mono" />
       </div>
       <div className="relative flex-1 min-h-0">
         <canvas ref={canvasRef} className="w-full h-full" />
@@ -594,7 +594,7 @@ export function LiquiditySurface3D({ ticker, className }: Surface3DProps) {
     <div className={`flex flex-col bg-background ${className ?? ""}`}>
       <div className="terminal-header shrink-0">
         <span className="terminal-label">3D LIQUIDITY HEATMAP</span>
-        <div ref={infoRef} className="ml-auto text-[11px] font-mono" />
+        <div ref={infoRef} className="ml-auto text-[12px] font-mono" />
       </div>
       <div className="relative flex-1 min-h-0">
         <canvas ref={canvasRef} className="w-full h-full" />

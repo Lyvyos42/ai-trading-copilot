@@ -148,7 +148,7 @@ export default function PortfolioPage() {
               )}>
                 {value}
               </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">{sub}</div>
+              <div className="text-[12px] text-muted-foreground mt-0.5 font-mono">{sub}</div>
             </CardContent>
           </Card>
         ))}
@@ -177,7 +177,7 @@ export default function PortfolioPage() {
                 <thead>
                   <tr className="border-b border-border/50">
                     {["TICKER", "DIR", "ENTRY", "CURRENT", "QTY", "P&L", "P&L %", "SL", "TP1", "OPENED", ""].map((h) => (
-                      <th key={h} className="text-left text-[11px] text-muted-foreground font-mono font-medium py-2 px-3">{h}</th>
+                      <th key={h} className="text-left text-[12px] text-muted-foreground font-mono font-medium py-2 px-3">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -212,13 +212,13 @@ export default function PortfolioPage() {
                         </td>
                         <td className="py-3 px-3 font-mono text-xs text-bear/70">{formatPrice(pos.stop_loss, pos.ticker)}</td>
                         <td className="py-3 px-3 font-mono text-xs text-bull/70">{formatPrice(pos.take_profit_1, pos.ticker)}</td>
-                        <td className="py-3 px-3 text-[11px] text-muted-foreground font-mono">{timeAgo(pos.opened_at)}</td>
+                        <td className="py-3 px-3 text-[12px] text-muted-foreground font-mono">{timeAgo(pos.opened_at)}</td>
                         <td className="py-3 px-3">
                           <button
                             onClick={() => handleClose(pos.id)}
                             disabled={!canClose}
                             title={!isPriced ? "Live price unavailable: cannot close at fabricated market price" : "Close position"}
-                            className="text-[11px] font-mono text-muted-foreground hover:text-bear border border-border/50 hover:border-bear/40 rounded px-2 py-0.5 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50 disabled:cursor-not-allowed"
+                            className="text-[12px] font-mono text-muted-foreground hover:text-bear border border-border/50 hover:border-bear/40 rounded px-2 py-0.5 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50 disabled:cursor-not-allowed"
                           >
                             {isClosing ? "…" : !isPriced ? "FEED DOWN" : "CLOSE"}
                           </button>
@@ -235,7 +235,7 @@ export default function PortfolioPage() {
 
       {/* How it works */}
       <div className="mt-4 p-4 rounded border border-border/30 bg-white/[0.01]">
-        <div className="text-[11px] font-mono text-muted-foreground space-y-1">
+        <div className="text-[12px] font-mono text-muted-foreground space-y-1">
           <div className="text-primary font-semibold mb-2">HOW PAPER TRADING WORKS</div>
           <div>1. Go to <span className="text-foreground">Terminal</span> → select a ticker → click <span className="text-primary">RUN AI ANALYSIS</span></div>
           <div>2. A signal card appears in the feed → click <span className="text-primary">PAPER TRADE</span> to open a position</div>

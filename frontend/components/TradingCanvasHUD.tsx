@@ -192,7 +192,7 @@ export function TradingCanvasHUD({
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border/30 gap-2 overflow-x-auto scrollbar-none">
         {/* Left: Ticker Switcher Ribbon Tabs */}
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[9px] font-mono text-muted-foreground uppercase mr-1 hidden sm:inline">
+          <span className="text-[12px] font-mono text-muted-foreground uppercase mr-1 hidden sm:inline">
             WATCHLIST:
           </span>
 
@@ -236,7 +236,7 @@ export function TradingCanvasHUD({
               title="Add or Switch Symbol"
             >
               <Plus className="h-3 w-3" />
-              <span className="text-[10px] font-bold">ADD SYMBOL</span>
+              <span className="text-[12px] font-bold">ADD SYMBOL</span>
             </button>
 
             {/* Fast Symbol Search Palette Dropdown */}
@@ -266,7 +266,7 @@ export function TradingCanvasHUD({
                   )}
                 </div>
 
-                <div className="text-[9px] font-mono text-muted-foreground uppercase px-1 pb-1 border-b border-border/30 mb-1">
+                <div className="text-[12px] font-mono text-muted-foreground uppercase px-1 pb-1 border-b border-border/30 mb-1">
                   Institutional Instruments
                 </div>
 
@@ -280,11 +280,11 @@ export function TradingCanvasHUD({
                       >
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-foreground">{item.ticker}</span>
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                          <span className="text-[12px] text-muted-foreground truncate max-w-[120px]">
                             {item.name}
                           </span>
                         </div>
-                        <span className="text-[9px] px-1 py-0.2 rounded border border-border/40 bg-surface-2 text-muted-foreground uppercase">
+                        <span className="text-[12px] px-1 py-0.2 rounded border border-border/40 bg-surface-2 text-muted-foreground uppercase">
                           {item.category}
                         </span>
                       </button>
@@ -311,7 +311,7 @@ export function TradingCanvasHUD({
                 key={inv}
                 onClick={() => onIntervalChange(inv)}
                 className={cn(
-                  "px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors",
+                  "px-1.5 py-0.5 rounded text-[12px] font-mono transition-colors",
                   activeInterval === inv
                     ? "bg-primary text-primary-foreground font-bold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -325,7 +325,7 @@ export function TradingCanvasHUD({
           <button
             onClick={onToggle3D}
             className={cn(
-              "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border transition-colors",
+              "flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono border transition-colors",
               show3D
                 ? "bg-primary text-primary-foreground font-bold border-primary"
                 : "border-border/40 hover:bg-surface-2 text-muted-foreground"
@@ -347,7 +347,7 @@ export function TradingCanvasHUD({
             </span>
             <span
               className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border",
+                "px-2 py-0.5 rounded text-[12px] font-mono font-bold uppercase border",
                 matchingSignal && matchingSignal.direction === "LONG"
                   ? "bg-bull/15 text-bull border-bull/30"
                   : matchingSignal && matchingSignal.direction === "SHORT"
@@ -358,7 +358,7 @@ export function TradingCanvasHUD({
               {matchingSignal ? matchingSignal.direction : "MONITORING"}
             </span>
             {matchingSignal?.asset_class && (
-              <span className="text-[9px] font-mono text-muted-foreground border border-border/40 px-1 py-0.2 rounded uppercase">
+              <span className="text-[12px] font-mono text-muted-foreground border border-border/40 px-1 py-0.2 rounded uppercase">
                 {matchingSignal.asset_class}
               </span>
             )}
@@ -368,12 +368,12 @@ export function TradingCanvasHUD({
           <div className="hidden lg:flex items-center gap-1.5 pl-2 border-l border-border/40">
             {matchingSignal && !isNoSignal && entry && target && inval ? (
               <>
-                <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono">
+                <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono">
                   <span className="text-muted-foreground">ENTRY: </span>
                   <span className="font-bold text-foreground">{formatPrice(entry, ticker)}</span>
                 </div>
 
-                <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[10px] font-mono text-bull flex items-center gap-1">
+                <div className="px-2 py-0.5 rounded bg-bull/10 border border-bull/30 text-[12px] font-mono text-bull flex items-center gap-1">
                   <Target className="h-2.5 w-2.5" />
                   <span>TP: {formatPrice(target, ticker)}</span>
                   {targetDelta !== null && (
@@ -381,7 +381,7 @@ export function TradingCanvasHUD({
                   )}
                 </div>
 
-                <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[10px] font-mono text-bear flex items-center gap-1">
+                <div className="px-2 py-0.5 rounded bg-bear/10 border border-bear/30 text-[12px] font-mono text-bear flex items-center gap-1">
                   <Shield className="h-2.5 w-2.5" />
                   <span>SL: {formatPrice(inval, ticker)}</span>
                   {invalDelta !== null && (
@@ -390,18 +390,18 @@ export function TradingCanvasHUD({
                 </div>
 
                 {matchingSignal.risk_reward_ratio && matchingSignal.risk_reward_ratio > 0 && (
-                  <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono text-primary font-bold">
+                  <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono text-primary font-bold">
                     R:R {matchingSignal.risk_reward_ratio.toFixed(1)}:1
                   </div>
                 )}
               </>
             ) : analyzing ? (
-              <div className="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-[10px] font-mono text-primary flex items-center gap-1.5 animate-pulse">
+              <div className="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-[12px] font-mono text-primary flex items-center gap-1.5 animate-pulse">
                 <Activity className="h-3 w-3 animate-spin" />
                 <span>SYNTHESIZING 9-AGENT CONSENSUS FOR {ticker}...</span>
               </div>
             ) : matchingSignal && isNoSignal ? (
-              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
+              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono flex items-center gap-2 text-muted-foreground">
                 <span className="font-bold text-warn">NEUTRAL PIPELINE STANCE</span>
                 <span>•</span>
                 <span className="truncate max-w-md text-foreground/80">
@@ -411,7 +411,7 @@ export function TradingCanvasHUD({
                 </span>
               </div>
             ) : (
-              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
+              <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono flex items-center gap-2 text-muted-foreground">
                 <span>TELEMETRY: STANDBY</span>
                 <span>•</span>
                 <span>NO ACTIVE DOSSIER FOR {ticker} — INITIALIZE 9-AGENT SYNTHESIS</span>
@@ -442,7 +442,7 @@ export function TradingCanvasHUD({
             <>
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border border-border/40 hover:bg-surface-2 text-muted-foreground transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-mono border border-border/40 hover:bg-surface-2 text-muted-foreground transition-colors"
                 title="Copy Trade Blueprint"
               >
                 {copied ? <Check className="h-3 w-3 text-bull" /> : <Copy className="h-3 w-3" />}
@@ -454,7 +454,7 @@ export function TradingCanvasHUD({
                   onClick={() => onAdoptSignal(matchingSignal)}
                   disabled={isAdopted}
                   className={cn(
-                    "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono font-bold border transition-colors",
+                    "flex items-center gap-1 px-2 py-1 rounded text-[12px] font-mono font-bold border transition-colors",
                     isAdopted
                       ? "bg-bull/10 text-bull border-bull/30"
                       : "bg-surface-2 text-muted-foreground border-border/40 hover:text-foreground"
@@ -474,7 +474,7 @@ export function TradingCanvasHUD({
       {!isNoSignal && entry && target && inval && (
         <div className="px-3 pb-1.5">
           <div className="p-1.5 rounded border border-border/30 bg-surface-2/30">
-            <div className="flex items-center justify-between text-[9px] font-mono text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-[12px] font-mono text-muted-foreground mb-1">
               <span className="text-bear font-bold">STOP {formatPrice(inval, ticker)}</span>
               <span className="font-bold text-foreground">
                 PRICE JOURNEY: {journeyPct.toFixed(0)}% TO TARGET

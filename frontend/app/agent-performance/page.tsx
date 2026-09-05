@@ -40,7 +40,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub: st
       <div className={cn("text-2xl font-mono font-bold", value === "—" ? "text-muted-foreground" : "text-bull")}>
         {value}
       </div>
-      <div className="text-[11px] font-mono text-muted-foreground mt-1">{sub}</div>
+      <div className="text-[12px] font-mono text-muted-foreground mt-1">{sub}</div>
     </div>
   );
 }
@@ -54,7 +54,7 @@ function MonthlyChart({ months }: { months: { month: string; pct: number }[] }) 
           <span className="text-xs font-mono font-bold text-muted-foreground mb-1">
             NO RESOLVED MONTHLY PERIODS YET
           </span>
-          <span className="text-[11px] font-mono text-muted-foreground/70 max-w-md">
+          <span className="text-[12px] font-mono text-muted-foreground/70 max-w-md">
             Data aggregates automatically as active positions resolve through their evaluation windows. No synthetic fills.
           </span>
         </div>
@@ -74,7 +74,7 @@ function MonthlyChart({ months }: { months: { month: string; pct: number }[] }) 
           const h = Math.max((Math.abs(m.pct) / maxPct) * 100, 4);
           return (
             <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-              <span className={cn("text-[10px] font-mono font-bold", isGain ? "text-bull" : "text-bear")}>
+              <span className={cn("text-[12px] font-mono font-bold", isGain ? "text-bull" : "text-bear")}>
                 {isGain ? `+${m.pct.toFixed(1)}%` : `${m.pct.toFixed(1)}%`}
               </span>
               <div className="w-full relative" style={{ height: `${h}%` }}>
@@ -89,14 +89,14 @@ function MonthlyChart({ months }: { months: { month: string; pct: number }[] }) 
                   }}
                 />
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">{m.month}</span>
+              <span className="text-[12px] font-mono text-muted-foreground">{m.month}</span>
             </div>
           );
         })}
       </div>
       <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between">
-        <span className="text-[11px] font-mono text-muted-foreground">Avg monthly: {avgMonthly}%</span>
-        <span className="text-[11px] font-mono text-muted-foreground">{months.length} active periods recorded</span>
+        <span className="text-[12px] font-mono text-muted-foreground">Avg monthly: {avgMonthly}%</span>
+        <span className="text-[12px] font-mono text-muted-foreground">{months.length} active periods recorded</span>
       </div>
     </div>
   );
@@ -111,7 +111,7 @@ function EquityCurve({ points }: { points: number[] }) {
           <span className="text-xs font-mono font-bold text-muted-foreground mb-1">
             ACCUMULATING DATA POINTS
           </span>
-          <span className="text-[11px] font-mono text-muted-foreground/70 max-w-md">
+          <span className="text-[12px] font-mono text-muted-foreground/70 max-w-md">
             A minimum of 2 hand-resolved signals with realized P&L is required to construct an empirical equity curve. No synthetic interpolations.
           </span>
         </div>
@@ -164,8 +164,8 @@ function EquityCurve({ points }: { points: number[] }) {
         </defs>
       </svg>
       <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between">
-        <span className="text-[11px] font-mono text-muted-foreground">Start: ${startVal.toLocaleString()}</span>
-        <span className="text-[11px] font-mono text-bull font-bold">
+        <span className="text-[12px] font-mono text-muted-foreground">Start: ${startVal.toLocaleString()}</span>
+        <span className="text-[12px] font-mono text-bull font-bold">
           Current: ${endVal.toLocaleString()} ({Number(totalReturn) >= 0 ? "+" : ""}{totalReturn}%)
         </span>
       </div>
@@ -199,7 +199,7 @@ function AgentAccuracyChart({
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[9px] font-mono text-muted-foreground/60">AWAITING EVALUATIONS</span>
+                  <span className="text-[12px] font-mono text-muted-foreground/60">AWAITING EVALUATIONS</span>
                 </div>
               )}
             </div>
@@ -209,7 +209,7 @@ function AgentAccuracyChart({
           </div>
         ))}
       </div>
-      <div className="mt-3 pt-3 border-t border-border/30 text-[11px] font-mono text-muted-foreground">
+      <div className="mt-3 pt-3 border-t border-border/30 text-[12px] font-mono text-muted-foreground">
         Accuracy = signals where agent directional thesis aligned with verified market outcome. Abstaining agents are excluded from denominator.
       </div>
     </div>
@@ -227,11 +227,11 @@ function AssetClassGrid({
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {stats.map((a) => (
           <div key={a.name} className="text-center p-3 rounded border border-border/30 bg-background/40">
-            <div className="text-[10px] font-mono text-muted-foreground mb-1">{a.name.toUpperCase()}</div>
+            <div className="text-[12px] font-mono text-muted-foreground mb-1">{a.name.toUpperCase()}</div>
             <div className={cn("text-lg font-mono font-bold", a.winRate !== null ? "text-bull" : "text-muted-foreground")}>
               {a.winRate !== null ? `${a.winRate.toFixed(1)}%` : "—"}
             </div>
-            <div className="text-[10px] font-mono text-muted-foreground mt-1">
+            <div className="text-[12px] font-mono text-muted-foreground mt-1">
               {a.resolved > 0 ? `${a.resolved} res / ${a.total} tot` : `${a.total} signals`}
             </div>
           </div>
@@ -461,14 +461,14 @@ export default function AgentPerformancePage() {
         {isLowSample && (
           <div className="mt-4 max-w-2xl mx-auto p-3.5 rounded border border-warn/30 bg-warn/5 text-left">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-warn/20 text-warn font-bold">
+              <span className="text-[12px] font-mono px-1.5 py-0.5 rounded bg-warn/20 text-warn font-bold">
                 NOTICE
               </span>
               <span className="text-xs font-mono font-bold text-warn">
                 INSUFFICIENT SAMPLE SIZE — HAND-RESOLVED BENCHMARKS ACCUMULATING
               </span>
             </div>
-            <p className="text-[11px] font-mono text-warn/80 leading-relaxed">
+            <p className="text-[12px] font-mono text-warn/80 leading-relaxed">
               Currently {metrics.resolvedCount} signal{metrics.resolvedCount === 1 ? "" : "s"} resolved out of {metrics.totalSignals} total ({metrics.activeCount} active). Performance figures populate in real-time as price action touches research targets or invalidation levels.
             </p>
           </div>
@@ -555,9 +555,9 @@ export default function AgentPerformancePage() {
                 },
               ].map((m) => (
                 <div key={m.label} className="p-2.5 rounded border border-border/30 bg-background/40">
-                  <div className="text-[10px] font-mono text-muted-foreground">{m.label}</div>
+                  <div className="text-[12px] font-mono text-muted-foreground">{m.label}</div>
                   <div className="text-sm font-mono font-bold text-foreground">{m.value}</div>
-                  <div className="text-[10px] font-mono text-muted-foreground">{m.desc}</div>
+                  <div className="text-[12px] font-mono text-muted-foreground">{m.desc}</div>
                 </div>
               ))}
             </div>
@@ -586,7 +586,7 @@ export default function AgentPerformancePage() {
 
       {/* Disclaimer footer */}
       <div className="text-center px-4 py-6 border-t border-border/30">
-        <p className="text-[10px] font-mono text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+        <p className="text-[12px] font-mono text-muted-foreground max-w-3xl mx-auto leading-relaxed">
           All performance metrics reflect live, hand-resolved pipeline executions. AI Trading Copilot does not fabricate historical track records or fill missing values with synthetic estimates. Contact quantneuraledge@gmail.com for questions.
         </p>
       </div>

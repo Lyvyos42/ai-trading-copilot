@@ -36,7 +36,7 @@ export function PreMarketBriefing({ isOpen, onClose }: PreMarketBriefingProps) {
             <span className="text-xs font-mono font-bold text-foreground tracking-wider uppercase">
               AUTONOMOUS DAILY REGIME & MACRO INTELLIGENCE
             </span>
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
+            <span className="text-[12px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
               SYNTHESIZED
             </span>
           </div>
@@ -51,35 +51,35 @@ export function PreMarketBriefing({ isOpen, onClose }: PreMarketBriefingProps) {
         {/* Modal Content */}
         <div className="p-4 space-y-3 font-mono text-xs max-h-[70vh] overflow-y-auto">
           <div className="p-3 rounded border border-border/40 bg-surface-1/90 space-y-1">
-            <div className="flex items-center gap-1.5 text-primary text-[11px] font-bold uppercase">
+            <div className="flex items-center gap-1.5 text-primary text-[12px] font-bold uppercase">
               <Activity className="h-3 w-3" /> 1. Market Volatility & Regime Assessment
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed pl-4">
+            <p className="text-[12px] text-muted-foreground leading-relaxed pl-4">
               Volatility clustering indicates an active expansion regime. Intraday momentum is statistically favored over multi-day swing holding. Quantitative risk manager enforces 0.5x Kelly buffer on breakout setups across high-beta equities and commodities.
             </p>
           </div>
 
           <div className="p-3 rounded border border-border/40 bg-surface-1/90 space-y-1">
-            <div className="flex items-center gap-1.5 text-primary text-[11px] font-bold uppercase">
+            <div className="flex items-center gap-1.5 text-primary text-[12px] font-bold uppercase">
               <ShieldCheck className="h-3 w-3" /> 2. Cross-Asset Macro Stance
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed pl-4">
+            <p className="text-[12px] text-muted-foreground leading-relaxed pl-4">
               Treasury 10Y yield curve stabilization and global central bank rate trajectory suggest range-bound conditions across major FX pairs (EURUSD, USDJPY) with selective alpha concentration in AI infrastructure and gold spot liquidity sweeps.
             </p>
           </div>
 
           <div className="p-3 rounded border border-border/40 bg-surface-1/90 space-y-1">
-            <div className="flex items-center gap-1.5 text-primary text-[11px] font-bold uppercase">
+            <div className="flex items-center gap-1.5 text-primary text-[12px] font-bold uppercase">
               <Cpu className="h-3 w-3" /> 3. Institutional Microstructure & Order Flow Bias
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed pl-4">
+            <p className="text-[12px] text-muted-foreground leading-relaxed pl-4">
               Cumulative Volume Delta (CVD) absorption detected at London liquidity boundaries. Active agents prioritize 5m/15m Fair Value Gap (FVG) retests and VWAP deviation bands during the London/New York session overlap window.
             </p>
           </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="px-4 py-2 bg-surface-3/50 border-t border-border/40 flex justify-between items-center text-[10px] font-mono text-muted-foreground">
+        <div className="px-4 py-2 bg-surface-3/50 border-t border-border/40 flex justify-between items-center text-[12px] font-mono text-muted-foreground">
           <span>Press ESC or click close to dismiss</span>
           <button
             onClick={handleClose}

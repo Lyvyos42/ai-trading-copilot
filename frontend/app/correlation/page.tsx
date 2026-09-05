@@ -117,7 +117,7 @@ function CorrelationContent() {
       {/* Notice banner if correlations are syncing or unavailable */}
       {data?.detail && (
         <div className="panel p-3 mb-4 bg-muted/20 border-border/40 text-xs font-mono text-muted-foreground flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <span className="text-[12px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
             NOTICE
           </span>
           <span>{data.detail}</span>
@@ -141,7 +141,7 @@ function CorrelationContent() {
               {data.data_points > 0 ? (
                 <span className="text-[13px] font-mono text-muted-foreground">({data.data_points} data points)</span>
               ) : (
-                <span className="text-[11px] font-mono text-amber-400/80 uppercase">SYNCING HISTORICAL OVERLAP</span>
+                <span className="text-[12px] font-mono text-amber-400/80 uppercase">SYNCING HISTORICAL OVERLAP</span>
               )}
             </div>
             <div className="overflow-x-auto -mx-4 px-4" style={{ minWidth: 0 }}>

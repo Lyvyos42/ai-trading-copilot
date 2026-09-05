@@ -233,7 +233,7 @@ export default function SignalsPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
-          <span className="text-[12px] font-mono tracking-widest text-muted-foreground uppercase">
+          <span className="text-[13px] font-mono tracking-widest text-muted-foreground uppercase">
             AUTHENTICATING...
           </span>
         </div>
@@ -344,7 +344,7 @@ export default function SignalsPage() {
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="live-dot" />
                 <span
-                  className="text-[8px] font-bold"
+                  className="text-[11px] font-bold"
                   style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--bull))" }}
                 >
                   LIVE
@@ -574,7 +574,7 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <span
-                          className="text-[8px] font-bold"
+                          className="text-[11px] font-bold"
                           style={{
                             fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                             color: isCurrentStage ? color : isPastStage ? `${color}80` : "hsl(var(--muted-foreground) / 0.3)",
@@ -624,7 +624,7 @@ export default function SignalsPage() {
                             <Icon />
                           </span>
                           <span
-                            className="text-[8px] font-bold tracking-[0.08em] whitespace-nowrap"
+                            className="text-[11px] font-bold tracking-[0.08em] whitespace-nowrap"
                             style={{
                               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                               color: done
@@ -698,7 +698,7 @@ export default function SignalsPage() {
               </svg>
               <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal History</span>
               <span
-                className="ml-auto text-[8px] font-bold"
+                className="ml-auto text-[11px] font-bold"
                 style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
               >
                 {signals.length} TOTAL
@@ -711,8 +711,8 @@ export default function SignalsPage() {
                   className={
                     "ml-2 font-bold px-1.5 py-0.5 rounded " +
                     (resetMsg.ok
-                      ? "text-[7px]"
-                      : "text-[9px] inline-block max-w-[440px] whitespace-normal leading-snug align-top")
+                      ? "text-[11px]"
+                      : "text-[12px] inline-block max-w-[440px] whitespace-normal leading-snug align-top")
                   }
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
@@ -747,7 +747,7 @@ export default function SignalsPage() {
                       setResetMsg({ ok: false, text: e instanceof Error ? e.message : "reset failed" });
                     }
                   }}
-                  className="ml-2 text-[7px] font-bold px-1.5 py-0.5 rounded border transition-colors"
+                  className="ml-2 text-[11px] font-bold px-1.5 py-0.5 rounded border transition-colors"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                     borderColor: "hsl(var(--bear) / 0.3)",
@@ -783,7 +783,7 @@ export default function SignalsPage() {
                   style={{ borderColor: "hsl(var(--border))" }}
                 >
                   <div
-                    className="text-[8px] font-bold tracking-[0.1em]"
+                    className="text-[11px] font-bold tracking-[0.1em]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
                   >
                     {s.label}
@@ -795,7 +795,7 @@ export default function SignalsPage() {
                     {s.value}
                   </div>
                   <div
-                    className="text-[7px] font-mono mt-0.5"
+                    className="text-[11px] font-mono mt-0.5"
                     style={{ color: "hsl(var(--muted-foreground) / 0.6)" }}
                   >
                     {s.sub}
@@ -806,15 +806,15 @@ export default function SignalsPage() {
 
             {/* Context bar */}
             {signals.length > 0 && stats.resolved === 0 && (
-              <div className="px-3 py-1.5 border-b border-border/40 text-[9px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
+              <div className="px-3 py-1.5 border-b border-border/40 text-[12px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
                 <span>{stats.active} signals pending resolution (target / invalidation not yet hit)</span>
-                <span className="text-[8px] text-primary/70 border border-primary/20 px-1 rounded">UNRESOLVED</span>
+                <span className="text-[11px] text-primary/70 border border-primary/20 px-1 rounded">UNRESOLVED</span>
               </div>
             )}
             {signals.length > 0 && stats.resolved > 0 && (
-              <div className="px-3 py-1.5 border-b border-border/40 text-[9px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
+              <div className="px-3 py-1.5 border-b border-border/40 text-[12px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
                 <span>{stats.wins}W / {stats.losses}L from {stats.resolved} hand-resolved outcome{stats.resolved === 1 ? "" : "s"} ({stats.active} pending)</span>
-                <span className="text-[8px] text-muted-foreground border border-border px-1 rounded">{stats.winRate !== null ? `${stats.winRate.toFixed(1)}% WR` : ""}</span>
+                <span className="text-[11px] text-muted-foreground border border-border px-1 rounded">{stats.winRate !== null ? `${stats.winRate.toFixed(1)}% WR` : ""}</span>
               </div>
             )}
 
@@ -836,7 +836,7 @@ export default function SignalsPage() {
               {signals.length === 0 ? (
                 <div className="py-8 text-center">
                   <span
-                    className="text-[10px]"
+                    className="text-[12px]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.5)" }}
                   >
                     NO HISTORY
@@ -863,7 +863,7 @@ export default function SignalsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <span
-                            className="text-[10px] font-bold px-1 rounded"
+                            className="text-[12px] font-bold px-1 rounded"
                             style={{
                               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                               background: isBull ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
@@ -873,13 +873,13 @@ export default function SignalsPage() {
                             {isBull ? "▲" : "▼"}
                           </span>
                           <span
-                            className="text-[11px] font-bold"
+                            className="text-[12px] font-bold"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--foreground))" }}
                           >
                             {sig.ticker}
                           </span>
                           <span
-                            className="text-[8px]"
+                            className="text-[11px]"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: isBull ? "hsl(var(--bull) / 0.8)" : "hsl(var(--bear) / 0.8)" }}
                           >
                             {Math.round(pct)}%
@@ -887,7 +887,7 @@ export default function SignalsPage() {
                         </div>
                         {isResolved ? (
                           <span
-                            className="text-[8px] font-bold px-1.5 py-0.5 rounded"
+                            className="text-[11px] font-bold px-1.5 py-0.5 rounded"
                             style={{
                               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                               background: sig.status === "WIN" ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
@@ -901,7 +901,7 @@ export default function SignalsPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleResolveSignal(sig.signal_id, "WIN")}
-                              className="text-[7px] font-bold px-1.5 py-0.5 rounded transition-colors"
+                              className="text-[11px] font-bold px-1.5 py-0.5 rounded transition-colors"
                               style={{
                                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                                 background: "hsl(var(--bull) / 0.08)",
@@ -914,7 +914,7 @@ export default function SignalsPage() {
                             </button>
                             <button
                               onClick={() => handleResolveSignal(sig.signal_id, "LOSS")}
-                              className="text-[7px] font-bold px-1.5 py-0.5 rounded transition-colors"
+                              className="text-[11px] font-bold px-1.5 py-0.5 rounded transition-colors"
                               style={{
                                 fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                                 background: "hsl(var(--bear) / 0.08)",
@@ -933,7 +933,7 @@ export default function SignalsPage() {
                         <div className="flex items-center gap-2">
                           {typeof sig.entry_price === "number" && sig.entry_price > 0 && (
                             <span
-                              className="text-[9px]"
+                              className="text-[12px]"
                               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
                             >
                               {formatPrice(sig.entry_price, sig.ticker)}
@@ -941,21 +941,21 @@ export default function SignalsPage() {
                           )}
                           {sig.risk_reward_ratio && sig.risk_reward_ratio > 0 && (
                             <span
-                              className="text-[8px]"
+                              className="text-[11px]"
                               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary) / 0.7)" }}
                             >
                               {Math.min(sig.risk_reward_ratio, 10).toFixed(1)}:1
                             </span>
                           )}
                           <span
-                            className="text-[8px]"
+                            className="text-[11px]"
                             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.8)" }}
                           >
                             {formatPositionSize(sig.position_size_pct)}
                           </span>
                         </div>
                         <span
-                          className="text-[8px]"
+                          className="text-[11px]"
                           style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
                         >
                           {timeAgo(sig.timestamp)}

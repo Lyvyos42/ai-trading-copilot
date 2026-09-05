@@ -160,7 +160,7 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
       )}
       {feedUnavailable && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 p-6 text-center z-10 font-mono">
-          <div className="text-[11px] tracking-widest text-warn border border-warn/30 bg-warn/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
+          <div className="text-[12px] tracking-widest text-warn border border-warn/30 bg-warn/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
             FEED UNAVAILABLE
           </div>
           <div className="text-sm font-semibold text-foreground mb-1">
@@ -169,7 +169,7 @@ export function TradingChart({ ticker, signal, fillContainer, period = "6mo", in
           <div className="text-xs text-muted-foreground max-w-md leading-relaxed">
             {feedUnavailable}
           </div>
-          <div className="text-[10px] text-muted-foreground/60 mt-3">
+          <div className="text-[12px] text-muted-foreground/60 mt-3">
             Institutional restraint: abstaining from fabricating synthetic price action.
           </div>
         </div>

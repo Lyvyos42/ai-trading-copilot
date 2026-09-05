@@ -242,7 +242,7 @@ export default function HomePage() {
                     {agent.name.toUpperCase()}
                   </span>
                   <span
-                    className="text-[8px]"
+                    className="text-[11px]"
                     style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
                   >
                     {agent.model}
@@ -388,7 +388,7 @@ export default function HomePage() {
 
               {highlight && (
                 <div
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-[8px] font-bold tracking-[0.1em]"
+                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-[11px] font-bold tracking-[0.1em]"
                   style={{
                     fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                     background: "hsl(var(--bull))",

@@ -121,10 +121,18 @@ async def run_debate(state: TradingState) -> TradingState:
         elif direction == "SHORT":
             bear_points.append(f"{name}: {reasoning}")
 
+    # When nobody argued a side, SAY SO.
+    #
+    # These placeholders used to assert a case no analyst had made - and they
+    # were rendered to the user under the heading "Bull researcher" as though
+    # one had. "Valuation appears stretched" was published about Bitcoin,
+    # which has no valuation, purely because the bear list happened to be
+    # empty. Same fabrication-by-placeholder the agents were cleared of; it
+    # simply lived in the debate stage instead.
     if not bull_points:
-        bull_points = [f"Some analysts see relative value or mean-reversion opportunity in {ticker}."]
+        bull_points = [f"No analyst made a bullish case for {ticker}."]
     if not bear_points:
-        bear_points = [f"Valuation appears stretched or momentum is decelerating for {ticker}."]
+        bear_points = [f"No analyst made a bearish case for {ticker}."]
 
     bull_case = " | ".join(bull_points)
     bear_case = " | ".join(bear_points)
@@ -201,6 +209,17 @@ async def run_risk_gate_stage(state: TradingState) -> TradingState:
 
 async def run_fund_manager(state: TradingState) -> TradingState:
     signal = state.get("final_signal", {})
+
+    # NO_SIGNAL is terminal. Nothing downstream may relabel it.
+    #
+    # Without this, a BTC-USD run that the trader declined for want of a price
+    # was then overwritten here with status "RISK_GATE_BLOCKED", so the UI
+    # header read "risk gate blocked" while the reasons underneath still read
+    # "no live quote for this symbol" - two different explanations for one
+    # event, neither of which the user could reconcile. The risk gate cannot
+    # meaningfully veto a trade that was never proposed.
+    if signal.get("status") == "NO_SIGNAL":
+        return state
     risk = state.get("risk_assessment", {})
     gate = state.get("risk_gate_result", {})
     quant = state.get("quant_validation", {})

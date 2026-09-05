@@ -115,7 +115,7 @@ export function MarketBar() {
         ) : (
           <span
             title="Showing seed prices — backend not yet reachable"
-            className="font-mono text-[8px] font-bold tracking-widest px-1.5 py-0.5 rounded"
+            className="font-mono text-[11px] font-bold tracking-widest px-1.5 py-0.5 rounded"
             style={{ background: "rgba(255,160,0,0.15)", color: "#ffa000", border: "1px solid rgba(255,160,0,0.3)" }}
           >
             STALE

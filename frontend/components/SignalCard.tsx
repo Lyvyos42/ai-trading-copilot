@@ -116,26 +116,26 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
         <div className="px-3 py-2.5 border-l-2 border-border/60 bg-muted/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
+              <span className="text-[12px] font-mono font-bold px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
                 ABSTAIN
               </span>
               <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
               {signal.timeframe && (
-                <span className="text-[8px] font-mono text-muted-foreground border border-border/40 px-1 rounded">
+                <span className="text-[11px] font-mono text-muted-foreground border border-border/40 px-1 rounded">
                   {signal.timeframe}
                 </span>
               )}
-              <span className="text-[11px] font-mono text-muted-foreground">
+              <span className="text-[12px] font-mono text-muted-foreground">
                 PIPELINE ABSTAINED
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-[12px] font-mono text-muted-foreground">
               <Clock className="h-2.5 w-2.5" />
               {timeAgo(signal.timestamp)}
               {onDismiss && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onDismiss(signal.signal_id); }}
-                  className="text-[8px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear transition-colors ml-1"
+                  className="text-[11px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear transition-colors ml-1"
                   title="Dismiss signal"
                 >
                   <X className="h-2.5 w-2.5" />
@@ -144,7 +144,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             </div>
           </div>
           {signal.status_reasons && signal.status_reasons.length > 0 && (
-            <p className="text-[11px] font-mono text-muted-foreground/80 mt-1.5 leading-relaxed line-clamp-2">
+            <p className="text-[12px] font-mono text-muted-foreground/80 mt-1.5 leading-relaxed line-clamp-2">
               {signal.status_reasons[0]}
             </p>
           )}
@@ -165,7 +165,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             </span>
             <span className="text-xs font-mono font-bold text-foreground">{signal.ticker}</span>
             {signal.timeframe && (
-              <span className="text-[8px] font-mono text-primary/70 border border-primary/20 px-1 rounded">
+              <span className="text-[11px] font-mono text-primary/70 border border-primary/20 px-1 rounded">
                 {signal.timeframe}
               </span>
             )}
@@ -235,7 +235,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             const isPos = contrib >= 0;
             return (
               <span key={agent} className={cn(
-                "text-[8px] font-mono px-1 py-0.5 rounded border font-semibold",
+                "text-[11px] font-mono px-1 py-0.5 rounded border font-semibold",
                 isPos ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"
               )}>
                 {AGENT_SHORT[agent] || agent}: {isPos ? "+" : ""}{contrib.toFixed(0)}pp
@@ -250,7 +250,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             }).length;
             if (abstainedCount > 0) {
               return (
-                <span className="text-[8px] font-mono px-1 py-0.5 rounded border border-border/30 bg-muted/20 text-muted-foreground">
+                <span className="text-[11px] font-mono px-1 py-0.5 rounded border border-border/30 bg-muted/20 text-muted-foreground">
                   {abstainedCount} ABSTAINED
                 </span>
               );
@@ -259,7 +259,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           })()}
           {signal.agent_votes.risk_approved !== undefined && (
             <span className={cn(
-              "text-[8px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
+              "text-[11px] font-mono px-1 py-0.5 rounded border flex items-center gap-0.5",
               signal.agent_votes.risk_approved ? "bg-bull/10 text-bull border-bull/20" : "bg-bear/10 text-bear border-bear/20"
             )}>
               <Shield className="h-2 w-2" />
@@ -272,7 +272,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/30">
           {resolved ? (
             <span className={cn(
-              "text-[8px] font-mono px-2 py-0.5 rounded border font-bold",
+              "text-[11px] font-mono px-2 py-0.5 rounded border font-bold",
               resolved === "WIN" ? "bg-bull/10 border-bull/30 text-bull" : "bg-bear/10 border-bear/30 text-bear"
             )}>
               {resolved === "WIN" ? "WIN" : "LOSS"}
@@ -280,11 +280,11 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           ) : (
             <>
               <button onClick={(e) => handleResolve(e, "WIN")} disabled={resolving}
-                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bull/10 border-bull/30 text-bull hover:bg-bull/20 disabled:opacity-50">
+                className="text-[11px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bull/10 border-bull/30 text-bull hover:bg-bull/20 disabled:opacity-50">
                 WIN
               </button>
               <button onClick={(e) => handleResolve(e, "LOSS")} disabled={resolving}
-                className="text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bear/10 border-bear/30 text-bear hover:bg-bear/20 disabled:opacity-50">
+                className="text-[11px] font-mono px-2 py-0.5 rounded border font-bold transition-colors bg-bear/10 border-bear/30 text-bear hover:bg-bear/20 disabled:opacity-50">
                 LOSS
               </button>
             </>
@@ -292,24 +292,24 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           {onDismiss && (
             <button
               onClick={(e) => { e.stopPropagation(); onDismiss(signal.signal_id); }}
-              className="text-[8px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear hover:border-bear/30 transition-colors"
+              className="text-[11px] font-mono p-0.5 rounded border border-border/30 text-muted-foreground hover:text-bear hover:border-bear/30 transition-colors"
               title="Dismiss signal"
             >
               <X className="h-2.5 w-2.5" />
             </button>
           )}
           <div className="ml-auto flex items-center gap-1.5">
-            {resolveError && <span className="text-[8px] font-mono text-bear truncate">{resolveError}</span>}
-            {executeError && <span className="text-[8px] font-mono text-bear truncate">Error</span>}
+            {resolveError && <span className="text-[11px] font-mono text-bear truncate">{resolveError}</span>}
+            {executeError && <span className="text-[11px] font-mono text-bear truncate">Error</span>}
             {executed ? (
-              <span className="text-[8px] font-mono text-bull">
+              <span className="text-[11px] font-mono text-bull">
                 <a href="/portfolio" className="underline">Portfolio</a>
               </span>
             ) : (
               !resolved && (
                 <button onClick={handleExecute} disabled={loading || executed}
                   className={cn(
-                    "text-[8px] font-mono px-2 py-0.5 rounded border font-bold transition-colors",
+                    "text-[11px] font-mono px-2 py-0.5 rounded border font-bold transition-colors",
                     (loading || executed) ? "opacity-50 cursor-not-allowed border-border/30 text-muted-foreground" :
                     isBullish ? "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20"
                              : "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
@@ -369,7 +369,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
 
           {/* Institutional Restraint Callout */}
           <div className="p-3 mb-4 rounded border border-border/50 bg-background/50 font-mono text-xs space-y-2">
-            <div className="text-[11px] font-bold text-foreground uppercase tracking-wider">
+            <div className="text-[12px] font-bold text-foreground uppercase tracking-wider">
               INSTITUTIONAL RESTRAINT ACTIVATED
             </div>
             <p className="text-muted-foreground leading-relaxed">
@@ -377,7 +377,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             </p>
             {signal.status_reasons && signal.status_reasons.length > 0 && (
               <div className="mt-2 space-y-1 pt-2 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
+                <div className="text-[12px] text-muted-foreground/70 uppercase font-semibold">Abstention Factors:</div>
                 {signal.status_reasons.map((r, i) => (
                   <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                     <span className="text-primary font-bold">•</span>
@@ -391,7 +391,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           {/* Agent Attributions — Separated into Active vs Abstained */}
           {signal.agent_votes && (
             <div className="mb-4">
-              <div className="text-[11px] font-mono text-muted-foreground uppercase font-bold tracking-wider mb-2">
+              <div className="text-[12px] font-mono text-muted-foreground uppercase font-bold tracking-wider mb-2">
                 AGENT ATTRIBUTIONS
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -403,7 +403,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
                     <span
                       key={agent}
                       className={cn(
-                        "text-[10px] font-mono px-2 py-0.5 rounded border",
+                        "text-[12px] font-mono px-2 py-0.5 rounded border",
                         isAbstain
                           ? "bg-muted/20 text-muted-foreground border-border/40"
                           : v.direction === "LONG"
@@ -422,7 +422,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
           {/* Reasoning Chain */}
           {signal.reasoning_chain && signal.reasoning_chain.length > 0 && (
             <div className="p-2.5 rounded border border-border/40 bg-muted/20 text-xs font-mono">
-              <div className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase mb-1">
+              <div className="text-[12px] text-muted-foreground font-bold tracking-wider uppercase mb-1">
                 PIPELINE AUDIT TRAIL
               </div>
               {signal.reasoning_chain.map((step, i) => (
@@ -473,12 +473,12 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             {signal.strategy_sources && signal.strategy_sources.length > 0 && (
               <div className="flex gap-1 mt-1 flex-wrap">
                 {signal.strategy_sources.slice(0, 3).map((s: string) => (
-                  <span key={s} className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary/80">
+                  <span key={s} className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary/80">
                     {s}
                   </span>
                 ))}
                 {signal.strategy_sources.length > 3 && (
-                  <span className="text-[8px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
+                  <span className="text-[11px] font-mono text-muted-foreground">+{signal.strategy_sources.length - 3} more</span>
                 )}
               </div>
             )}
@@ -587,7 +587,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
                     <div className="flex-1 h-2 bg-muted/20 rounded overflow-hidden relative">
                       <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border/30" />
                     </div>
-                    <span className="text-[11px] font-mono w-16 text-right text-muted-foreground/60 italic">
+                    <span className="text-[12px] font-mono w-16 text-right text-muted-foreground/60 italic">
                       ABSTAINED
                     </span>
                   </div>
@@ -766,7 +766,7 @@ function ProbabilityDonut({ score, isBullish }: { score: number; isBullish?: boo
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-[13px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}%</span>
-        <span className="text-[7px] font-mono text-muted-foreground leading-none mt-0.5">
+        <span className="text-[11px] font-mono text-muted-foreground leading-none mt-0.5">
           {isBull ? "BULL" : "BEAR"}
         </span>
       </div>
@@ -788,7 +788,7 @@ function ConvictionBadge({ tier, size }: { tier: string; size?: "sm" }) {
   return (
     <span className={cn(
       "font-mono font-bold rounded border",
-      isSm ? "text-[8px] px-1 py-0.5" : "text-[13px] px-1.5 py-0.5",
+      isSm ? "text-[11px] px-1 py-0.5" : "text-[13px] px-1.5 py-0.5",
       tier === "HIGH"     ? "bg-bull/10 text-bull border-bull/20" :
       tier === "MODERATE" ? "bg-warn/10 text-warn border-warn/20" :
       tier === "LOW"      ? "bg-muted text-muted-foreground border-border/30" :

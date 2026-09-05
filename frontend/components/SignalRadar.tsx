@@ -81,16 +81,16 @@ function RadarScannerDial({ count, scanning }: { count: number; scanning: boolea
 
       {/* Radar Telemetry Readout */}
       <div className="flex-1 min-w-0 font-mono">
-        <div className="flex items-center justify-between text-[10px]">
+        <div className="flex items-center justify-between text-[12px]">
           <span className="text-primary font-bold tracking-wider">ALGO_CONF_RADAR</span>
           <span className="text-bull font-bold">{scanning ? "SWEEPING..." : "92% ACTIVE"}</span>
         </div>
-        <div className="text-[9px] text-muted-foreground truncate">
+        <div className="text-[12px] text-muted-foreground truncate">
           {scanning ? "Polling microstructure L2 books..." : `${count} institutional setups detected`}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="h-1.5 w-1.5 rounded-full bg-bull animate-pulse" />
-          <span className="text-[8px] text-muted-foreground uppercase">Liquidity Clusters Monitored</span>
+          <span className="text-[11px] text-muted-foreground uppercase">Liquidity Clusters Monitored</span>
         </div>
       </div>
     </div>
@@ -149,7 +149,7 @@ export function SignalRadar({
             <button
               onClick={() => setViewMode("STREAM")}
               className={cn(
-                "px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors flex items-center gap-1",
+                "px-2 py-0.5 rounded text-[12px] font-mono font-bold transition-colors flex items-center gap-1",
                 viewMode === "STREAM"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -157,12 +157,12 @@ export function SignalRadar({
             >
               <Radar className="h-3 w-3" />
               <span>RADAR</span>
-              <span className="text-[9px] opacity-75">({signals.length})</span>
+              <span className="text-[12px] opacity-75">({signals.length})</span>
             </button>
             <button
               onClick={() => setViewMode("MY_DESK")}
               className={cn(
-                "px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors flex items-center gap-1",
+                "px-2 py-0.5 rounded text-[12px] font-mono font-bold transition-colors flex items-center gap-1",
                 viewMode === "MY_DESK"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -170,14 +170,14 @@ export function SignalRadar({
             >
               <Bookmark className="h-3 w-3" />
               <span>MY DESK</span>
-              <span className="text-[9px] opacity-75">({adoptedSignals.length})</span>
+              <span className="text-[12px] opacity-75">({adoptedSignals.length})</span>
             </button>
           </div>
 
           <button
             onClick={onScanNow}
             disabled={scanning}
-            className="flex items-center gap-1 px-2 py-0.5 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-mono font-bold transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary text-[12px] font-mono font-bold transition-colors disabled:opacity-50"
           >
             <Sparkles className={cn("h-3 w-3", scanning && "animate-spin")} />
             <span>{scanning ? "SCANNING" : "SCAN NOW"}</span>
@@ -203,7 +203,7 @@ export function SignalRadar({
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "px-1.5 py-0.5 rounded text-[9px] font-mono whitespace-nowrap transition-colors",
+                "px-1.5 py-0.5 rounded text-[12px] font-mono whitespace-nowrap transition-colors",
                 activeTab === tab
                   ? "bg-surface-3 text-primary font-bold border border-border/60"
                   : "text-muted-foreground hover:text-foreground"
@@ -223,7 +223,7 @@ export function SignalRadar({
             <div className="text-xs font-mono font-bold text-muted-foreground">
               {viewMode === "MY_DESK" ? "NO ADOPTED TRADES YET" : "NO SIGNALS MATCH FILTER"}
             </div>
-            <p className="text-[10px] font-mono text-muted-foreground/70 max-w-xs mx-auto">
+            <p className="text-[12px] font-mono text-muted-foreground/70 max-w-xs mx-auto">
               {viewMode === "MY_DESK"
                 ? "Click 'Adopt Signal' on any setup to monitor live price action and distance to target here."
                 : "Trigger 'SCAN NOW' to run multi-agent confluence screening across the market catalogue."}
@@ -257,7 +257,7 @@ export function SignalRadar({
                     </span>
                     <span
                       className={cn(
-                        "px-1 py-0.2 rounded text-[8px] font-mono font-bold uppercase",
+                        "px-1 py-0.2 rounded text-[11px] font-mono font-bold uppercase",
                         isBull
                           ? "bg-bull/15 text-bull border border-bull/30"
                           : isShort
@@ -267,7 +267,7 @@ export function SignalRadar({
                     >
                       {sig.direction}
                     </span>
-                    <span className="text-[8px] font-mono text-muted-foreground uppercase">
+                    <span className="text-[11px] font-mono text-muted-foreground uppercase">
                       {sig.timeframe || "1D"}
                     </span>
                   </div>
@@ -295,7 +295,7 @@ export function SignalRadar({
 
                 {/* Line 2: Levels & Geometry */}
                 {!isNoSignal && (
-                  <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                  <div className="flex items-center justify-between text-[12px] font-mono mb-1">
                     <span className="text-muted-foreground">
                       E: <span className="text-foreground font-semibold">{formatPrice(entry, sig.ticker)}</span>
                     </span>
@@ -311,7 +311,7 @@ export function SignalRadar({
                 )}
 
                 {/* Line 3: Confluence Bar & Time */}
-                <div className="flex items-center justify-between pt-1 border-t border-border/20 text-[9px] font-mono text-muted-foreground">
+                <div className="flex items-center justify-between pt-1 border-t border-border/20 text-[12px] font-mono text-muted-foreground">
                   <span className={cn("font-bold", isBull ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground")}>
                     {prob.toFixed(0)}% {isBull ? "BULL" : isShort ? "BEAR" : "CONFLUENCE"}
                   </span>

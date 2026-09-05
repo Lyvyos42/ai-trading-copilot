@@ -163,7 +163,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
           onClick={toggleEnabled}
           disabled={saving || symbols.length === 0}
           className={cn(
-            "flex items-center gap-1 text-[8px] font-mono font-bold px-2 py-0.5 rounded border transition-colors",
+            "flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded border transition-colors",
             enabled
               ? "bg-bear/10 border-bear/30 text-bear hover:bg-bear/20"
               : "bg-bull/10 border-bull/30 text-bull hover:bg-bull/20",
@@ -180,7 +180,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
       {config && (
         <div className="flex items-center gap-2">
           <span className={cn("h-1.5 w-1.5 rounded-full", enabled ? "bg-bull animate-pulse" : "bg-muted-foreground")} />
-          <span className="text-[8px] font-mono text-muted-foreground">
+          <span className="text-[11px] font-mono text-muted-foreground">
             {enabled ? "ACTIVE" : "INACTIVE"}
             {config.last_scan_at && ` — last scan ${new Date(config.last_scan_at).toLocaleTimeString()}`}
           </span>
@@ -188,19 +188,19 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
       )}
 
       {error && error !== "pro_required" && (
-        <div className="text-[8px] font-mono text-bear">{error}</div>
+        <div className="text-[11px] font-mono text-bear">{error}</div>
       )}
 
       {/* Symbol list */}
       <div>
-        <div className="text-[8px] font-mono text-muted-foreground mb-1.5">
+        <div className="text-[11px] font-mono text-muted-foreground mb-1.5">
           SYMBOLS ({symbols.length}/{MAX_SYMBOLS})
         </div>
         <div className="flex flex-wrap gap-1 mb-1.5 min-h-[20px]">
           {symbols.map(sym => (
             <span
               key={sym}
-              className="flex items-center gap-0.5 text-[8px] font-mono px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary"
+              className="flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary"
             >
               {sym}
               <button onClick={() => removeSymbol(sym)} className="hover:text-bear transition-colors ml-0.5">
@@ -209,7 +209,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
             </span>
           ))}
           {symbols.length === 0 && (
-            <span className="text-[8px] font-mono text-muted-foreground/50 italic">No symbols added</span>
+            <span className="text-[11px] font-mono text-muted-foreground/50 italic">No symbols added</span>
           )}
         </div>
 
@@ -222,12 +222,12 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
               onKeyDown={e => e.key === "Enter" && addSymbol()}
               placeholder="e.g. XAUUSD"
               maxLength={12}
-              className="flex-1 text-[8px] font-mono bg-muted/20 border border-border/50 rounded px-1.5 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/40"
+              className="flex-1 text-[11px] font-mono bg-muted/20 border border-border/50 rounded px-1.5 py-1 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/40"
             />
             <button
               onClick={addSymbol}
               disabled={!newSymbol.trim()}
-              className="text-[8px] font-mono px-1.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+              className="text-[11px] font-mono px-1.5 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
             >
               <Plus className="h-2.5 w-2.5" />
             </button>
@@ -237,14 +237,14 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
 
       {/* Concurrent scans */}
       <div>
-        <div className="text-[8px] font-mono text-muted-foreground mb-1">CONCURRENT SCANS</div>
+        <div className="text-[11px] font-mono text-muted-foreground mb-1">CONCURRENT SCANS</div>
         <div className="flex gap-1">
           {CONCURRENT_OPTIONS.map(n => (
             <button
               key={n}
               onClick={() => setConcurrent(n)}
               className={cn(
-                "w-6 h-6 text-[8px] font-mono font-bold rounded border transition-colors",
+                "w-6 h-6 text-[11px] font-mono font-bold rounded border transition-colors",
                 concurrent === n
                   ? "bg-primary/10 border-primary/50 text-primary"
                   : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-primary"
@@ -258,14 +258,14 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
 
       {/* Interval */}
       <div>
-        <div className="text-[8px] font-mono text-muted-foreground mb-1">SCAN INTERVAL</div>
+        <div className="text-[11px] font-mono text-muted-foreground mb-1">SCAN INTERVAL</div>
         <div className="flex gap-1">
           {INTERVAL_OPTIONS.map(m => (
             <button
               key={m}
               onClick={() => setIntervalMin(m)}
               className={cn(
-                "px-2 h-6 text-[8px] font-mono font-bold rounded border transition-colors",
+                "px-2 h-6 text-[11px] font-mono font-bold rounded border transition-colors",
                 interval === m
                   ? "bg-primary/10 border-primary/50 text-primary"
                   : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-primary"
@@ -280,7 +280,7 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
       {/* Cost estimate */}
       <div className="pt-1 border-t border-border/30">
         <div className="flex items-center justify-between">
-          <span className="text-[8px] font-mono text-muted-foreground">EST. COST / HOUR</span>
+          <span className="text-[11px] font-mono text-muted-foreground">EST. COST / HOUR</span>
           <span className={cn(
             "text-[13px] font-mono font-bold",
             parseFloat(costPerHour) < 0.02 ? "text-bull" : parseFloat(costPerHour) < 0.05 ? "text-warn" : "text-bear"
@@ -288,13 +288,13 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
             ~${costPerHour}
           </span>
         </div>
-        <div className="text-[7px] font-mono text-muted-foreground/50 mt-0.5">
+        <div className="text-[11px] font-mono text-muted-foreground/50 mt-0.5">
           {symbols.length} symbols × {Math.round(60 / interval)} scans/hr × $0.001 (Haiku)
         </div>
       </div>
 
       {triggerMsg && (
-        <div className="text-[8px] font-mono text-center text-primary bg-primary/10 border border-primary/20 py-1 px-2 rounded">
+        <div className="text-[11px] font-mono text-center text-primary bg-primary/10 border border-primary/20 py-1 px-2 rounded">
           {triggerMsg}
         </div>
       )}
@@ -304,14 +304,14 @@ export function ScannerPanel({ onConfigChange }: ScannerPanelProps) {
         <button
           onClick={() => triggerNow()}
           disabled={triggering}
-          className="text-[8px] font-mono font-bold px-2 py-1.5 rounded border border-primary/50 text-primary bg-primary/5 hover:bg-primary/15 transition-colors disabled:opacity-40"
+          className="text-[11px] font-mono font-bold px-2 py-1.5 rounded border border-primary/50 text-primary bg-primary/5 hover:bg-primary/15 transition-colors disabled:opacity-40"
         >
           {triggering ? "SCANNING…" : "⚡ SCAN NOW"}
         </button>
         <button
           onClick={() => saveConfig()}
           disabled={saving}
-          className="text-[8px] font-mono font-bold px-2 py-1.5 rounded border border-border/60 text-foreground hover:bg-white/5 transition-colors disabled:opacity-40"
+          className="text-[11px] font-mono font-bold px-2 py-1.5 rounded border border-border/60 text-foreground hover:bg-white/5 transition-colors disabled:opacity-40"
         >
           {saving ? "SAVING…" : "SAVE CONFIG"}
         </button>
