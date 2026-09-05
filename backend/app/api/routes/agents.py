@@ -3,7 +3,7 @@ GET /api/v1/agents/status — health and activity of all 9 agents + Risk Gate
 """
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user
@@ -119,21 +119,78 @@ async def agent_status(
     cutoff_today = datetime.utcnow() - timedelta(hours=24)
     cutoff_7d = datetime.utcnow() - timedelta(days=7)
 
+    # Scoped to the caller. Both counts were global, so a user with four
+    # resolved signals of their own saw a platform-wide figure on their own
+    # dashboard - 451 signals "today" and 7.5% accuracy - with no way to tell
+    # it was not theirs.
+    user_id = _user.get("sub") or _user.get("id") or _user.get("user_id") or ""
+    mine = or_(Signal.user_id == user_id, Signal.user_id.is_(None))
+
     today_result = await db.execute(
-        select(func.count()).select_from(Signal).where(Signal.created_at >= cutoff_today)
+        select(func.count()).select_from(Signal)
+        .where(mine).where(Signal.created_at >= cutoff_today)
     )
     signals_today_count = today_result.scalar() or 0
 
+    # PER-AGENT accuracy, actually per agent.
+    #
+    # This used to compute ONE overall win rate and hand the identical number
+    # to all eleven agents, so the panel showed eleven rows of "7.5%" as if
+    # each had been measured separately. Nothing was being attributed.
+    #
+    # agent_votes stores each analyst's direction on every signal, and a
+    # resolved signal records whether ITS direction paid. So an agent that
+    # voted with a signal that WON was right, and one that voted against a
+    # signal that won was wrong. Agents that abstained or voted NEUTRAL are
+    # excluded rather than counted as wrong - having no opinion is not an
+    # incorrect opinion.
     res_7d = await db.execute(
-        select(Signal.outcome)
+        select(Signal.outcome, Signal.direction, Signal.agent_votes)
+        .where(mine)
         .where(Signal.resolved_at >= cutoff_7d)
         .where(Signal.outcome.in_(["WIN", "LOSS"]))
     )
-    outcomes_7d = [r[0] for r in res_7d.all()]
-    acc_7d = None
-    if outcomes_7d:
-        wins_7d = sum(1 for o in outcomes_7d if o == "WIN")
-        acc_7d = round(wins_7d / len(outcomes_7d) * 100, 1)
+    rows_7d = res_7d.all()
+
+    # AGENTS[].name -> the key used in agent_votes
+    _VOTE_KEY = {
+        "FundamentalAnalyst":  "fundamental",
+        "TechnicalAnalyst":    "technical",
+        "SentimentAnalyst":    "sentiment",
+        "MacroAnalyst":        "macro",
+        "OrderFlowAnalyst":    "order_flow",
+        "RegimeChangeAnalyst": "regime_change",
+        "CorrelationAnalyst":  "correlation",
+    }
+    tally: dict[str, list[int]] = {k: [0, 0] for k in _VOTE_KEY.values()}   # [right, total]
+    overall_right = overall_total = 0
+
+    for outcome, direction, votes in rows_7d:
+        signal_paid = outcome == "WIN"
+        overall_total += 1
+        overall_right += 1 if signal_paid else 0
+        if not isinstance(votes, dict):
+            continue
+        for key in tally:
+            vote = votes.get(key)
+            if not isinstance(vote, dict):
+                continue
+            vd = vote.get("direction")
+            if vd not in ("LONG", "SHORT"):
+                continue                      # abstained or neutral - not a call
+            agreed = vd == direction
+            tally[key][1] += 1
+            if agreed == signal_paid:
+                tally[key][0] += 1
+
+    def _acc(key: str | None):
+        """None means UNMEASURED. Never 0.0, which reads as 'measured, and bad'."""
+        if key is None or key not in tally:
+            return None
+        right, total = tally[key]
+        return round(right / total * 100, 1) if total else None
+
+    overall_acc = round(overall_right / overall_total * 100, 1) if overall_total else None
 
     statuses = []
     for a in AGENTS:
@@ -145,7 +202,16 @@ async def agent_status(
             "status": "HEALTHY",
             "avg_latency_ms": 0,
             "signals_today": signals_today_count,
-            "accuracy_7d": acc_7d,
+            # Analysts get their own measured accuracy. TraderAgent, RiskGate,
+            # RiskManager and QuantAnalyst cast no directional vote, so they
+            # carry the signal-level result where that is what they influence,
+            # and None where nothing is attributable to them.
+            "accuracy_7d": (_acc(_VOTE_KEY.get(a["name"]))
+                            if a["name"] in _VOTE_KEY
+                            else (overall_acc if a["name"] == "TraderAgent" else None)),
+            "accuracy_sample": (tally.get(_VOTE_KEY.get(a["name"], ""), [0, 0])[1]
+                                if a["name"] in _VOTE_KEY
+                                else (overall_total if a["name"] == "TraderAgent" else 0)),
             "last_active": now,
         })
     return {"agents": statuses, "total": len(statuses), "all_healthy": True, "timestamp": now}

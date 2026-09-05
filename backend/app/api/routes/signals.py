@@ -13,12 +13,14 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, desc, func, delete, or_
+from sqlalchemy import select, desc, func, delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user, get_optional_user
 from app.db.database import get_db
 from app.models.signal import Signal
+from app.models.portfolio import Position
+from app.models.memory import AgentCorrection
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
 from app.data.market_data import resolve_ticker, resolve_asset_class, _fetch_rest_spot_price, _fetch_tv_ta_spot
@@ -830,8 +832,36 @@ async def reset_signals(
     # reset that filtered on user_id alone deleted none of them and the button
     # looked broken. Those same rows are the ones served to anonymous callers
     # below, so clearing them closes that too.
-    result = await db.execute(
-        delete(Signal).where(or_(Signal.user_id == user_id, Signal.user_id.is_(None)))
-    )
-    await db.commit()
+    # Two tables carry a foreign key to signals.id: `positions` (paper trades)
+    # and `agent_corrections` (lessons the agents recorded from past calls).
+    # Deleting a referenced signal raises a FK violation, and because this is
+    # one bulk statement a SINGLE referenced row failed the ENTIRE reset - which
+    # surfaced in the UI as a bare "Internal server error".
+    #
+    # Both columns are nullable, so the reference is DETACHED rather than the
+    # rows being cascade-deleted. Clearing your signal history should not
+    # destroy your paper-trading record or what the agents have learned; those
+    # simply stop pointing at a signal that no longer exists.
+    scope = or_(Signal.user_id == user_id, Signal.user_id.is_(None))
+    try:
+        doomed = (await db.execute(select(Signal.id).where(scope))).scalars().all()
+        if doomed:
+            await db.execute(
+                update(Position).where(Position.signal_id.in_(doomed))
+                .values(signal_id=None)
+            )
+            await db.execute(
+                update(AgentCorrection).where(AgentCorrection.signal_id.in_(doomed))
+                .values(signal_id=None)
+            )
+        result = await db.execute(delete(Signal).where(scope))
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        # Never let this fail as an opaque 500 again - the last two rounds of
+        # this bug were both prolonged by a message that named nothing.
+        raise HTTPException(
+            status_code=500,
+            detail=f"Reset failed and was rolled back: {type(exc).__name__}: {exc}",
+        )
     return {"deleted": result.rowcount}

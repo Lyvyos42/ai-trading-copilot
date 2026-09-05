@@ -356,6 +356,8 @@ export interface AgentStatus {
   avg_latency_ms: number;
   signals_today: number;
   accuracy_7d: number | null;
+  /** How many resolved signals that accuracy is computed from. 0 = unmeasured. */
+  accuracy_sample?: number;
   last_active: string;
 }
 
