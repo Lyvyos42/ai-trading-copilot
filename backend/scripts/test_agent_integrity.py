@@ -239,8 +239,42 @@ async def test_macro_is_not_structurally_bearish():
               f"{bear}->{off}  {bull}->{on}")
 
 
+def test_asset_class_routing():
+    print("\nSTRUCTURAL — asset class routing prevents tab misclassification")
+    from app.data.market_data import resolve_asset_class
+    from app.agents.correlation import CorrelationAnalyst
+
+    check("EURJPY=X resolves to fx even when passed stocks tab",
+          resolve_asset_class("EURJPY=X", "stocks") == "fx",
+          resolve_asset_class("EURJPY=X", "stocks"))
+    check("EURUSD resolves to fx",
+          resolve_asset_class("EURUSD") == "fx",
+          resolve_asset_class("EURUSD"))
+    check("BTC-USD resolves to crypto",
+          resolve_asset_class("BTC-USD") == "crypto",
+          resolve_asset_class("BTC-USD"))
+    check("XAUUSD resolves to commodities",
+          resolve_asset_class("XAUUSD") == "commodities",
+          resolve_asset_class("XAUUSD"))
+    check("GC=F resolves to commodities",
+          resolve_asset_class("GC=F") == "commodities",
+          resolve_asset_class("GC=F"))
+    check("SPX resolves to indices",
+          resolve_asset_class("SPX") == "indices",
+          resolve_asset_class("SPX"))
+    check("AAPL resolves to stocks",
+          resolve_asset_class("AAPL") == "stocks",
+          resolve_asset_class("AAPL"))
+
+    corr = CorrelationAnalyst()._find_correlated_assets("EURUSD", "fx")
+    check("correlation agent clusters fx with fx pairs, not tech stocks",
+          any("JPY" in a or "GBP" in a or "AUD" in a for a in corr),
+          str(corr))
+
+
 async def main():
     test_no_rng_in_agents()
+    test_asset_class_routing()
     await test_abstentions()
     await test_real_paths_still_work()
     await test_trader_gates()

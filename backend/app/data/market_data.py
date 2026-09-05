@@ -81,6 +81,60 @@ def resolve_ticker(display_symbol: str) -> str:
     return _TICKER_ALIAS.get(upper, upper)
 
 
+_CRYPTO_SYMBOLS = {
+    "BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "DOT", "LINK", "UNI", "MATIC", "BNB"
+}
+_METAL_PREFIXES = ("XAU", "XAG", "XPT", "XPD")
+_COMMODITY_SYMBOLS = {
+    "USOIL", "UKOIL", "NATGAS", "RBOB", "HEATOIL", "CORN", "WHEAT", "SOYBEAN",
+    "COFFEE", "SUGAR", "COTTON", "COCOA", "CL=F", "BZ=F", "NG=F", "GC=F", "SI=F", "PL=F", "PA=F"
+}
+_INDEX_SYMBOLS = {
+    "US500", "SPX", "US100", "NDX", "US30", "DJIA", "US2000", "RUT", "UK100", "FTSE",
+    "GER40", "DAX", "FRA40", "CAC40", "JPN225", "NKY", "HK50", "AUS200", "ESP35", "ITA40", "CHN50", "STOXX50"
+}
+_CCY = {
+    "USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD", "SEK", "NOK",
+    "DKK", "PLN", "ZAR", "MXN", "TRY", "HKD", "SGD", "CNH", "CZK", "HUF",
+    "ILS", "THB", "RUB", "BRL", "INR", "KRW"
+}
+
+
+def resolve_asset_class(ticker: str, asset_class: str | None = None) -> str:
+    """Determine the true asset class of a ticker symbol.
+
+    Prevents UI tab defaults (e.g. 'stocks' tab) from misclassifying FX pairs
+    (like EURJPY=X or EURUSD), cryptocurrencies, commodities, and indices.
+    """
+    t = (ticker or "").upper().strip()
+    ac = (asset_class or "").lower().strip()
+    base = t.replace("=X", "").replace("=F", "")
+
+    # 1. Crypto hints
+    if any(c in t for c in ("-USD", "-USDT", "USDT")) or base in _CRYPTO_SYMBOLS or ac == "crypto":
+        return "crypto"
+
+    # 2. Metals & Commodities
+    if any(t.startswith(m) for m in _METAL_PREFIXES) or t in _COMMODITY_SYMBOLS or base in _COMMODITY_SYMBOLS or ac in ("commodities", "metals"):
+        return "commodities"
+
+    # 3. Forex: ends with =X, in _TICKER_ALIAS as FX, or 6-char currency pair
+    if t.endswith("=X") or (len(base) == 6 and base[:3] in _CCY and base[3:] in _CCY) or ac in ("fx", "forex"):
+        return "fx"
+
+    # 4. Indices
+    if t.startswith("^") or base in _INDEX_SYMBOLS or ac in ("indices", "index"):
+        return "indices"
+
+    # 5. ETFs & Fixed Income if explicitly specified
+    if ac in ("etf", "etfs"):
+        return "etfs"
+    if ac in ("fixed_income", "bonds"):
+        return "fixed_income"
+
+    return "stocks"
+
+
 # Some Yahoo Finance tickers (e.g. XAUUSD=X) 404 on the v8/finance/chart REST API
 # but have a working equivalent that returns the live regularMarketPrice.
 # This mapping is used ONLY for the REST spot-price call — OHLCV history still
@@ -370,6 +424,7 @@ async def fetch_market_data(ticker: str, asset_class: str = "stocks") -> dict:
     with OHLCV data and injects it into data["close"], so agents always receive
     the current market price rather than a stale historical bar close.
     """
+    asset_class = resolve_asset_class(ticker, asset_class)
     yf_sym = resolve_ticker(ticker)
     upper = ticker.upper()
 
@@ -556,12 +611,12 @@ async def _fetch_yfinance(ticker: str, asset_class: str = "stocks") -> dict:
             "volume_ratio": volume_ratio,
             "atr": round(atr, dec),
             "price_decimals": dec,
-            # Fundamentals — present in info dict for most US equities
-            "pe_ratio":        info.get("trailingPE") or info.get("forwardPE"),
-            "pb_ratio":        info.get("priceToBook"),
-            "eps_growth":      info.get("earningsGrowth"),
-            "revenue_growth":  info.get("revenueGrowth"),
-            "dividend_yield":  info.get("dividendYield"),
+            # Fundamentals — present in info dict for most US equities only
+            "pe_ratio":        (info.get("trailingPE") or info.get("forwardPE")) if asset_class == "stocks" else None,
+            "pb_ratio":        info.get("priceToBook") if asset_class == "stocks" else None,
+            "eps_growth":      info.get("earningsGrowth") if asset_class == "stocks" else None,
+            "revenue_growth":  info.get("revenueGrowth") if asset_class == "stocks" else None,
+            "dividend_yield":  info.get("dividendYield") if asset_class == "stocks" else None,
             "earnings_surprise": None,  # not available via yfinance
         }
 
@@ -682,6 +737,7 @@ _CLASS_PRICE_RANGE: dict[str, tuple[float, float]] = {
 
 def _mock_market_data(ticker: str, asset_class: str) -> dict:
     """Deterministic realistic mock data for demo / offline mode."""
+    asset_class = resolve_asset_class(ticker, asset_class)
     rng = random.Random(sum(ord(c) for c in ticker))
 
     # Use known price if available, otherwise derive from asset class range.

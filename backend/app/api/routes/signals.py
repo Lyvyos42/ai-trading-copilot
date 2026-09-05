@@ -22,7 +22,7 @@ from app.db.database import get_db
 from app.models.signal import Signal
 from app.models.user import User
 from app.pipeline.graph import run_pipeline
-from app.data.market_data import resolve_ticker, _fetch_rest_spot_price, _fetch_tv_ta_spot
+from app.data.market_data import resolve_ticker, resolve_asset_class, _fetch_rest_spot_price, _fetch_tv_ta_spot
 from app.services.market_hours import market_status
 from app.services.signal_resolver import resolve_open_signals, window_to_hours
 
@@ -392,9 +392,10 @@ async def generate_signal(
     # Free tier & visitors: real Python analysis with market data (no AI cost)
     # Paid tiers: full AI-powered multi-agent pipeline
     is_free = tier not in _PAID_TIERS
+    resolved_asset_class = resolve_asset_class(ticker, body.asset_class)
     state = await run_pipeline(
         ticker=ticker,
-        asset_class=body.asset_class,
+        asset_class=resolved_asset_class,
         timeframe=body.timeframe,
         profile=profile_slug,
         user_id=user_id_for_pipeline,
@@ -470,7 +471,7 @@ async def generate_signal(
     signal = Signal(
         user_id=user_id,
         ticker=ticker,
-        asset_class=body.asset_class,
+        asset_class=resolved_asset_class,
         timeframe=body.timeframe,
         direction=direction,
         entry_price=final.get("entry_price", 0),

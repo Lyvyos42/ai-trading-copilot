@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from app.auth.jwt import get_current_user
 from app.pipeline.graph import run_pipeline
+from app.data.market_data import resolve_asset_class
 
 router = APIRouter(prefix="/api/v1/debate", tags=["debate"])
 
@@ -46,11 +47,12 @@ async def trigger_debate(
     _check_ip_rate_limit(client_ip)
 
     ticker = body.ticker.upper().strip()
-    state = await run_pipeline(ticker=ticker, asset_class=body.asset_class)
+    resolved_asset_class = resolve_asset_class(ticker, body.asset_class)
+    state = await run_pipeline(ticker=ticker, asset_class=resolved_asset_class)
 
     return {
         "ticker": ticker,
-        "asset_class": body.asset_class,
+        "asset_class": resolved_asset_class,
         "bull_case": state.get("bull_case", ""),
         "bear_case": state.get("bear_case", ""),
         "analyst_votes": {

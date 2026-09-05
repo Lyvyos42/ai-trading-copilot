@@ -109,16 +109,16 @@ def run_risk_gate(state: dict) -> dict:
         })
 
     # ── Rule 9: No statistical edge (p > 0.10) → WARN ─────────────────────
-    p_value = quant.get("p_value", 0.5)
-    if p_value > 0.10:
+    p_value = quant.get("p_value")
+    if p_value is not None and p_value > 0.10:
         triggered.append({
             "rule": 9, "name": "no_statistical_edge",
             "reason": f"p-value {p_value:.4f} > 0.10 — no statistically significant edge",
         })
 
     # ── Rule 10: Win rate below 40% in backtest → BLOCK ───────────────────
-    backtest_wr = quant.get("backtest_win_rate", 0.45)
-    if backtest_wr < 0.40:
+    backtest_wr = quant.get("backtest_win_rate")
+    if backtest_wr is not None and backtest_wr < 0.40:
         triggered.append({
             "rule": 10, "name": "low_win_rate",
             "reason": f"Backtest win rate {backtest_wr:.0%} below 40% minimum",
@@ -134,16 +134,16 @@ def run_risk_gate(state: dict) -> dict:
 
     # ── Rule 12: Concentration risk HIGH + correlation > 0.7 → BLOCK ──────
     conc_risk = correlation.get("concentration_risk", "LOW")
-    port_corr = correlation.get("portfolio_correlation", 0)
-    if conc_risk == "HIGH" and port_corr > 0.7:
+    port_corr = correlation.get("portfolio_correlation")
+    if conc_risk == "HIGH" and port_corr is not None and port_corr > 0.7:
         triggered.append({
             "rule": 12, "name": "concentration_breach",
             "reason": f"Concentration HIGH with correlation {port_corr:.2f} > 0.70",
         })
 
     # ── Rule 13: Negative expectancy → BLOCK ──────────────────────────────
-    expectancy = quant.get("expectancy_per_trade", 0.01)
-    if expectancy < 0:
+    expectancy = quant.get("expectancy_per_trade")
+    if expectancy is not None and expectancy < 0:
         triggered.append({
             "rule": 13, "name": "negative_expectancy",
             "reason": f"Expected value per trade is {expectancy:+.3f}R — negative edge",

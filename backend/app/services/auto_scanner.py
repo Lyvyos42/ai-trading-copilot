@@ -253,12 +253,14 @@ async def _generate_signal_for_user(
     confluence_score: int,
     summary: str,
 ) -> Signal | None:
-    """Run the pipeline in fallback mode and persist a Signal record."""
     from app.pipeline.graph import run_pipeline
+    from app.data.market_data import resolve_asset_class
 
     try:
+        asset_class = resolve_asset_class(ticker)
         state = await run_pipeline(
             ticker=ticker,
+            asset_class=asset_class,
             force_fallback=True,
             user_id=user_id,
         )
@@ -298,7 +300,7 @@ async def _generate_signal_for_user(
         signal = Signal(
             user_id=user_id,
             ticker=ticker,
-            asset_class=final.get("asset_class", "stocks"),
+            asset_class=final.get("asset_class") or asset_class,
             timeframe=final.get("timeframe", "1D"),
             direction=signal_direction,
             entry_price=final.get("entry_price", 0),

@@ -209,10 +209,9 @@ async def run_fund_manager(state: TradingState) -> TradingState:
 
     # Apply Kelly adjustment from correlation analysis
     kelly_adj = correlation.get("kelly_adjustment", 1.0)
-    if kelly_adj and kelly_adj != 1.0:
-        signal["position_size_pct"] = round(
-            signal.get("position_size_pct", 2.0) * kelly_adj, 2
-        )
+    current_pos = signal.get("position_size_pct")
+    if kelly_adj and kelly_adj != 1.0 and current_pos is not None:
+        signal["position_size_pct"] = round(current_pos * kelly_adj, 2)
 
     # Apply Risk Gate results
     if not gate.get("passed", True):
@@ -223,17 +222,16 @@ async def run_fund_manager(state: TradingState) -> TradingState:
                 t["reason"] for t in gate.get("triggered_rules", [])
             ]
         elif gate.get("mode") == "PRESERVATION":
-            signal["position_size_pct"] = round(
-                signal.get("position_size_pct", 0) * 0.25, 2
-            )
+            current_pos = signal.get("position_size_pct")
+            signal["position_size_pct"] = round(current_pos * 0.25, 2) if current_pos is not None else None
             signal["status"] = "PRESERVATION_MODE"
 
     # Crisis regime → halve position
     regime = state.get("regime_change_analysis", {})
     if regime.get("current_regime") == "CRISIS" and signal.get("status") not in ("RISK_GATE_BLOCKED",):
-        signal["position_size_pct"] = round(
-            signal.get("position_size_pct", 0) * 0.5, 2
-        )
+        current_pos = signal.get("position_size_pct")
+        if current_pos is not None:
+            signal["position_size_pct"] = round(current_pos * 0.5, 2)
 
     # If risk not approved, zero out
     if not risk.get("approved", True) and signal.get("status") != "RISK_GATE_BLOCKED":
@@ -287,9 +285,11 @@ async def run_fund_manager(state: TradingState) -> TradingState:
 
     reasoning = state.get("reasoning_chain", [])
     lean = "BULLISH" if prob >= 50 else "BEARISH"
+    pos_size = signal.get("position_size_pct")
+    size_str = f", position size {pos_size:.1f}% of equity" if pos_size is not None else ""
     reasoning.append(
         f"Fund Manager: {signal['status']} "
-        f"— {prob:.0f}% {lean}, position size {signal.get('position_size_pct', 0):.1f}% of equity. "
+        f"— {prob:.0f}% {lean}{size_str}. "
         f"Conviction: {signal.get('conviction_tier', 'N/A')}."
     )
 
@@ -365,11 +365,13 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
     Run the full 9-agent pipeline for a given ticker.
     Returns the completed TradingState with final_signal populated.
     """
-    from app.data.market_data import fetch_market_data
+    from app.data.market_data import fetch_market_data, resolve_asset_class
     from app.data.fred_provider import get_macro_snapshot
     from app.data.quiver_provider import get_alternative_data
     from app.services.news_context import get_news_context
     from app.profiles.manager import profile_manager
+
+    asset_class = resolve_asset_class(ticker, asset_class)
 
     # Fetch market data, live news context, and FRED data in parallel
     if market_data is None:

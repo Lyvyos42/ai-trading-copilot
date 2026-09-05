@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from app.data.market_data import resolve_ticker, _REST_ALIAS
 from app.models.signal import Signal
+import app.models.user  # noqa: F401 - ensures users table is registered for foreign key resolution
 
 log = structlog.get_logger()
 

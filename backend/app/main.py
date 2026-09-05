@@ -115,10 +115,12 @@ async def lifespan(app: FastAPI):
     # Start background news scraper (runs every 5 min)
     try:
         start_scheduler()
-        # Kick off an immediate first scrape on startup
+        # Kick off an immediate first scrape and signal resolution on startup
         import asyncio
         from app.services.news_scraper import scrape_all_feeds
+        from app.services.scheduler import _resolve_job
         asyncio.create_task(scrape_all_feeds())
+        asyncio.create_task(_resolve_job())
     except Exception as exc:
         log.error("scheduler_start_failed", error=str(exc))
 

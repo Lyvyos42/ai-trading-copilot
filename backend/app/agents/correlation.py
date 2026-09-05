@@ -38,8 +38,20 @@ _CORRELATION_MAP = {
         "defi": ["UNIUSD", "AAVEUSD", "LINKUSD"],
     },
     "forex": {
-        "usd_pairs": ["EURUSD", "GBPUSD", "USDJPY", "USDCHF"],
+        "usd_pairs": ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "EURJPY"],
         "commodity_fx": ["AUDUSD", "NZDUSD", "USDCAD"],
+    },
+    "fx": {
+        "usd_pairs": ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "EURJPY"],
+        "commodity_fx": ["AUDUSD", "NZDUSD", "USDCAD"],
+    },
+    "commodities": {
+        "metals": ["XAUUSD", "XAGUSD", "XPTUSD", "GC=F", "SI=F"],
+        "energy": ["USOIL", "UKOIL", "NATGAS", "CL=F", "BZ=F"],
+    },
+    "indices": {
+        "us": ["SPX", "NDX", "DJIA", "US500", "US100", "US30", "^GSPC", "^NDX"],
+        "europe_asia": ["FTSE", "DAX", "CAC40", "JPN225", "NKY"],
     },
 }
 
