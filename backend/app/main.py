@@ -239,8 +239,25 @@ async def global_exception_handler(request: Request, exc: Exception):
         error=str(exc),
         traceback=traceback.format_exc(),
     )
+    # The LAST frame inside our own code, not the raw message.
+    #
+    # "TypeError: 'NoneType' object is not subscriptable" names a fault class
+    # but no location, and this codebase has hundreds of subscripts across the
+    # pipeline, the providers and the route - so the message alone sent us
+    # grepping file by file. One file:line ends that immediately.
+    #
+    # Frames from site-packages are skipped so the pointer lands on the line we
+    # can actually change rather than somewhere inside httpx or SQLAlchemy.
+    site = f"{os.sep}site-packages{os.sep}"
+    ours = [f for f in traceback.extract_tb(exc.__traceback__) if site not in f.filename]
+    where = ""
+    if ours:
+        last = ours[-1]
+        fname = last.filename.replace(os.sep, "/").split("/app/")[-1]
+        where = f" at app/{fname}:{last.lineno} in {last.name}()"
+
     expose = os.getenv("EXPOSE_ERROR_DETAIL", "1").lower() not in ("0", "false", "no")
-    detail = (f"{type(exc).__name__}: {exc}" if expose else "Internal server error")
+    detail = (f"{type(exc).__name__}: {exc}{where}" if expose else "Internal server error")
     return JSONResponse(
         status_code=500,
         content={"detail": f"{detail} [ref {error_id}]", "error_id": error_id},
