@@ -82,9 +82,11 @@ export const AgentStatusPanel = memo(function AgentStatusPanel({ agents, compact
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={cn(
                   "text-[11px] font-mono font-bold",
-                  agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear"
+                  agent.accuracy_7d != null
+                    ? (agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear")
+                    : "text-muted-foreground"
                 )}>
-                  {agent.accuracy_7d}%
+                  {agent.accuracy_7d != null ? `${agent.accuracy_7d}%` : "—"}
                 </span>
                 <div className="flex items-center gap-0.5">
                   <div className={cn(
@@ -140,11 +142,13 @@ export const AgentStatusPanel = memo(function AgentStatusPanel({ agents, compact
               <div className="text-right">
                 <div className={cn(
                   "text-lg font-mono font-bold",
-                  agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear"
+                  agent.accuracy_7d != null
+                    ? (agent.accuracy_7d >= 65 ? "text-bull" : agent.accuracy_7d >= 55 ? "text-warn" : "text-bear")
+                    : "text-muted-foreground"
                 )}>
-                  {agent.accuracy_7d}%
+                  {agent.accuracy_7d != null ? `${agent.accuracy_7d}%` : "—"}
                 </div>
-                <div className="text-[13px] text-muted-foreground">7d accuracy</div>
+                <div className="text-[13px] text-muted-foreground">{agent.accuracy_7d != null ? "7d accuracy" : "unmeasured"}</div>
                 <div className="flex items-center justify-end gap-1 mt-1">
                   <div className={cn(
                     "h-1.5 w-1.5 rounded-full",

@@ -199,9 +199,13 @@ def format_for_agent(snapshot: dict) -> str:
     for key, label in labels.items():
         if key in snapshot:
             d = snapshot[key]
-            val = d["value"]
-            trend = d["trend"]
-            date = d["date"]
+            if not isinstance(d, dict):
+                continue
+            val = d.get("value")
+            if val is None:
+                continue
+            trend = d.get("trend", "STABLE")
+            date = d.get("date", "recent")
             # Format percentage-type indicators
             if key in ("gdp_growth", "fed_funds", "unemployment", "yield_10y", "yield_2y"):
                 lines.append(f"  {label}: {val:.2f}% ({trend}) [as of {date}]")

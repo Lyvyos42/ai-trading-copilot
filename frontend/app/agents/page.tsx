@@ -267,8 +267,14 @@ function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?:
           style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: "12px" }}
         >
           {[
-            { label: "7D ACC", value: `${agent.accuracy_7d}%`, color: agent.accuracy_7d >= 60 ? "hsl(var(--bull))" : "hsl(var(--warn))" },
-            { label: "LATENCY", value: `${agent.avg_latency_ms}ms`, color: "hsl(var(--foreground))" },
+            {
+              label: "7D ACC",
+              value: agent.accuracy_7d != null ? `${agent.accuracy_7d}%` : "—",
+              color: agent.accuracy_7d != null
+                ? (agent.accuracy_7d >= 60 ? "hsl(var(--bull))" : "hsl(var(--warn))")
+                : "hsl(var(--muted-foreground))"
+            },
+            { label: "LATENCY", value: agent.avg_latency_ms > 0 ? `${agent.avg_latency_ms}ms` : "—", color: "hsl(var(--foreground))" },
             { label: "TODAY", value: `${agent.signals_today}`, color },
           ].map(({ label, value, color: c }) => (
             <div

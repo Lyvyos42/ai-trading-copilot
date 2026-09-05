@@ -332,32 +332,44 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
               {isActive && signal.current_price ? "LIVE" : (signal.timeframe || "1D") + " window"}
             </div>
           </div>
-          <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
-            <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
-              <ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET
-            </div>
-            <div className="text-xs font-mono font-bold text-bull">
-              {target ? formatPrice(target, signal.ticker) : "—"}
-            </div>
-            {target && liveEntry > 0 && (
-              <div className="text-[13px] font-mono text-bull/70 mt-0.5">
-                +{((Math.abs(target - liveEntry) / liveEntry) * 100).toFixed(1)}%
+          {(() => {
+            const targetDelta = (target && liveEntry > 0) ? ((target - liveEntry) / liveEntry) * 100 : null;
+            const isTargetUp = targetDelta === null || targetDelta >= 0;
+            return (
+              <div className="text-center p-2.5 rounded border bg-background/40 border-bull/30">
+                <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
+                  {isTargetUp ? <ArrowUpRight className="h-3 w-3 text-bull" /> : <ArrowDownRight className="h-3 w-3 text-bull" />} RESEARCH TARGET
+                </div>
+                <div className="text-xs font-mono font-bold text-bull">
+                  {target ? formatPrice(target, signal.ticker) : "—"}
+                </div>
+                {targetDelta !== null && (
+                  <div className="text-[13px] font-mono text-bull/70 mt-0.5">
+                    {targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className="text-center p-2.5 rounded border bg-background/40 border-bear/30">
-            <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
-              <ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION
-            </div>
-            <div className="text-xs font-mono font-bold text-bear">
-              {inval ? formatPrice(inval, signal.ticker) : "—"}
-            </div>
-            {inval && liveEntry > 0 && (
-              <div className="text-[13px] font-mono text-bear/70 mt-0.5">
-                -{((Math.abs(liveEntry - inval) / liveEntry) * 100).toFixed(1)}%
+            );
+          })()}
+          {(() => {
+            const invalDelta = (inval && liveEntry > 0) ? ((inval - liveEntry) / liveEntry) * 100 : null;
+            const isInvalUp = invalDelta !== null && invalDelta >= 0;
+            return (
+              <div className="text-center p-2.5 rounded border bg-background/40 border-bear/30">
+                <div className="terminal-label mb-0.5 flex items-center justify-center gap-1">
+                  {isInvalUp ? <ArrowUpRight className="h-3 w-3 text-bear" /> : <ArrowDownRight className="h-3 w-3 text-bear" />} INVALIDATION
+                </div>
+                <div className="text-xs font-mono font-bold text-bear">
+                  {inval ? formatPrice(inval, signal.ticker) : "—"}
+                </div>
+                {invalDelta !== null && (
+                  <div className="text-[13px] font-mono text-bear/70 mt-0.5">
+                    {invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
           <div className="text-center p-2.5 rounded border bg-background/40 border-primary/30">
             <div className="terminal-label mb-0.5">POTENTIAL R:R</div>
             <div className="text-xs font-mono font-bold text-primary">
@@ -434,12 +446,19 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
 
         {/* Risk + Quant badges */}
         <div className="flex gap-1.5 mb-3 flex-wrap">
-          {signal.agent_votes.quant_validated !== undefined && (
-            <div className={cn(
-              "text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1",
-              signal.agent_votes.quant_validated ? "bg-bull/10 text-bull border-bull/20" : "bg-warn/10 text-warn border-warn/20"
-            )}>
-              QUANT {signal.agent_votes.quant_validated ? "VALIDATED" : "UNCONFIRMED"}
+          {signal.agent_votes.quant_validated === true && (
+            <div className="text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1 bg-bull/10 text-bull border-bull/20">
+              QUANT VALIDATED
+            </div>
+          )}
+          {signal.agent_votes.quant_validated === false && (
+            <div className="text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1 bg-warn/10 text-warn border-warn/20">
+              QUANT UNCONFIRMED
+            </div>
+          )}
+          {signal.agent_votes.quant_validated === null && (
+            <div className="text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1 bg-muted/30 text-muted-foreground border-border/40">
+              QUANT UNMEASURED
             </div>
           )}
           {signal.agent_votes.risk_approved !== undefined && (

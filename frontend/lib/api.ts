@@ -335,7 +335,7 @@ export interface AgentStatus {
   status: string;
   avg_latency_ms: number;
   signals_today: number;
-  accuracy_7d: number;
+  accuracy_7d: number | null;
   last_active: string;
 }
 

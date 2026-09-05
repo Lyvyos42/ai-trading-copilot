@@ -1,11 +1,14 @@
 """
 GET /api/v1/agents/status — health and activity of all 9 agents + Risk Gate
 """
-import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import get_current_user
+from app.db.database import get_db
+from app.models.signal import Signal
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
@@ -102,20 +105,41 @@ AGENTS = [
 
 
 @router.get("/status")
-async def agent_status(_user: dict = Depends(get_current_user)):
+async def agent_status(
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
     now = datetime.now(timezone.utc).isoformat()
+    cutoff_today = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff_7d = datetime.now(timezone.utc) - timedelta(days=7)
+
+    today_result = await db.execute(
+        select(func.count()).select_from(Signal).where(Signal.created_at >= cutoff_today)
+    )
+    signals_today_count = today_result.scalar() or 0
+
+    res_7d = await db.execute(
+        select(Signal.outcome)
+        .where(Signal.resolved_at >= cutoff_7d)
+        .where(Signal.outcome.in_(["WIN", "LOSS"]))
+    )
+    outcomes_7d = [r[0] for r in res_7d.all()]
+    acc_7d = None
+    if outcomes_7d:
+        wins_7d = sum(1 for o in outcomes_7d if o == "WIN")
+        acc_7d = round(wins_7d / len(outcomes_7d) * 100, 1)
+
     statuses = []
     for a in AGENTS:
-        rng = random.Random(sum(ord(c) for c in a["name"]))
         statuses.append({
             "name": a["name"],
             "role": a["role"],
             "model": a["model"],
             "strategies": a["strategies"],
             "status": "HEALTHY",
-            "avg_latency_ms": rng.randint(800, 4500),
-            "signals_today": rng.randint(5, 120),
-            "accuracy_7d": round(rng.uniform(52, 78), 1),
+            "avg_latency_ms": 0,
+            "signals_today": signals_today_count,
+            "accuracy_7d": acc_7d,
             "last_active": now,
         })
     return {"agents": statuses, "total": len(statuses), "all_healthy": True, "timestamp": now}

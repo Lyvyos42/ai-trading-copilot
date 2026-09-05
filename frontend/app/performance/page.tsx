@@ -61,9 +61,9 @@ export default function PerformancePage() {
           />
           <StatCard
             label="WIN RATE"
-            value={`${summary.win_rate_pct}%`}
+            value={summary.resolved_signals > 0 ? `${summary.win_rate_pct}%` : "—"}
             icon={<Target className="h-3.5 w-3.5 text-bull" />}
-            valueColor={summary.win_rate_pct >= 50 ? "text-bull" : "text-bear"}
+            valueColor={summary.resolved_signals > 0 ? (summary.win_rate_pct >= 50 ? "text-bull" : "text-bear") : "text-muted-foreground"}
           />
           <StatCard
             label="AVG P&L"

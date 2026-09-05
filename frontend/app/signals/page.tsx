@@ -226,8 +226,8 @@ export default function SignalsPage() {
     const losses = signals.filter((s) => s.status === "LOSS").length;
     const active = signals.filter((s) => s.status === "ACTIVE").length;
     const resolved = wins + losses;
-    const winRate = resolved > 0 ? (wins / resolved) * 100 : 0;
-    return { total: signals.length, wins, losses, active, winRate };
+    const winRate = resolved > 0 ? (wins / resolved) * 100 : null;
+    return { total: signals.length, wins, losses, active, resolved, winRate };
   }, [signals]);
 
   return (
@@ -754,10 +754,17 @@ export default function SignalsPage() {
               style={{ borderColor: "hsl(var(--border))" }}
             >
               {[
-                { label: "ACTIVE", value: stats.active, color: "hsl(var(--primary))" },
-                { label: "WINS", value: stats.wins, color: "hsl(var(--bull))" },
-                { label: "LOSSES", value: stats.losses, color: "hsl(var(--bear))" },
-                { label: "WIN %", value: `${stats.winRate.toFixed(0)}%`, color: stats.winRate >= 50 ? "hsl(var(--bull))" : "hsl(var(--bear))" },
+                { label: "PENDING", value: stats.active, color: "hsl(var(--primary))", sub: "active" },
+                { label: "WINS", value: stats.wins, color: "hsl(var(--bull))", sub: "resolved" },
+                { label: "LOSSES", value: stats.losses, color: "hsl(var(--bear))", sub: "resolved" },
+                {
+                  label: "WIN %",
+                  value: stats.winRate !== null ? `${stats.winRate.toFixed(0)}%` : "—",
+                  color: stats.winRate !== null
+                    ? (stats.winRate >= 50 ? "hsl(var(--bull))" : "hsl(var(--bear))")
+                    : "hsl(var(--muted-foreground))",
+                  sub: stats.resolved > 0 ? `${stats.resolved} resolved` : "unmeasured"
+                },
               ].map((s) => (
                 <div
                   key={s.label}
@@ -776,12 +783,32 @@ export default function SignalsPage() {
                   >
                     {s.value}
                   </div>
+                  <div
+                    className="text-[7px] font-mono mt-0.5"
+                    style={{ color: "hsl(var(--muted-foreground) / 0.6)" }}
+                  >
+                    {s.sub}
+                  </div>
                 </div>
               ))}
             </div>
 
+            {/* Context bar */}
+            {signals.length > 0 && stats.resolved === 0 && (
+              <div className="px-3 py-1.5 border-b border-border/40 text-[9px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
+                <span>{stats.active} signals pending resolution (target / invalidation not yet hit)</span>
+                <span className="text-[8px] text-primary/70 border border-primary/20 px-1 rounded">UNRESOLVED</span>
+              </div>
+            )}
+            {signals.length > 0 && stats.resolved > 0 && (
+              <div className="px-3 py-1.5 border-b border-border/40 text-[9px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
+                <span>{stats.wins}W / {stats.losses}L from {stats.resolved} hand-resolved outcome{stats.resolved === 1 ? "" : "s"} ({stats.active} pending)</span>
+                <span className="text-[8px] text-muted-foreground border border-border px-1 rounded">{stats.winRate !== null ? `${stats.winRate.toFixed(1)}% WR` : ""}</span>
+              </div>
+            )}
+
             {/* Win rate progress bar */}
-            {(stats.wins + stats.losses) > 0 && (
+            {stats.resolved > 0 && stats.winRate !== null && (
               <div className="px-3 pt-2 pb-1">
                 <div className="flex rounded overflow-hidden h-1.5">
                   <div className="transition-all" style={{ width: `${stats.winRate}%`, background: "hsl(var(--bull) / 0.7)" }} />

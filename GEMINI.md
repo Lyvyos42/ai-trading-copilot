@@ -1,6 +1,12 @@
 # AI Trading Copilot — Project Guidelines & Rules
 
+## Core Behavioral & Quality Standards (STRICT)
+1. **ZERO-EMOJI MANDATE**: Never use emojis anywhere in code, UI components, CSS, JavaScript, logs, or responses. When visual markers or iconography are needed, use clean, modern SVGs, Lucide vector icons, or precision geometric badges only.
+2. **AUTONOMOUS FINISH & PERFECTION**: Never ship unfinished work, leave placeholders, or pause to ask for user opinions midway. Self-prompt, diagnose, iterate, and verify until everything works and looks visually and technically flawless.
+3. **POST-TASK VERIFICATION RIGOR**: After finishing any task, systematically audit every page, check syntax, inspect runtime logs, and verify that no edge cases, files, or views were missed.
+
 ## Project Identity & Architecture
+
 * **Name**: AI Trading Copilot Web Terminal
 * **Type**: Full-Stack Multi-Agent Algorithmic Trading Platform
 * **Production Deployments**:

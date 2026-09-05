@@ -23,6 +23,10 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
     : signal.entry_price;
   const target = signal.research_target || signal.take_profit_1;
   const inval  = signal.invalidation_level || signal.stop_loss;
+  const targetDelta = (target && liveEntry > 0) ? ((target - liveEntry) / liveEntry) * 100 : null;
+  const invalDelta = (inval && liveEntry > 0) ? ((inval - liveEntry) / liveEntry) * 100 : null;
+  const isTargetUp = targetDelta === null || targetDelta >= 0;
+  const isInvalUp = invalDelta !== null && invalDelta >= 0;
   const rrRatio = (liveEntry && inval && target)
     ? Math.abs((target - liveEntry) / Math.max(Math.abs(inval - liveEntry), 0.0001))
     : (signal.risk_reward_ratio ?? 0);
@@ -35,38 +39,27 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
           <X className="h-4 w-4" />
         </button>
 
-        {/* Header: Ticker + Probability + Conviction */}
+        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-lg font-mono font-bold">{signal.ticker}</span>
           <span className={cn(
-            "px-2 py-0.5 rounded text-[14px] font-mono font-bold",
-            isBullish ? "bg-[hsl(var(--bull)/0.1)] text-bull" : "bg-[hsl(var(--bear)/0.1)] text-bear"
+            "text-xs font-mono font-bold px-2 py-0.5 rounded",
+            isBullish ? "bg-[hsl(var(--bull)/0.15)] text-bull" : "bg-[hsl(var(--bear)/0.15)] text-bear"
           )}>
-            {Math.round(prob)}% {isBullish ? "BULLISH" : "BEARISH"}
+            {signal.direction}
           </span>
-          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] uppercase">{signal.asset_class}</span>
-          <span className={cn(
-            "text-[13px] font-mono font-bold px-1.5 py-0.5 rounded border",
-            convictionTier === "HIGH" ? "bg-[hsl(var(--bull)/0.1)] text-bull border-[hsl(var(--bull)/0.2)]" :
-            convictionTier === "MODERATE" ? "bg-[hsl(38,85%,52%,0.1)] text-[hsl(38,85%,52%)] border-[hsl(38,85%,52%,0.2)]" :
-            "bg-[hsl(var(--muted)/0.5)] text-[hsl(var(--muted-foreground))] border-[hsl(var(--border)/0.3)]"
-          )}>
-            {convictionTier}
+          <h2 className="text-xl font-mono font-bold tracking-tight text-[hsl(var(--foreground))]">{signal.ticker}</h2>
+          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))]">{signal.asset_class.toUpperCase()}</span>
+          <span className="text-[14px] font-mono text-[hsl(var(--muted-foreground))] border border-[hsl(var(--border))] px-1.5 rounded">{signal.timeframe}</span>
+          <span className="text-[14px] font-mono font-bold text-bull ml-auto">
+            {formatPrice(liveEntry, signal.ticker)}
           </span>
-          {signal.outcome && (
-            <div className={cn("px-2 py-0.5 rounded text-[14px] font-mono font-bold ml-auto",
-              isWin ? "bg-[hsl(var(--bull)/0.1)] text-bull" : "bg-[hsl(var(--bear)/0.1)] text-bear"
-            )}>
-              {signal.outcome} {signal.pnl_pct != null && `(${signal.pnl_pct >= 0 ? "+" : ""}${signal.pnl_pct.toFixed(2)}%)`}
-            </div>
-          )}
         </div>
 
         {/* Probability bar */}
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[14px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULL</span>
-            <span className="text-[14px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEAR</span>
+          <div className="flex justify-between text-[14px] font-mono mb-1">
+            <span className="text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
+            <span className="text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
           </div>
           <div className="w-full flex h-2.5 rounded overflow-hidden">
             <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
@@ -77,16 +70,30 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
         {/* Research Target + Invalidation + R:R */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="data-cell">
-            <span className="data-cell-label flex items-center gap-1"><ArrowUpRight className="h-3 w-3 text-bull" /> RESEARCH TARGET</span>
-            <span className="data-cell-value text-bull">
-              {signal.research_target ? formatPrice(signal.research_target, signal.ticker) : formatPrice(signal.take_profit_1, signal.ticker)}
+            <span className="data-cell-label flex items-center gap-1">
+              {isTargetUp ? <ArrowUpRight className="h-3 w-3 text-bull" /> : <ArrowDownRight className="h-3 w-3 text-bull" />} RESEARCH TARGET
             </span>
+            <span className="data-cell-value text-bull">
+              {target ? formatPrice(target, signal.ticker) : "—"}
+            </span>
+            {targetDelta !== null && (
+              <span className="text-[12px] font-mono text-bull/70 mt-0.5">
+                {targetDelta >= 0 ? "+" : ""}{targetDelta.toFixed(1)}%
+              </span>
+            )}
           </div>
           <div className="data-cell">
-            <span className="data-cell-label flex items-center gap-1"><ArrowDownRight className="h-3 w-3 text-bear" /> INVALIDATION</span>
-            <span className="data-cell-value text-bear">
-              {signal.invalidation_level ? formatPrice(signal.invalidation_level, signal.ticker) : formatPrice(signal.stop_loss, signal.ticker)}
+            <span className="data-cell-label flex items-center gap-1">
+              {isInvalUp ? <ArrowUpRight className="h-3 w-3 text-bear" /> : <ArrowDownRight className="h-3 w-3 text-bear" />} INVALIDATION
             </span>
+            <span className="data-cell-value text-bear">
+              {inval ? formatPrice(inval, signal.ticker) : "—"}
+            </span>
+            {invalDelta !== null && (
+              <span className="text-[12px] font-mono text-bear/70 mt-0.5">
+                {invalDelta >= 0 ? "+" : ""}{invalDelta.toFixed(1)}%
+              </span>
+            )}
           </div>
           <div className="data-cell">
             <span className="data-cell-label">POTENTIAL R:R</span>
