@@ -6,6 +6,7 @@ import { PreMarketBriefing } from "@/components/PreMarketBriefing";
 import { SignalRadar } from "@/components/SignalRadar";
 import { TradingCanvasHUD } from "@/components/TradingCanvasHUD";
 import { TradingViewChart } from "@/components/TradingViewChart";
+import { ChartHolographicOverlay } from "@/components/ChartHolographicOverlay";
 import { AgentConsensusHUD } from "@/components/AgentConsensusHUD";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { useRequireAuth } from "@/lib/useAuth";
@@ -459,11 +460,16 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full w-full">
+              <div className="h-full w-full relative">
                 <TradingViewChart
                   ticker={activeTicker}
                   interval={chartInterval}
                   fillContainer={true}
+                />
+                <ChartHolographicOverlay
+                  signal={selectedSignal}
+                  ticker={activeTicker}
+                  interval={chartInterval}
                 />
               </div>
             )}
