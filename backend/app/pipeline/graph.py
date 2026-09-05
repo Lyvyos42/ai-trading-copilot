@@ -11,9 +11,12 @@ Stage 7: Fund Manager final approval & signal packaging
 """
 import asyncio
 import time
+import structlog
 from langgraph.graph import StateGraph, END
 from app.pipeline.state import TradingState
 from app.agents.schema import AgentOutput
+
+log = structlog.get_logger()
 from app.agents.fundamental import FundamentalAnalyst
 from app.agents.technical import TechnicalAnalyst
 from app.agents.sentiment import SentimentAnalyst
@@ -373,23 +376,62 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
 
     asset_class = resolve_asset_class(ticker, asset_class)
 
-    # Fetch market data, live news context, and FRED data in parallel
+    # Fetch market data, live news context and FRED data in parallel.
+    #
+    # NO OPTIONAL DATA SOURCE MAY KILL SIGNAL GENERATION.
+    #
+    # asyncio.gather without return_exceptions=True propagates the FIRST
+    # exception and discards the rest, so a transient failure in news or FRED -
+    # neither of which is required to produce a signal - took down the whole
+    # request as an unhandled 500. get_alternative_data was worse: awaited
+    # bare, and only for pro, enterprise and admin, so it could fail for paying
+    # users on a path no free-tier test ever executes.
+    #
+    # Each source now degrades to its empty shape and records why. The agents
+    # already handle absence correctly - macro and sentiment abstain without
+    # news, fundamental abstains without figures - so a missing enrichment
+    # source now costs conviction rather than the entire signal.
+    _degraded: list[str] = []
+
+    async def _optional(coro, label, empty):
+        try:
+            return await coro
+        except Exception as exc:
+            log.warning("optional_source_failed", source=label, ticker=ticker,
+                        error=f"{type(exc).__name__}: {exc}")
+            _degraded.append(label)
+            return empty
+
     if market_data is None:
         market_data, news_ctx, fred_snapshot = await asyncio.gather(
-            fetch_market_data(ticker, asset_class),
-            get_news_context(ticker),
-            get_macro_snapshot(),
+            _optional(fetch_market_data(ticker, asset_class), "market_data", None),
+            _optional(get_news_context(ticker), "news", {"has_news": False}),
+            _optional(get_macro_snapshot(), "fred", {}),
         )
     else:
         news_ctx, fred_snapshot = await asyncio.gather(
-            get_news_context(ticker),
-            get_macro_snapshot(),
+            _optional(get_news_context(ticker), "news", {"has_news": False}),
+            _optional(get_macro_snapshot(), "fred", {}),
         )
 
-    # Fetch QuiverQuant alternative data for Pro/Enterprise tiers only
+    # market_data is the one input a signal cannot be priced without. If even
+    # the fallback raised, hand the agents the same tagged-empty payload
+    # fetch_market_data returns for a dead feed, so this lands in the existing
+    # abstain -> NO_SIGNAL path rather than crashing on a None dict.
+    if not market_data:
+        market_data = {
+            "ticker": ticker, "asset_class": asset_class,
+            "data_source": "unavailable",
+            "closes": [], "highs": [], "lows": [], "volumes": [],
+            "close": None, "atr": 0.0,
+            "pe_ratio": None, "eps_growth": None, "revenue_growth": None,
+        }
+
+    # QuiverQuant alternative data, Pro/Enterprise/Admin only - strictly an
+    # enrichment, never a dependency.
     alt_data = {}
     if user_tier in ("pro", "enterprise", "admin"):
-        alt_data = await get_alternative_data(ticker)
+        alt_data = await _optional(get_alternative_data(ticker), "alternative_data", {})
 
     # Build reasoning chain prefix describing news context quality
     reasoning_prefix = []
@@ -433,6 +475,12 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
             import structlog
             structlog.get_logger().error("memory_retrieval_failed", error=str(exc))
 
+    if _degraded:
+        reasoning_prefix.append(
+            "Degraded run: " + ", ".join(_degraded) + " unavailable, so agents "
+            "depending on them abstained. Conviction is lower than a full run."
+        )
+
     initial_state: TradingState = {
         "ticker":           ticker,
         "timeframe":        timeframe,
@@ -445,6 +493,11 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "user_id":          user_id or "",
         "strategy_profile": profile,
         "reasoning_chain":  reasoning_prefix,
+        # Which optional sources were unavailable for THIS run. A signal built
+        # without news or FRED is a weaker signal, and the user is entitled to
+        # know that rather than seeing agents abstain for reasons the UI cannot
+        # explain.
+        "degraded_sources": _degraded,
         "errors": [],
     }
 
