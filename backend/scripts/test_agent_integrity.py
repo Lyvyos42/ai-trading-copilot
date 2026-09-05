@@ -54,6 +54,52 @@ class _NoLLM:
 _router.model_router = _NoLLM()
 sys.modules["app.providers.router"] = _router
 
+
+# Isolate the agents from every EXTERNAL data source.
+#
+# macro and sentiment now fetch on demand when the pipeline state does not
+# already carry news or FRED - which is correct behaviour, and it quietly broke
+# the two abstention tests: with a local trading.db holding 20 scraped
+# articles, "no news" was no longer no news, and both agents legitimately
+# voted. The tests were asserting an environment, not a contract.
+#
+# These stubs make the empty case genuinely empty, so the assertion is about
+# what the agent does with nothing rather than about what happens to be in a
+# database on the machine running the suite.
+_news_ctx = types.ModuleType("app.services.news_context")
+
+
+async def _no_news(*_a, **_kw):
+    return {"has_news": False, "article_count": 0, "ticker_headlines": [],
+            "market_headlines": [], "macro_headlines": [], "geo_headlines": [],
+            "crisis_headlines": [], "avg_sentiment": 0.0}
+
+
+_news_ctx.get_news_context = _no_news
+sys.modules["app.services.news_context"] = _news_ctx
+
+_tiingo = types.ModuleType("app.data.tiingo_provider")
+
+
+async def _no_articles(*_a, **_kw):
+    return []
+
+
+_tiingo.fetch_ticker_news = _no_articles
+_tiingo.fetch_market_news = _no_articles
+sys.modules["app.data.tiingo_provider"] = _tiingo
+
+_fred = types.ModuleType("app.data.fred_provider")
+
+
+async def _no_fred(*_a, **_kw):
+    return {}
+
+
+_fred.get_macro_snapshot = _no_fred
+_fred.format_for_agent = lambda *_a, **_kw: ""
+sys.modules["app.data.fred_provider"] = _fred
+
 from app.agents.fundamental import FundamentalAnalyst      # noqa: E402
 from app.agents.technical import TechnicalAnalyst          # noqa: E402
 from app.agents.quant import QuantAnalyst                  # noqa: E402
