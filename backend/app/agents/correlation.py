@@ -1,5 +1,4 @@
 import json
-import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
@@ -93,62 +92,34 @@ Output JSON only."""
 
     def _mock_analysis(self, ticker: str, asset_class: str, price_change: float,
                        regime: str, correlated: list) -> dict:
-        seed = sum(ord(c) for c in ticker) + 33
-        rng = random.Random(seed)
+        """Cluster membership is real; the correlation numbers were not.
 
-        # Portfolio correlation (higher in risk-off/crisis)
-        base_corr = rng.uniform(0.2, 0.6)
-        if regime in ("RISK_OFF", "CRISIS"):
-            base_corr = min(1.0, base_corr + 0.3)  # Correlations spike in crisis
-        portfolio_corr = round(base_corr, 3)
+        Removed:
 
-        # Concentration risk
-        if portfolio_corr > 0.7:
-            concentration = "HIGH"
-        elif portfolio_corr > 0.4:
-            concentration = "MODERATE"
-        else:
-            concentration = "LOW"
+            base_corr     = rng.uniform(0.2, 0.6)
+            contagion     = portfolio_corr * 0.8 + rng.uniform(-0.1, 0.1)
+            diversification = 1.0 - portfolio_corr * 0.8 + rng.uniform(-0.1, 0.1)
+            confidence    = rng.uniform(55, 70)
 
-        # Contagion risk
-        contagion = min(1.0, max(0.0, portfolio_corr * 0.8 + rng.uniform(-0.1, 0.1)))
-        if abs(price_change) > 3.0:
-            contagion = min(1.0, contagion + 0.2)
+        A correlation coefficient requires two price series. This agent is
+        handed one - the ticker being analysed - and never fetches the other
+        side, so it cannot compute a correlation and previously drew one from
+        a uniform distribution instead. Contagion and diversification were
+        then derived from that invented figure, which made them invented too.
 
-        # Diversification score (inverse of concentration)
-        diversification = max(0.0, 1.0 - portfolio_corr * 0.8 + rng.uniform(-0.1, 0.1))
-
-        # Kelly adjustment: reduce sizing when correlation is high
-        kelly_adj = max(0.5, min(1.5, 1.0 - (portfolio_corr - 0.3) * 0.5))
-        if concentration == "HIGH":
-            kelly_adj = min(kelly_adj, 0.7)
-
-        # Direction: correlation analysis is mostly about sizing, not direction
-        # But high contagion in risk-off suggests SHORT bias
-        if contagion > 0.7 and regime in ("RISK_OFF", "CRISIS"):
-            direction = "SHORT"
-            confidence = rng.uniform(55, 70)
-        elif diversification > 0.6 and regime == "RISK_ON":
-            direction = "LONG"
-            confidence = rng.uniform(50, 65)
-        else:
-            direction = "NEUTRAL"
-            confidence = rng.uniform(40, 55)
-
-        return {
-            "direction": direction,
-            "confidence": round(confidence, 1),
-            "portfolio_correlation": portfolio_corr,
-            "concentration_risk": concentration,
-            "contagion_risk": round(contagion, 3),
-            "diversification_score": round(diversification, 3),
-            "kelly_adjustment": round(kelly_adj, 3),
-            "correlated_assets": correlated[:5],
-            "reasoning": (
-                f"{ticker} correlation analysis: portfolio correlation {portfolio_corr:.2f}, "
-                f"concentration risk {concentration}. Contagion probability: {contagion:.0%}. "
-                f"Diversification score: {diversification:.2f}. Kelly adjustment: {kelly_adj:.2f}x. "
-                f"Correlated with: {', '.join(correlated[:3])}. "
-                f"Strategy 3.18/6.5: {direction} at {confidence:.0f}%."
-            ),
-        }
+        What survives is genuinely known: which assets sit in the same
+        published cluster as this one (a static, curated map). That is useful
+        context for a trader holding several positions, and it is reported as
+        cluster membership rather than dressed up as a measured coefficient.
+        """
+        return self.abstain(
+            f"{ticker} sits in a cluster with {', '.join(correlated[:4]) or 'no mapped peers'}. "
+            f"No correlation coefficient is reported: computing one needs the price "
+            f"history of both legs and this agent receives only {ticker}. Cluster "
+            f"membership is published as context, not as a measured correlation.",
+            correlated_assets=correlated[:6],
+            portfolio_correlation=None,
+            contagion_risk=None,
+            diversification_score=None,
+            cluster_regime=regime,
+        )

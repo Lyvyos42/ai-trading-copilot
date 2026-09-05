@@ -1,5 +1,4 @@
 import json
-import random
 import numpy as np
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
@@ -182,19 +181,39 @@ class TechnicalAnalyst(BaseAgent):
         }
 
     def _mock_analysis(self, ticker: str) -> dict:
-        rng = random.Random(sum(ord(c) for c in ticker))
-        direction = rng.choice(["LONG", "SHORT", "NEUTRAL"])
-        base_price = rng.uniform(50, 500)
-        confidence = rng.uniform(45, 88)
-        return {
-            "direction": direction,
-            "confidence": round(confidence, 1),
-            "trend_signal": "BULLISH" if direction == "LONG" else "BEARISH",
-            "momentum_score": round(rng.uniform(-0.6, 0.6), 3),
-            "mean_reversion_signal": round(rng.uniform(-0.5, 0.5), 3),
-            "support": round(base_price * 0.94, 2),
-            "resistance": round(base_price * 1.06, 2),
-            "rsi": round(rng.uniform(30, 75), 1),
-            "ema_crossover": "BULLISH" if direction == "LONG" else "BEARISH",
-            "reasoning": f"{ticker} technical analysis based on EMA crossover, RSI, and momentum signals.",
-        }
+        """No bars, no analysis.
+
+        Reached from `if not closes: return self._mock_analysis(ticker)` -
+        the price feed returned nothing. The old response to that was:
+
+            direction  = rng.choice(["LONG", "SHORT", "NEUTRAL"])
+            base_price = rng.uniform(50, 500)
+            confidence = rng.uniform(45, 88)
+            support    = base_price * 0.94
+            resistance = base_price * 1.06
+
+        A random direction at up to 88% confidence, on a random price, from
+        the one agent in the pipeline that is supposed to be grounded in
+        actual bars. The invented support and resistance then travelled into
+        the risk manager, which computed a reward/risk ratio from them - so a
+        symbol trading at 4,400 could be assigned support at 235.
+
+        This is the strictest abstention in the pipeline. If the price feed
+        is down there is nothing to analyse, and with the technical agent
+        abstaining the trader will almost always fall below
+        MIN_DIRECTIONAL_VOTES and publish no signal at all - which is the
+        correct outcome when the market data never arrived.
+        """
+        return self.abstain(
+            f"No price bars returned for {ticker}. Technical analysis needs OHLCV "
+            f"data and none was available, so no trend, level or momentum reading "
+            f"is produced.",
+            trend_signal=None,
+            momentum_score=None,
+            mean_reversion_signal=None,
+            support=None,
+            resistance=None,
+            rsi=None,
+            atr=None,
+            ema_crossover=None,
+        )

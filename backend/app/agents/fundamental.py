@@ -1,5 +1,4 @@
 import json
-import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 from app.data.quiver_provider import format_for_agent as format_alt_data
@@ -57,33 +56,69 @@ Output JSON only."""
         return self._mock_analysis(ticker, market_data)
 
     def _mock_analysis(self, ticker: str, market_data: dict) -> dict:
-        from datetime import date
-        price = market_data.get("close", 0)
-        seed = sum(ord(c) for c in ticker) + date.today().toordinal() + int(price * 100)
-        rng = random.Random(seed)
+        """Fundamentals when they exist; an abstention when they do not.
 
-        eps_growth = market_data.get("eps_growth", rng.uniform(-10, 30))
-        earnings_mom = min(1.0, max(-1.0, eps_growth / 30.0))
-        pe = market_data.get("pe_ratio", rng.uniform(10, 35))
-        pe_score = 1.0 - min(1.0, pe / 30.0)  # Lower P/E = higher score
-        value_score = (pe_score + rng.uniform(-0.2, 0.2))
+        The previous version invented them:
 
-        composite = earnings_mom * 0.5 + value_score * 0.3 + rng.uniform(-0.1, 0.1)
+            eps_growth = market_data.get("eps_growth", rng.uniform(-10, 30))
+            pe         = market_data.get("pe_ratio",   rng.uniform(10, 35))
+
+        market_data.py sets pe_ratio and eps_growth to None for every
+        non-equity, so for FX, metals and indices both defaults fired on
+        every call. That is how a EURJPY signal came to be published with
+        "EPS growth: 6.0%" and "P/E 28.2x" in its bull case, and why a
+        currency pair had a value-factor score at all.
+
+        A currency pair has no earnings. There is no number to estimate, so
+        none is offered.
+        """
+        eps_growth = market_data.get("eps_growth")
+        pe = market_data.get("pe_ratio")
+
+        if eps_growth is None and pe is None:
+            return self.abstain(
+                f"No fundamental data for {ticker} - it has no earnings or "
+                f"valuation multiples to analyse (currency pairs, metals and "
+                f"indices never do). Strategies 3.2 and 3.3 do not apply.",
+                pe_score=None,
+                earnings_momentum=None,
+                value_score=None,
+                revenue_growth=None,
+            )
+
+        # Real values only. A missing half is treated as absent, not as zero -
+        # a stock with no EPS figure is not a stock with 0% growth.
+        parts, notes = [], []
+        earnings_mom = None
+        if eps_growth is not None:
+            earnings_mom = min(1.0, max(-1.0, eps_growth / 30.0))
+            parts.append(earnings_mom * 0.5)
+            notes.append(f"EPS growth {eps_growth:.1f}%")
+
+        pe_score = value_score = None
+        if pe is not None and pe > 0:
+            pe_score = 1.0 - min(1.0, pe / 30.0)
+            value_score = pe_score
+            parts.append(value_score * 0.3)
+            notes.append(f"P/E {pe:.1f}x ({'attractive' if pe_score > 0.5 else 'stretched'})")
+
+        composite = sum(parts)
         direction = "LONG" if composite > 0.1 else ("SHORT" if composite < -0.1 else "NEUTRAL")
-        confidence = min(95, max(30, 50 + composite * 40 + rng.uniform(-5, 5)))
+        # Confidence is capped well below the technical agent's ceiling: this
+        # is a two-factor read on quarterly data, not a timing signal, and it
+        # was previously allowed up to 95 with a random component.
+        confidence = min(70.0, max(30.0, 50.0 + composite * 40.0))
 
         return {
             "direction": direction,
             "confidence": round(confidence, 1),
-            "pe_score": round(pe_score, 3),
-            "earnings_momentum": round(earnings_mom, 3),
-            "value_score": round(value_score, 3),
-            "revenue_growth": market_data.get("revenue_growth", round(rng.uniform(0, 20), 1)),
+            "pe_score": round(pe_score, 3) if pe_score is not None else None,
+            "earnings_momentum": round(earnings_mom, 3) if earnings_mom is not None else None,
+            "value_score": round(value_score, 3) if value_score is not None else None,
+            "revenue_growth": market_data.get("revenue_growth"),
             "reasoning": (
-                f"{ticker} shows {'positive' if earnings_mom > 0 else 'negative'} earnings momentum "
-                f"(EPS growth: {eps_growth:.1f}%). Value score is "
-                f"{'attractive' if pe_score > 0.5 else 'stretched'} at P/E {pe:.1f}x. "
-                f"Applying strategy 3.2 (earnings momentum) and 3.3 (value factor) yields a "
-                f"{direction} signal with {confidence:.0f}% confidence."
+                f"{ticker} fundamentals from reported figures: {', '.join(notes)}. "
+                f"Strategies 3.2 (earnings momentum) and 3.3 (value factor) give "
+                f"{direction} at {confidence:.0f}% confidence."
             ),
         }

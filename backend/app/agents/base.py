@@ -51,5 +51,28 @@ class BaseAgent:
             lines.append("Intraday-to-swing horizon. Balance technical levels with sentiment and macro context.")
         return "\n".join(lines) + "\n\n"
 
+    @staticmethod
+    def abstain(reason: str, **extra) -> dict:
+        """No usable data — say so instead of inventing a number.
+
+        Every agent used to answer a missing data source with
+        `rng.uniform(...)`, seeded on the ticker and the date. That produced
+        output which was stable within a day and therefore looked like
+        analysis: a P/E for a currency pair, a geopolitical risk index, a win
+        rate and a p-value computed from an invented sample size.
+
+        An agent that cannot see anything has exactly one honest answer, and
+        this is it. confidence 0 with direction NEUTRAL keeps it out of the
+        trader's long/short sums, and `abstained` lets the pipeline count how
+        many analysts actually saw data before it calls anything a signal.
+        """
+        return {
+            "direction": "NEUTRAL",
+            "confidence": 0.0,
+            "abstained": True,
+            "reasoning": reason,
+            **extra,
+        }
+
     async def analyze(self, state: TradingState) -> dict:
         raise NotImplementedError

@@ -1,5 +1,4 @@
 import json
-import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
@@ -87,17 +86,40 @@ class TraderAgent(BaseAgent):
         _dec = _price_decimals(current_price, ticker)
         _pfmt = f".{_dec}f"
 
-        # Vote aggregation from all 7 analysts
+        # Vote aggregation across the 7 analysts.
+        #
+        # An analyst that abstained saw no data. Its opinion is not NEUTRAL -
+        # it has none - so it is excluded from the tally entirely rather than
+        # contributing a `.get("confidence", 50)` default, which is what used
+        # to happen and which quietly manufactured a vote for every agent
+        # whose output was missing a field.
         all_analyses = [fund, tech, sent, macro, oflow, regime, corr]
         votes = []
         for analysis in all_analyses:
+            if not analysis or analysis.get("abstained"):
+                continue
             d = analysis.get("direction", "NEUTRAL")
-            c = analysis.get("confidence", 50)
+            c = analysis.get("confidence", 0)
+            if c <= 0:
+                continue
             votes.append((d, c))
+
+        # How many analysts actually formed a directional opinion. This is the
+        # number that decides whether there is a signal at all.
+        directional_votes = [(d, c) for d, c in votes if d in ("LONG", "SHORT")]
 
         long_score = sum(c for d, c in votes if d == "LONG")
         short_score = sum(c for d, c in votes if d == "SHORT")
-        direction = "LONG" if long_score >= short_score else "SHORT"
+        # Ties and empty tallies used to resolve to LONG through `>=`. With
+        # abstentions now possible that would have turned "nobody knows" into
+        # a buy recommendation, so the tie is explicitly NEUTRAL and the
+        # no-signal case is handled by MIN_DIRECTIONAL_VOTES below.
+        if long_score > short_score:
+            direction = "LONG"
+        elif short_score > long_score:
+            direction = "SHORT"
+        else:
+            direction = "NEUTRAL"
 
         # Build system prompt with profile injection
         profile_slug = state.get("strategy_profile", "balanced")
@@ -264,6 +286,10 @@ Output JSON only."""
     def _compute_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None) -> dict:
         return self._compute_probability_signal(ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data)
 
+    # Minimum analysts that must have data AND a direction before a signal
+    # is published at all. See the NO_SIGNAL branch below.
+    MIN_DIRECTIONAL_VOTES = 2
+
     # Profile → analytical window and ATR multipliers
     _PROFILE_PARAMS = {
         "scalper":       {"window": "5-30 MIN",  "target_atr": 1.0,  "stop_atr": 0.5},
@@ -284,9 +310,6 @@ Output JSON only."""
     def _compute_probability_signal(self, ticker, price, direction, votes, tech, risk, fund, sent, macro, market_data=None, profile: str = "balanced", timeframe: str = "1D") -> dict:
         if market_data is None:
             market_data = {}
-        from datetime import date
-        rng = random.Random(sum(ord(c) for c in ticker) + 13 + date.today().toordinal() + int(price * 100))
-
         dec = _price_decimals(price, ticker)
         # Forex pairs have much smaller ATR (~0.5%) vs stocks (~1.2%)
         t_upper = ticker.upper().replace("/", "").replace("-", "").replace("=X", "")
@@ -313,16 +336,100 @@ Output JSON only."""
         long_weight = sum(c for d, c in votes if d == "LONG")
         short_weight = sum(c for d, c in votes if d == "SHORT")
         directional_total = long_weight + short_weight
-        if directional_total > 0:
-            bullish_pct = round(long_weight / directional_total * 100, 1)
-        else:
-            bullish_pct = 50.0
+        n_directional = len([1 for d, _ in votes if d in ("LONG", "SHORT")])
+
+        # Not enough analysts saw data to call anything.
+        #
+        # `direction = "LONG" if probability_score >= 50 else "SHORT"` cannot
+        # return "no opinion": with an empty tally bullish_pct defaulted to
+        # 50.0 and the >= sent it to LONG. That was harmless while every agent
+        # always answered - they answered with RNG. Now that agents abstain,
+        # it would have converted silence into a buy recommendation, which is
+        # a worse failure than the one being fixed.
+        #
+        # Two independent directional votes is the floor. One agent agreeing
+        # with itself is not a consensus, and the technical agent alone is a
+        # single indicator set, not a nine-agent pipeline.
+        # Synthetic price data can never become a published signal.
+        #
+        # market_data.py falls back to _mock_market_data when BOTH the
+        # TradingView and yfinance feeds fail. That builds 260 bars from
+        # `rng.gauss(0.0001, 0.012)` - a random walk - and tags the result
+        # data_source="mock". Every downstream number is then computed
+        # correctly from fabricated bars: the technical agent's EMA crossover
+        # and RSI are real arithmetic on invented prices, and the entry,
+        # research target and invalidation level below would be derived from
+        # a synthetic ATR around a synthetic price.
+        #
+        # The tag was already being recorded and simply never checked.
+        if market_data.get("data_source") == "mock":
+            return {
+                "direction": "NEUTRAL",
+                "status": "NO_SIGNAL",
+                "probability_score": None,
+                "confidence_score": 0.0,
+                "confidence": 0.0,
+                "entry_price": None,
+                "research_target": None,
+                "invalidation_level": None,
+                "risk_reward_ratio": None,
+                "position_size_pct": None,
+                "status_reasons": [
+                    "Live price feed unavailable - both TradingView and Yahoo failed.",
+                    "Bars for this symbol are synthetic, so no tradeable level can be quoted.",
+                ],
+                "reasoning_chain": [
+                    f"{ticker}: no live market data.",
+                    "Prices came from the offline generator, not the market.",
+                    "No signal is published on synthetic bars.",
+                ],
+                "strategy_sources": [],
+                "agent_attribution": [],
+            }
+
+        if n_directional < self.MIN_DIRECTIONAL_VOTES or directional_total <= 0:
+            # Only the analyses passed into this method are in scope here;
+            # order_flow, regime and correlation are aggregated into `votes`
+            # upstream and are reflected in n_directional.
+            abstained_names = [n for n, a in (("fundamental", fund), ("technical", tech),
+                                              ("sentiment", sent), ("macro", macro))
+                               if not a or a.get("abstained")]
+            return {
+                "direction": "NEUTRAL",
+                "status": "NO_SIGNAL",
+                "probability_score": None,
+                "confidence_score": 0.0,
+                "confidence": 0.0,
+                "entry_price": entry,
+                "research_target": None,
+                "invalidation_level": None,
+                "risk_reward_ratio": None,
+                "position_size_pct": None,
+                "status_reasons": [
+                    f"Only {n_directional} analyst(s) formed a directional view; "
+                    f"{self.MIN_DIRECTIONAL_VOTES} are required.",
+                    f"Abstained (no data): {', '.join(abstained_names) or 'none'}.",
+                ],
+                "reasoning_chain": [
+                    f"{ticker}: insufficient evidence for a signal.",
+                    f"{n_directional} of 7 analysts had data and a direction.",
+                    "No trade idea is published rather than one built on a thin tally.",
+                ],
+                "strategy_sources": [],
+                "agent_attribution": [],
+            }
+
+        bullish_pct = round(long_weight / directional_total * 100, 1)
         bearish_pct = round(100 - bullish_pct, 1)
         probability_score = bullish_pct
         direction = "LONG" if probability_score >= 50 else "SHORT"
 
-        conviction = max(long_weight, short_weight) / directional_total if directional_total > 0 else 0.5
-        confidence = min(92, max(35, 45 + conviction * 50))
+        conviction = max(long_weight, short_weight) / directional_total
+        # Confidence is capped by how many analysts actually contributed. Two
+        # agreeing agents out of seven should not read like seven agreeing:
+        # the old formula could return 92 on a single unopposed vote.
+        coverage = n_directional / 7.0
+        confidence = min(92, max(35, 45 + conviction * 50)) * (0.55 + 0.45 * coverage)
 
         # Research target & invalidation level (replaces TP/SL)
         if direction == "LONG":
@@ -395,7 +502,11 @@ Output JSON only."""
             "take_profit_2": round(tp2, dec),
             "take_profit_3": round(tp3, dec),
             "confidence_score": round(confidence, 1),
-            "position_size_pct": risk.get("position_size_pct", round(rng.uniform(1, 3), 2)),
+            # Was `risk.get("position_size_pct", round(rng.uniform(1, 3), 2))`
+            # - a random 1-3% of equity presented to the user as a sizing
+            # recommendation whenever the risk manager had not produced one.
+            # None means "size this yourself"; it is not filled in.
+            "position_size_pct": risk.get("position_size_pct"),
             "strategy_sources": strategy_sources,
             "reasoning_chain": reasoning_chain,
             "trade_rationale": (

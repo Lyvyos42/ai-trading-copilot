@@ -1,5 +1,4 @@
 import json
-import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 
@@ -36,30 +35,37 @@ class RegimeChangeAnalyst(BaseAgent):
         macro = state.get("macro_analysis", {})
         news_ctx = state.get("news_context", {})
 
-        vix = market_data.get("vix", 18.0)
+        # A missing VIX used to default to 18.0 - a specific, plausible,
+        # entirely invented level that then drove regime classification. None
+        # means "not observed", and the classifier treats it that way.
+        vix = market_data.get("vix")
         price_change = market_data.get("price_change_pct", 0.0)
         atr = market_data.get("atr", 0)
-        close = market_data.get("close", 100)
+        close = market_data.get("close")
 
-        # Volatility ratio as regime indicator
-        vol_ratio = (atr / close * 100) if close else 1.2
+        # Volatility ratio as regime indicator. This one IS real: ATR and
+        # close both come from actual bars. It falls back to None rather than
+        # the old 1.2, which was a made-up volatility for any symbol whose
+        # price failed to load.
+        vol_ratio = (atr / close * 100) if (close and atr) else None
 
-        # Use macro regime if available
-        macro_regime = macro.get("macro_regime", "TRANSITIONAL")
-        geo_risk = macro.get("geopolitical_risk", 40.0)
-        fed_stance = macro.get("fed_stance", "NEUTRAL")
+        # Macro context, only where the macro agent actually produced it.
+        # `geopolitical_risk` was renamed to geo_article_volume because it
+        # counted scraped articles rather than risk; reading the old key here
+        # would have silently returned the 40.0 default on every call.
+        macro_regime = macro.get("macro_regime")
+        fed_stance = macro.get("fed_stance")
 
         # Crisis headlines from news context
         crisis_hl = news_ctx.get("crisis_headlines", [])
 
         strategy_ctx = self._strategy_context(state)
         user_msg = f"""{strategy_ctx}Detect regime state for {ticker}.
-VIX level: {vix}
+VIX level: {vix if vix is not None else "not observed"}
 Price change today: {price_change:+.2f}%
-Volatility (ATR/price): {vol_ratio:.3f}%
-Macro regime (from macro agent): {macro_regime}
-Fed stance: {fed_stance}
-Geopolitical risk: {geo_risk}/100
+Volatility (ATR/price): {f"{vol_ratio:.3f}%" if vol_ratio is not None else "unavailable"}
+Macro regime (from macro agent): {macro_regime or "not assessed"}
+Fed stance: {fed_stance or "not assessed"}
 Crisis headlines: {len(crisis_hl)} detected
 
 Apply strategy 19.2 (regime classification) and 6.1 (vol regime switching).
@@ -73,84 +79,85 @@ Determine probability of regime change within next 5 sessions. Output JSON only.
             except json.JSONDecodeError:
                 pass
 
-        return self._mock_analysis(ticker, vix, price_change, vol_ratio, macro_regime, geo_risk, crisis_hl)
+        return self._mock_analysis(ticker, vix, price_change, vol_ratio, macro_regime, crisis_hl)
 
-    def _mock_analysis(self, ticker: str, vix: float, price_change: float,
-                       vol_ratio: float, macro_regime: str, geo_risk: float,
+    def _mock_analysis(self, ticker: str, vix: float | None, price_change: float,
+                       vol_ratio: float | None, macro_regime: str | None,
                        crisis_hl: list) -> dict:
-        seed = sum(ord(c) for c in ticker) + 88
-        rng = random.Random(seed)
+        """Regime from realised volatility, which is real, or an abstention.
 
-        # Regime determination
-        if vix > 35 or crisis_hl:
-            regime = "CRISIS"
-            stability = rng.uniform(0.1, 0.3)
-        elif vix > 25 or geo_risk > 65:
-            regime = "RISK_OFF"
-            stability = rng.uniform(0.3, 0.5)
-        elif vix < 15 and geo_risk < 35:
-            regime = "RISK_ON"
-            stability = rng.uniform(0.6, 0.9)
+        The old version drew everything it reported from a seeded RNG:
+
+            stability   = rng.uniform(0.6, 0.9)      # per branch
+            change_prob = rng.uniform(0.05, 0.25)
+            vix_term    = rng.choice(["CONTANGO", "FLAT"])
+            confidence  = rng.uniform(55, 85)
+
+        VIX term structure in particular was a coin flip printed as a market
+        observation - this feed carries no VIX futures curve at all.
+
+        What IS available is ATR/close, computed from real bars, and that is
+        a legitimate realised-volatility regime proxy. So the classification
+        is built from that alone, and everything the data cannot support is
+        reported as None instead of being filled in.
+        """
+        if vol_ratio is None:
+            return self.abstain(
+                f"No usable price data for {ticker}, so no volatility regime can be "
+                f"classified. Neither realised volatility nor VIX was observed.",
+                current_regime=None,
+                regime_stability=None,
+                change_probability=None,
+                vix_term_structure=None,
+            )
+
+        # Realised-volatility bands. ATR/close near 0.5% is a quiet FX tape,
+        # 1-2% is a normal equity tape, and above 3% is genuinely disturbed.
+        if vol_ratio < 0.8:
+            regime, stability = "LOW_VOLATILITY", 0.80
+        elif vol_ratio < 2.0:
+            regime, stability = "NORMAL", 0.65
+        elif vol_ratio < 3.5:
+            regime, stability = "ELEVATED_VOLATILITY", 0.45
         else:
-            regime = "TRANSITIONAL"
-            stability = rng.uniform(0.3, 0.6)
+            regime, stability = "HIGH_VOLATILITY", 0.25
 
-        # VIX term structure
-        if vix > 25:
-            vix_term = "BACKWARDATION"
-        elif vix < 15:
-            vix_term = "CONTANGO"
-        else:
-            vix_term = rng.choice(["CONTANGO", "FLAT"])
+        # Crisis headlines and a large daily move both argue the current
+        # regime is less likely to persist.
+        change_probability = round(min(0.75, (1.0 - stability) * 0.6
+                                       + (0.15 if crisis_hl else 0.0)
+                                       + min(0.2, abs(price_change) / 25.0)), 3)
 
-        # Credit spreads
-        if regime in ("CRISIS", "RISK_OFF"):
-            credit = "WIDENING"
-        elif regime == "RISK_ON":
-            credit = "TIGHTENING"
-        else:
-            credit = "STABLE"
+        # Confidence reflects how much corroboration exists, not a random draw.
+        confidence = 55.0
+        if vix is not None:
+            confidence += 10.0
+        if macro_regime:
+            confidence += 5.0
 
-        # Sector rotation
-        if regime == "RISK_ON":
-            rotation = "CYCLICAL_LEADING"
-        elif regime in ("RISK_OFF", "CRISIS"):
-            rotation = "DEFENSIVE_LEADING"
-        else:
-            rotation = "MIXED"
-
-        # Regime change probability (higher when transitional or vol is shifting)
-        change_prob = rng.uniform(0.05, 0.25)
-        if regime == "TRANSITIONAL":
-            change_prob = rng.uniform(0.3, 0.6)
-        elif abs(price_change) > 2.0:
-            change_prob = min(0.8, change_prob + 0.2)
-
-        # Direction based on regime
-        if regime == "RISK_ON":
-            direction = "LONG"
-            confidence = rng.uniform(55, 80)
-        elif regime in ("RISK_OFF", "CRISIS"):
-            direction = "SHORT"
-            confidence = rng.uniform(55, 85)
-        else:
-            direction = "NEUTRAL"
-            confidence = rng.uniform(40, 60)
+        notes = [f"realised volatility (ATR/close) {vol_ratio:.2f}%"]
+        if vix is not None:
+            notes.append(f"VIX {vix:.1f}")
+        if macro_regime:
+            notes.append(f"macro regime {macro_regime}")
+        if crisis_hl:
+            notes.append(f"{len(crisis_hl)} crisis headlines")
 
         return {
-            "direction": direction,
+            # Regime is a state description, not a directional call. It used
+            # to vote LONG/SHORT off the same RNG; it now stays out of the
+            # direction sum and informs sizing and conviction instead.
+            "direction": "NEUTRAL",
             "confidence": round(confidence, 1),
             "current_regime": regime,
-            "regime_stability": round(stability, 3),
-            "vix_term_structure": vix_term,
-            "credit_spread_signal": credit,
-            "sector_rotation": rotation,
-            "regime_change_probability": round(change_prob, 3),
+            "regime_stability": stability,
+            "change_probability": change_probability,
+            # No VIX futures curve in this feed, so no term structure claim.
+            "vix_term_structure": None,
             "reasoning": (
-                f"{ticker} regime analysis: current regime is {regime} "
-                f"(stability {stability:.2f}). VIX at {vix:.1f} ({vix_term}). "
-                f"Credit spreads {credit.lower()}. Sector rotation: {rotation.lower().replace('_', ' ')}. "
-                f"Regime change probability: {change_prob:.0%}. "
-                f"Strategy 6.1/19.2: {direction} at {confidence:.0f}%."
+                f"{ticker} regime: {regime} from {', '.join(notes)}. "
+                f"Estimated probability of regime change within 5 sessions: "
+                f"{change_probability:.0%}. Regime is context for sizing and "
+                f"conviction; it does not itself vote a direction."
             ),
         }

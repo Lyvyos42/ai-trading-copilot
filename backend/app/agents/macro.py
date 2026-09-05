@@ -1,5 +1,4 @@
 import json
-import random
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
 from app.data.fred_provider import format_for_agent as format_fred
@@ -42,30 +41,67 @@ class MacroAnalyst(BaseAgent):
         super().__init__("MacroAnalyst", tier="standard")
 
     async def analyze(self, state: TradingState) -> dict:
-        ticker     = state.get("ticker", "UNKNOWN")
+        ticker      = state.get("ticker", "UNKNOWN")
         asset_class = state.get("asset_class", "stocks")
-        news_ctx   = state.get("news_context", {})
-        has_news   = news_ctx.get("has_news", False)
-        fred_block = format_fred(state.get("fred_data", {}))
         strategy_ctx = self._strategy_context(state)
 
-        if has_news:
-            return await self._analyze_with_live_news(ticker, asset_class, news_ctx, fred_block, strategy_ctx)
-        else:
-            return await self._analyze_with_mock(ticker, asset_class, fred_block)
+        # 1. Retrieve FRED data from state or fetch on-demand
+        fred_data = state.get("fred_data")
+        if not fred_data:
+            try:
+                from app.data.fred_provider import get_macro_snapshot
+                fred_data = await get_macro_snapshot()
+            except Exception:
+                fred_data = {}
 
-    # ── Live news path ────────────────────────────────────────────────────────
+        # 2. Retrieve news context from state or fetch on-demand
+        news_ctx = state.get("news_context")
+        if not news_ctx or not news_ctx.get("has_news"):
+            try:
+                from app.services.news_context import get_news_context
+                news_ctx = await get_news_context(ticker)
+            except Exception:
+                news_ctx = {}
 
-    async def _analyze_with_live_news(self, ticker: str, asset_class: str, news_ctx: dict, fred_block: str = "", strategy_ctx: str = "") -> dict:
+        has_news = bool(news_ctx and news_ctx.get("has_news") and news_ctx.get("article_count", 0) > 0)
+        has_fred = bool(fred_data and any(k in fred_data for k in (
+            "yield_curve_spread", "cpi_yoy", "fed_funds", "gdp_growth", "unemployment", "pce_inflation"
+        )))
+
+        if not has_news and not has_fred:
+            return self.abstain(
+                f"No live economic data (FRED) or scraped news headlines available for {ticker}. "
+                f"MacroAnalyst abstains rather than estimating a regime without real inputs.",
+                gdp_signal=None,
+                inflation_signal=None,
+                fed_stance=None,
+                geo_article_volume=0,
+                carry_signal=None,
+                macro_regime=None,
+                upcoming_events=[],
+                key_news_drivers=[],
+                symbol_specific=False,
+                _live_news=False,
+            )
+
+        fred_block = format_fred(fred_data)
+        return await self._analyze_with_real_data(ticker, asset_class, news_ctx or {}, fred_data or {}, fred_block, strategy_ctx)
+
+    # ── Real data analysis path ───────────────────────────────────────────────
+
+    async def _analyze_with_real_data(
+        self, ticker: str, asset_class: str, news_ctx: dict, fred_data: dict,
+        fred_block: str = "", strategy_ctx: str = ""
+    ) -> dict:
         macro_hl   = news_ctx.get("macro_headlines", [])
         geo_hl     = news_ctx.get("geo_headlines", [])
         crisis_hl  = news_ctx.get("crisis_headlines", [])
         avg_sent   = news_ctx.get("avg_sentiment", 0.0)
         art_count  = news_ctx.get("article_count", 0)
 
-        # Derive geopolitical risk score from volume of geo/crisis articles
+        # Volume of geo/crisis articles
         geo_count    = len(geo_hl) + len(crisis_hl) * 2
-        geo_risk_est = min(95, max(10, geo_count * 8 + 20))
+        geo_risk_est = min(95, max(10, geo_count * 8 + 20)) if art_count > 0 else 20
 
         macro_section = ""
         if macro_hl:
@@ -86,11 +122,11 @@ GEOPOLITICAL HEADLINES ({len(geo_hl)} articles):
         crisis_section = ""
         if crisis_hl:
             crisis_section = f"""
-⚠ CRISIS / SYSTEMIC RISK HEADLINES ({len(crisis_hl)} articles):
+CRISIS / SYSTEMIC RISK HEADLINES ({len(crisis_hl)} articles):
 {chr(10).join(f'  • {h}' for h in crisis_hl)}
 """
 
-        user_msg = f"""{strategy_ctx}Assess macro environment for {ticker} ({asset_class}) using LIVE news data.
+        user_msg = f"""{strategy_ctx}Assess macro environment for {ticker} ({asset_class}) using LIVE economic and news data.
 
 === LIVE MACRO INTELLIGENCE (Real headlines, scraped in last 24h) ===
 {macro_section}
@@ -98,12 +134,12 @@ GEOPOLITICAL HEADLINES ({len(geo_hl)} articles):
 {crisis_section}
 === DERIVED INDICATORS (from {art_count} scraped articles) ===
 • Overall news sentiment: {avg_sent:+.3f}
-• Estimated geopolitical risk index: {geo_risk_est}/100
+• Estimated geopolitical news volume: {geo_risk_est}/100
 • Crisis alert level: {"HIGH" if len(crisis_hl) >= 2 else "ELEVATED" if crisis_hl else "NORMAL"}
 
 {fred_block}
 
-Strategy 19.2: Determine the current macro regime from the real headlines above.
+Strategy 19.2: Determine current macro regime from the real indicators and headlines above.
 Strategy 8.2: Assess FX carry implications.
 Strategy 19.5: Identify any upcoming catalyst events mentioned.
 Output JSON only."""
@@ -115,55 +151,103 @@ Output JSON only."""
                 result["_live_news"] = True
                 result["_macro_headlines"] = macro_hl[:3]
                 result["_geo_headlines"] = geo_hl[:2]
+                result["symbol_specific"] = False
                 return result
             except json.JSONDecodeError:
                 pass
 
-        return self._derive_from_news(ticker, macro_hl, geo_hl, crisis_hl, avg_sent, geo_risk_est)
+        return self._derive_from_macro_and_news(
+            ticker, macro_hl, geo_hl, crisis_hl, avg_sent, geo_risk_est, fred_data
+        )
 
-    def _derive_from_news(
+    def _derive_from_macro_and_news(
         self, ticker: str, macro_hl: list, geo_hl: list, crisis_hl: list,
-        avg_sent: float, geo_risk: float
+        avg_sent: float, geo_risk: float, fred_data: dict
     ) -> dict:
-        """Fallback: derive macro regime directly from news content."""
+        """Deterministic derivation using verified FRED indicators and news headlines."""
         all_text = " ".join(macro_hl + geo_hl + crisis_hl).lower()
 
-        # Fed stance detection
-        if any(w in all_text for w in ["rate hike", "hawkish", "tighten", "inflation concern"]):
+        # 1. Fed stance: FRED fed_funds trend + news text
+        fed_funds_info = fred_data.get("fed_funds", {})
+        fed_funds_trend = fed_funds_info.get("trend", "STABLE")
+        if fed_funds_trend == "RISING" or any(w in all_text for w in ["rate hike", "hawkish", "tighten", "inflation concern"]):
             fed_stance = "HAWKISH"
-        elif any(w in all_text for w in ["rate cut", "dovish", "ease", "pivot", "pause"]):
+        elif fed_funds_trend == "FALLING" or any(w in all_text for w in ["rate cut", "dovish", "ease", "pivot", "pause"]):
             fed_stance = "DOVISH"
         else:
             fed_stance = "NEUTRAL"
 
-        # Inflation signal
-        if any(w in all_text for w in ["inflation surge", "cpi rises", "price increase", "hot inflation"]):
+        # 2. Inflation signal: FRED CPI/PCE trend + news text
+        cpi_info = fred_data.get("cpi_yoy", {}) or fred_data.get("pce_inflation", {})
+        cpi_trend = cpi_info.get("trend", "STABLE")
+        if cpi_trend == "RISING" or any(w in all_text for w in ["inflation surge", "cpi rises", "price increase", "hot inflation"]):
             inflation = "RISING"
-        elif any(w in all_text for w in ["inflation eases", "cpi falls", "disinflation", "deflation"]):
+        elif cpi_trend == "FALLING" or any(w in all_text for w in ["inflation eases", "cpi falls", "disinflation", "deflation"]):
             inflation = "FALLING"
         else:
             inflation = "STABLE"
 
-        # GDP signal
-        if any(w in all_text for w in ["recession", "contraction", "gdp falls", "economic slowdown"]):
+        # 3. GDP signal: FRED real GDP growth + news text
+        gdp_info = fred_data.get("gdp_growth", {})
+        gdp_val = gdp_info.get("value")
+        gdp_trend = gdp_info.get("trend", "STABLE")
+        if (gdp_val is not None and gdp_val < 0) or gdp_trend == "FALLING" or any(w in all_text for w in ["recession", "contraction", "gdp falls", "economic slowdown"]):
             gdp = "CONTRACTIONARY"
-        elif any(w in all_text for w in ["strong growth", "gdp beats", "expansion", "boom"]):
+        elif (gdp_val is not None and gdp_val > 2.0) or gdp_trend == "RISING" or any(w in all_text for w in ["strong growth", "gdp beats", "expansion", "boom"]):
             gdp = "EXPANSIONARY"
         else:
             gdp = "STABLE"
 
-        # Regime
-        if crisis_hl or geo_risk > 65 or fed_stance == "HAWKISH":
-            regime = "RISK_OFF"
-            direction = "SHORT"
-            confidence = 65.0
-        elif avg_sent > 0.1 and fed_stance != "HAWKISH":
-            regime = "RISK_ON"
-            direction = "LONG"
-            confidence = 60.0
+        # 4. Yield curve spread (10Y - 2Y)
+        yc_info = fred_data.get("yield_curve_spread", {})
+        yc_val = yc_info.get("value")
+        yc_trend = yc_info.get("trend", "")
+        yield_curve_inverted = (yc_val is not None and yc_val < 0) or (yc_trend == "INVERTED")
+
+        # 5. Unemployment trend
+        unemp_info = fred_data.get("unemployment", {})
+        unemp_rising = unemp_info.get("trend") == "RISING"
+
+        # 6. Regime evaluation: symmetric comparison grounded in verified indicators
+        risk_off_reasons = []
+        if crisis_hl:
+            risk_off_reasons.append("crisis_headlines")
+        if fed_stance == "HAWKISH":
+            risk_off_reasons.append("hawkish_fed")
+        if inflation == "RISING":
+            risk_off_reasons.append("rising_inflation")
+        if gdp == "CONTRACTIONARY":
+            risk_off_reasons.append("contractionary_gdp")
+        if yield_curve_inverted:
+            risk_off_reasons.append("yield_curve_inverted")
+        if unemp_rising:
+            risk_off_reasons.append("rising_unemployment")
+        if avg_sent < -0.1:
+            risk_off_reasons.append("bearish_news_sentiment")
+
+        risk_on_reasons = []
+        if fed_stance == "DOVISH":
+            risk_on_reasons.append("dovish_fed")
+        if inflation == "FALLING":
+            risk_on_reasons.append("falling_inflation")
+        if gdp == "EXPANSIONARY":
+            risk_on_reasons.append("expansionary_gdp")
+        if yc_val is not None and yc_val > 0.5:
+            risk_on_reasons.append("steep_yield_curve")
+        if avg_sent > 0.1:
+            risk_on_reasons.append("bullish_news_sentiment")
+
+        risk_off = len(risk_off_reasons)
+        risk_on = len(risk_on_reasons)
+
+        if risk_off > risk_on:
+            regime, direction = "RISK_OFF", "SHORT"
+            confidence = min(70.0, 50.0 + (risk_off - risk_on) * 5.0)
+        elif risk_on > risk_off:
+            regime, direction = "RISK_ON", "LONG"
+            confidence = min(70.0, 50.0 + (risk_on - risk_off) * 5.0)
         else:
-            regime = "TRANSITIONAL"
-            direction = "NEUTRAL"
+            regime, direction = "TRANSITIONAL", "NEUTRAL"
             confidence = 50.0
 
         events = []
@@ -176,90 +260,40 @@ Output JSON only."""
         if not events:
             events = ["Monitor macro calendar"]
 
+        fed_rate = fed_funds_info.get("value", 0.0)
+        carry_signal = round(min(1.0, max(-1.0, (fed_rate - 2.0) * 0.1 + avg_sent * 0.2)), 3) if fed_rate else round(avg_sent * 0.3, 3)
+
+        evidence_pieces = []
+        if fred_data:
+            evidence_pieces.append(f"FRED data ({len(fred_data)} series)")
+            if yield_curve_inverted:
+                evidence_pieces.append(f"inverted yield curve ({yc_val:+.2f}%)")
+        if macro_hl or geo_hl or crisis_hl:
+            evidence_pieces.append(f"{len(macro_hl) + len(geo_hl) + len(crisis_hl)} scraped headlines")
+
+        evidence_str = " + ".join(evidence_pieces) if evidence_pieces else "market indicators"
+
+        reasoning = (
+            f"Macro regime from real data ({evidence_str}): {regime}. "
+            f"Fed stance: {fed_stance}. Inflation: {inflation}. GDP: {gdp}. "
+            f"Signals favoring risk-off: {risk_off} ({', '.join(risk_off_reasons) or 'none'}), "
+            f"risk-on: {risk_on} ({', '.join(risk_on_reasons) or 'none'}). "
+            f"{'Crisis headlines present. ' if crisis_hl else ''}"
+            f"Strategy 19.2 macro momentum: {direction} at {confidence:.0f}% confidence."
+        )
+
         return {
             "direction": direction,
             "confidence": round(confidence, 1),
             "gdp_signal": gdp,
             "inflation_signal": inflation,
             "fed_stance": fed_stance,
-            "geopolitical_risk": round(geo_risk, 1),
-            "carry_signal": round(avg_sent * 0.3, 3),
+            "geo_article_volume": round(geo_risk, 1),
+            "carry_signal": carry_signal,
             "macro_regime": regime,
             "upcoming_events": events,
             "key_news_drivers": (macro_hl + geo_hl)[:3],
-            "reasoning": (
-                f"Live macro analysis: regime is {regime}. "
-                f"Fed stance: {fed_stance}. Inflation: {inflation}. GDP: {gdp}. "
-                f"Geopolitical risk index: {geo_risk:.0f}/100. "
-                f"{'CRISIS alert active. ' if crisis_hl else ''}"
-                f"Strategy 19.2 macro momentum: {direction} at {confidence:.0f}% confidence."
-            ),
+            "symbol_specific": False,
+            "reasoning": reasoning,
             "_live_news": True,
-        }
-
-    # ── Mock path (no news in DB yet) ─────────────────────────────────────────
-
-    MACRO_REGIMES = [
-        {"regime": "RISK_ON",      "gdp": "EXPANSIONARY",  "inflation": "STABLE",  "fed": "DOVISH",  "geo_risk": 25.0, "direction_bias": "LONG"},
-        {"regime": "RISK_OFF",     "gdp": "CONTRACTIONARY", "inflation": "RISING", "fed": "HAWKISH", "geo_risk": 70.0, "direction_bias": "SHORT"},
-        {"regime": "TRANSITIONAL", "gdp": "STABLE",         "inflation": "FALLING","fed": "NEUTRAL", "geo_risk": 45.0, "direction_bias": "NEUTRAL"},
-    ]
-    UPCOMING_EVENTS = [
-        "FOMC Rate Decision", "Non-Farm Payrolls", "CPI Report",
-        "GDP Advance Estimate", "Fed Chair Press Conference",
-        "ECB Policy Meeting", "PCE Inflation Data",
-    ]
-
-    async def _analyze_with_mock(self, ticker: str, asset_class: str, fred_block: str = "") -> dict:
-        rng = random.Random(sum(ord(c) for c in ticker) + 99)
-        regime_data = rng.choice(self.MACRO_REGIMES)
-        events = rng.sample(self.UPCOMING_EVENTS, 2)
-
-        user_msg = f"""Assess macro environment for {ticker} ({asset_class}).
-NOTE: Live news scraper is warming up — using estimated macro regime.
-Current macro regime indicators:
-- GDP signal: {regime_data['gdp']} (Strategy 19.2 state variable 1)
-- Inflation: {regime_data['inflation']} (Strategy 19.2 state variable 2)
-- Fed stance: {regime_data['fed']} (Strategy 19.2 state variable 3)
-- Geopolitical risk: {regime_data['geo_risk']}/100 (Strategy 19.2 state variable 4)
-- FX Carry: USD vs G10 high-yield spread {rng.uniform(-0.5, 0.5):.2f}% (Strategy 8.2)
-- Upcoming events: {', '.join(events)} (Strategy 19.5)
-
-{fred_block}
-Output JSON only."""
-
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
-        if raw:
-            try:
-                result = json.loads(raw)
-                result["_live_news"] = False
-                return result
-            except json.JSONDecodeError:
-                pass
-
-        return self._mock_fallback(ticker, regime_data, events, rng)
-
-    def _mock_fallback(self, ticker: str, regime_data: dict, events: list, rng: random.Random) -> dict:
-        geo_risk   = regime_data["geo_risk"] + rng.uniform(-10, 10)
-        carry      = rng.uniform(-0.3, 0.3)
-        direction  = regime_data["direction_bias"]
-        confidence = rng.uniform(45, 80)
-        return {
-            "direction": direction,
-            "confidence": round(confidence, 1),
-            "gdp_signal": regime_data["gdp"],
-            "inflation_signal": regime_data["inflation"],
-            "fed_stance": regime_data["fed"],
-            "geopolitical_risk": round(geo_risk, 1),
-            "carry_signal": round(carry, 3),
-            "macro_regime": regime_data["regime"],
-            "upcoming_events": events,
-            "key_news_drivers": [],
-            "reasoning": (
-                f"Macro regime is {regime_data['regime']} (estimated). GDP {regime_data['gdp'].lower()}, "
-                f"inflation {regime_data['inflation'].lower()}, Fed {regime_data['fed'].lower()}. "
-                f"Geopolitical risk {geo_risk:.0f}/100. "
-                f"Strategy 19.2: {direction} at {confidence:.0f}% confidence."
-            ),
-            "_live_news": False,
         }

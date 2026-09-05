@@ -1,5 +1,4 @@
 import json
-import random
 import math
 from app.agents.base import BaseAgent
 from app.pipeline.state import TradingState
@@ -156,14 +155,21 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
     def _mock_analysis(self, ticker: str, market_data: dict, vwap_dev: float, vol_ratio: float, obv_trend: str, micro: dict | None = None) -> dict:
         from datetime import date
         price = market_data.get("close", 0)
-        seed = sum(ord(c) for c in ticker) + 55 + date.today().toordinal() + int(price * 100)
-        rng = random.Random(seed)
+        # vol_ratio, vwap_dev and obv_trend are REAL - computed from actual
+        # bars upstream. The mock path then injected noise on top of them:
+        #
+        #     vpin         = 0.3 + (vol_ratio - 1.0) * 0.2 + rng.uniform(-0.1, 0.1)
+        #     ba_imbalance = vwap_dev / 2.0 + rng.uniform(-0.2, 0.2)
+        #     smf          = ... + rng.uniform(-0.15, 0.15)
+        #
+        # The jitter was wider than the signal it was added to. With a typical
+        # vwap_dev of ~0.2 the real term contributes 0.10 while the noise term
+        # spans +/-0.20, so the random component dominated the measurement it
+        # was decorating. Removed - the real derivation stands on its own.
+        vpin = min(1.0, max(0.0, 0.3 + (vol_ratio - 1.0) * 0.2))
 
-        # VPIN: higher when volume is unusual
-        vpin = min(1.0, max(0.0, 0.3 + (vol_ratio - 1.0) * 0.2 + rng.uniform(-0.1, 0.1)))
-
-        # Bid/ask imbalance derived from VWAP deviation + noise
-        ba_imbalance = max(-1.0, min(1.0, vwap_dev / 2.0 + rng.uniform(-0.2, 0.2)))
+        # Bid/ask imbalance derived from VWAP deviation
+        ba_imbalance = max(-1.0, min(1.0, vwap_dev / 2.0))
 
         # Block trade bias
         if vol_ratio > 1.5 and vwap_dev > 0.3:
@@ -176,12 +182,12 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
         dark_pool = "HIGH" if vol_ratio > 1.8 else ("MODERATE" if vol_ratio > 1.2 else "LOW")
 
         # Smart money flow composite
-        smf = ba_imbalance * 0.4 + (1 if obv_trend == "RISING" else -1) * 0.3 + rng.uniform(-0.15, 0.15)
+        smf = ba_imbalance * 0.4 + (1 if obv_trend == "RISING" else -1) * 0.3
         smf = max(-1.0, min(1.0, smf))
 
         composite = smf * 0.5 + ba_imbalance * 0.3 + (vpin - 0.5) * 0.2
         direction = "LONG" if composite > 0.1 else ("SHORT" if composite < -0.1 else "NEUTRAL")
-        confidence = min(88, max(30, 50 + abs(composite) * 40 + rng.uniform(-5, 5)))
+        confidence = min(88, max(30, 50 + abs(composite) * 40))
 
         # Incorporate microstructure depth imbalance into composite
         if micro and micro.get("depth_imbalance"):
@@ -189,7 +195,7 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
             composite += di * 0.15
             smf = max(-1.0, min(1.0, smf + di * 0.1))
             direction = "LONG" if composite > 0.1 else ("SHORT" if composite < -0.1 else "NEUTRAL")
-            confidence = min(88, max(30, 50 + abs(composite) * 40 + rng.uniform(-5, 5)))
+            confidence = min(88, max(30, 50 + abs(composite) * 40))
 
         micro_str = ""
         if micro:
