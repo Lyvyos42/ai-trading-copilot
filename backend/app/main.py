@@ -1,6 +1,7 @@
 """
 AI Multi-Agent Trading Copilot — FastAPI backend
 """
+import os
 from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request
@@ -204,5 +205,43 @@ async def health():
 # ─── Global error handler ─────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    log.error("unhandled_exception", path=request.url.path, error=str(exc))
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    """Name the failure instead of hiding it.
+
+    This used to log only str(exc) - no exception type, no traceback, no line -
+    and return a bare "Internal server error". That is how a 500 on
+    POST /signals/generate reached the UI with nothing to act on: the message
+    named no cause, and the log did not name one either, so neither the user
+    nor the server told us what broke.
+
+    Two changes. The log now carries the exception TYPE and the full traceback,
+    which is what makes a Render log searchable. And the response carries a
+    short error_id that appears in both, so a screenshot of the UI can be tied
+    to a specific log line.
+
+    EXPOSE_ERROR_DETAIL controls whether the exception message itself is
+    returned. It is ON by default while this app is pre-revenue and being
+    debugged from screenshots, because an unnamed 500 has now cost three
+    separate rounds of investigation. Exception messages can carry internal
+    detail - table names, paths, query fragments - so turn it OFF (set it to
+    "0") before this serves untrusted users at scale; the error_id still ties
+    the report to the log line.
+    """
+    import traceback
+    import uuid as _uuid
+
+    error_id = _uuid.uuid4().hex[:8]
+    log.error(
+        "unhandled_exception",
+        error_id=error_id,
+        path=request.url.path,
+        method=request.method,
+        exc_type=type(exc).__name__,
+        error=str(exc),
+        traceback=traceback.format_exc(),
+    )
+    expose = os.getenv("EXPOSE_ERROR_DETAIL", "1").lower() not in ("0", "false", "no")
+    detail = (f"{type(exc).__name__}: {exc}" if expose else "Internal server error")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{detail} [ref {error_id}]", "error_id": error_id},
+    )
