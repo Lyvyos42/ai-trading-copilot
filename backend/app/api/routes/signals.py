@@ -902,6 +902,20 @@ def _build_agent_detail(state: dict) -> dict:
     }
 
 
+# POST is an alias for the DELETE below, not a second implementation.
+#
+# Verified 2026-09-05: this endpoint answers a browser-shaped cross-origin
+# DELETE in 0.30s, its preflight returns 200 with DELETE in allow-methods, and
+# the same browser reads GET /signals from this host without trouble - yet the
+# DELETE never left the client, failing six times over 74s with a bare
+# "Failed to fetch". A verb that is fine at the server and fine in preflight
+# but dies in the client is being filtered locally: security-suite web shields,
+# corporate proxies and some content blockers routinely allow GET and POST
+# while dropping DELETE.
+#
+# We do not control the user's browser, so the semantically nicer verb is not
+# worth an unusable button. POST reaches the same handler.
+@router.post("/reset")
 @router.delete("/reset")
 async def reset_signals(
     db: AsyncSession = Depends(get_db),

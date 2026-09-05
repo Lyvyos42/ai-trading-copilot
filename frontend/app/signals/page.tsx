@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { SignalCard } from "@/components/SignalCard";
-import { generateSignal, listSignals, resolveSignal, apiFetch, wakeBackend, API_URL, type Signal } from "@/lib/api";
+import { generateSignal, listSignals, resolveSignal, apiFetch, resetSignals, wakeBackend, API_URL, type Signal } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatPrice, timeAgo } from "@/lib/utils";
@@ -718,7 +718,7 @@ export default function SignalsPage() {
                     if (!confirm("Delete all signals and start fresh?")) return;
                     setResetMsg({ ok: true, text: "resetting…" });
                     try {
-                      const r = await apiFetch<{ deleted: number }>("/api/v1/signals/reset", { method: "DELETE" });
+                      const r = await resetSignals();
                       // Re-read from the server rather than just clearing local
                       // state, so the panel shows what actually remains.
                       const left = await listSignals(50).catch(() => [] as Signal[]);

@@ -42,8 +42,10 @@ export async function getToken(): Promise<string | null> {
  *  It names none of them, so it reads like a broken endpoint - which cost two
  *  rounds of investigating a server that was answering in 0.3s the whole time.
  */
-function networkErrorMessage(path: string, err: unknown): string {
+function networkErrorMessage(path: string, err: unknown, delays: number[]): string {
   const detail = err instanceof Error ? err.message : String(err);
+  const tries = delays.length + 1;
+  const secs = Math.round(delays.reduce((a, b) => a + b, 0) / 1000);
 
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return "You are offline - the browser reports no network connection.";
@@ -55,12 +57,16 @@ function networkErrorMessage(path: string, err: unknown): string {
 
   let host = API_URL;
   try { host = new URL(API_URL).host; } catch {}
-  return `Cannot reach ${host}${path} - 6 attempts over ~74s, no reply. `
+  return `Cannot reach ${host}${path} - ${tries} attempt${tries === 1 ? "" : "s"} over ~${secs}s, no reply. `
        + `The API answers from outside the browser, so this is local: a blocking `
        + `extension (adblocker / privacy shield), a VPN or proxy, or DNS. [${detail}]`;
 }
 
-export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options?: RequestInit,
+  opts?: { delays?: number[] },
+): Promise<T> {
   const token = await getToken();
   const reqOptions: RequestInit = {
     headers: {
@@ -77,7 +83,11 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   // gave up BEFORE the server could possibly answer. That surfaced as
   // "Failed to fetch", which reads like a broken endpoint rather than a
   // sleeping one. 2+5+12+25+30 = 74s now covers it.
-  const DELAYS = [2_000, 5_000, 12_000, 25_000, 30_000];
+  //
+  // Overridable, so a caller that has a working fallback can fail fast and use
+  // it rather than making the user sit through the full cold-start budget for
+  // an attempt it already expects to lose. See resetSignals.
+  const DELAYS = opts?.delays ?? [2_000, 5_000, 12_000, 25_000, 30_000];
   let lastError: unknown;
   for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
     try {
@@ -109,11 +119,39 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
       }
       // Every retry is spent. Replace the browser's opaque wording with
       // something that names what was tried and where.
-      if (!isHttpError) throw new Error(networkErrorMessage(path, err));
+      if (!isHttpError) throw new Error(networkErrorMessage(path, err, DELAYS));
       throw err;
     }
   }
   throw lastError;
+}
+
+/** Clear the caller's signals. Tries DELETE, falls back to POST.
+ *
+ *  Measured 2026-09-05, from the browser that was failing: GET to this host
+ *  succeeded and populated the panel, while DELETE to the same host failed six
+ *  times over 74s with a bare "Failed to fetch". From outside that browser the
+ *  endpoint answers a browser-shaped DELETE in 0.30s and its preflight returns
+ *  200 with DELETE in allow-methods - so nothing between here and the server
+ *  objects to the verb. Something in the client does: security-suite web
+ *  shields, corporate proxies and some content blockers pass GET and POST and
+ *  drop DELETE.
+ *
+ *  The DELETE gets ONE fast attempt rather than the full cold-start budget,
+ *  because when it is being filtered locally no amount of waiting helps, and
+ *  74s of waiting before trying the thing that works is just a slower failure.
+ *  An HTTP answer - 401, 500, anything - means the request did arrive, so it
+ *  is reported as-is rather than retried under a different verb.
+ */
+export async function resetSignals(): Promise<{ deleted: number }> {
+  try {
+    return await apiFetch<{ deleted: number }>(
+      "/api/v1/signals/reset", { method: "DELETE" }, { delays: [1_500] },
+    );
+  } catch (err) {
+    if ((err as any)?._httpStatus != null) throw err;
+    return await apiFetch<{ deleted: number }>("/api/v1/signals/reset", { method: "POST" });
+  }
 }
 
 /** Fire-and-forget: ping the backend health endpoint to wake Render from sleep.
