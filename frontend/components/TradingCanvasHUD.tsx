@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn, formatPrice, formatPct, formatPositionSize } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
+import { SymbolPicker } from "@/components/SymbolPicker";
 
 interface TradingCanvasHUDProps {
   ticker: string;
@@ -48,19 +49,10 @@ const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
 const DEFAULT_PINNED = ["AAPL", "BTC-USD", "NVDA", "XAUUSD", "EURUSD=X", "TSLA", "US500"];
 
-const ASSET_SUGGESTIONS = [
-  { ticker: "BTC-USD", name: "Bitcoin / USD", category: "crypto" },
-  { ticker: "ETH-USD", name: "Ethereum / USD", category: "crypto" },
-  { ticker: "SOL-USD", name: "Solana / USD", category: "crypto" },
-  { ticker: "NVDA", name: "NVIDIA Corp", category: "stocks" },
-  { ticker: "AAPL", name: "Apple Inc", category: "stocks" },
-  { ticker: "MSFT", name: "Microsoft Corp", category: "stocks" },
-  { ticker: "TSLA", name: "Tesla Inc", category: "stocks" },
-  { ticker: "XAUUSD", name: "Gold Spot / USD", category: "commodities" },
-  { ticker: "EURUSD=X", name: "EUR / USD Spot", category: "forex" },
-  { ticker: "USDJPY=X", name: "USD / JPY Spot", category: "forex" },
-  { ticker: "US500", name: "S&P 500 Index", category: "indices" },
-];
+// ASSET_SUGGESTIONS lived here: eleven hardcoded instruments that were the
+// ONLY thing the watchlist search could find. Deleted rather than left
+// dormant - it is the list that made a 283-instrument catalogue invisible,
+// and a stale copy of a catalogue is worse than no copy. See SymbolPicker.
 
 export function TradingCanvasHUD({
   ticker,
@@ -130,7 +122,10 @@ export function TradingCanvasHUD({
       setPinnedTabs((prev) => [...prev, cleanSym]);
     }
     onSelectTicker(cleanSym);
-    setSearchOpen(false);
+    // The panel is NOT closed here. Adding one instrument is the rare case;
+    // building a watchlist means adding several, and closing after each one
+    // forces the user to reopen and re-find their place in the catalogue.
+    // SymbolPicker closes itself on Escape or an outside click.
     setSearchQuery("");
   }
 
@@ -195,11 +190,6 @@ export function TradingCanvasHUD({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const filteredSuggestions = ASSET_SUGGESTIONS.filter(
-    (s) =>
-      s.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="border-b border-border/40 bg-surface-1/95 backdrop-blur-md flex flex-col z-20 shrink-0">
@@ -256,63 +246,19 @@ export function TradingCanvasHUD({
 
             {/* Fast Symbol Search Palette Dropdown */}
             {searchOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-72 rounded-md border border-border/80 bg-surface-3 shadow-2xl p-2 z-50 animate-fade-in">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-1 border border-border/50 mb-2">
-                  <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && searchQuery.trim()) {
-                        handleSelectSymbol(searchQuery.trim());
-                      } else if (e.key === "Escape") {
-                        setSearchOpen(false);
-                      }
-                    }}
-                    placeholder="Search ticker (e.g. BTC, NVDA, EURUSD)..."
-                    className="w-full bg-transparent text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="text-[12px] font-mono text-muted-foreground uppercase px-1 pb-1 border-b border-border/30 mb-1">
-                  Institutional Instruments
-                </div>
-
-                <div className="max-h-48 overflow-y-auto space-y-0.5">
-                  {filteredSuggestions.length > 0 ? (
-                    filteredSuggestions.map((item) => (
-                      <button
-                        key={item.ticker}
-                        onClick={() => handleSelectSymbol(item.ticker)}
-                        className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs font-mono text-left hover:bg-surface-1 transition-colors"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-foreground">{item.ticker}</span>
-                          <span className="text-[12px] text-muted-foreground truncate max-w-[120px]">
-                            {item.name}
-                          </span>
-                        </div>
-                        <span className="text-[12px] px-1 py-0.2 rounded border border-border/40 bg-surface-2 text-muted-foreground uppercase">
-                          {item.category}
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      onClick={() => handleSelectSymbol(searchQuery)}
-                      className="w-full text-center py-2 text-xs font-mono text-primary hover:underline"
-                    >
-                      Load custom symbol: <strong>{searchQuery.toUpperCase()}</strong>
-                    </button>
-                  )}
-                </div>
+              /* Browsable catalogue, not a text box.
+                 Was a filter over eleven hardcoded suggestions, so a user who
+                 did not already know a ticker had no way to find one. The
+                 backend has carried 283 instruments across 11 asset classes
+                 all along; SymbolPicker reads them. Multi-add keeps the panel
+                 open so several can be pinned in one pass. */
+              <div className="absolute left-0 top-full mt-1.5 z-50 animate-fade-in">
+                <SymbolPicker
+                  selected={pinnedTabs}
+                  multi
+                  onSelect={handleSelectSymbol}
+                  onClose={() => setSearchOpen(false)}
+                />
               </div>
             )}
           </div>

@@ -354,7 +354,34 @@ SYMBOLS = {
     ],
 }
 
-ALL_SYMBOLS = [s for cat in SYMBOLS.values() for s in cat]
+# Flattened WITH the group key preserved.
+#
+# This was `[s for cat in SYMBOLS.values() for s in cat]`, which dropped the
+# asset class on the way out - so /market/symbols returned 283 instruments in
+# one undifferentiated list and no client could offer "browse the FX pairs".
+# The UI worked around it by hardcoding eleven suggestions, which is why a
+# user who does not already know a ticker could not find one.
+ALL_SYMBOLS = [
+    {**s, "asset_class": group}
+    for group, items in SYMBOLS.items()
+    for s in items
+]
+
+# Display names for the groups, so the client does not have to guess how to
+# label "stocks_us" or invent an ordering.
+ASSET_CLASS_LABELS = {
+    "stocks_us":   "US Stocks",
+    "stocks_eu":   "European Stocks",
+    "stocks_asia": "Asian Stocks",
+    "etfs":        "ETFs",
+    "crypto":      "Crypto",
+    "forex":       "Forex",
+    "metals":      "Metals",
+    "energy":      "Energy",
+    "agriculture": "Agriculture",
+    "indices":     "Indices",
+    "futures":     "Futures",
+}
 
 
 # ── Bar ticker map: display symbol → yfinance ticker ─────────────────────────
@@ -571,16 +598,50 @@ async def get_quotes():
 
 
 @router.get("/symbols")
-async def get_symbols(q: str = Query(default="", max_length=50)):
-    """Search symbols by query string. Returns all if q is empty."""
-    if not q:
-        return {"symbols": ALL_SYMBOLS, "total": len(ALL_SYMBOLS)}
-    q_lower = q.lower()
-    results = [
-        s for s in ALL_SYMBOLS
-        if q_lower in s["symbol"].lower() or q_lower in s["name"].lower()
-    ]
-    return {"symbols": results[:30], "total": len(results)}
+async def get_symbols(q: str = Query(default="", max_length=50),
+                      asset_class: str = Query(default="", max_length=30),
+                      limit: int = Query(default=0, ge=0, le=1000)):
+    """Browse or search the instrument catalogue.
+
+    Empty q returns EVERYTHING, grouped, so a client can offer a real browse
+    rather than requiring the user to already know a ticker. `asset_class`
+    narrows to one group; `limit` caps a search.
+
+    The 30-result cap that used to be unconditional is now opt-in: it made
+    sense for a type-ahead and made browsing impossible.
+    """
+    rows = ALL_SYMBOLS
+    if asset_class:
+        rows = [s for s in rows if s.get("asset_class") == asset_class]
+    if q:
+        ql = q.lower()
+        rows = [s for s in rows
+                if ql in s["symbol"].lower() or ql in s["name"].lower()
+                or ql in str(s.get("cat", "")).lower()]
+    total = len(rows)
+    if limit:
+        rows = rows[:limit]
+
+    groups = {}
+    for s in rows:
+        groups.setdefault(s.get("asset_class", "other"), []).append(s)
+
+    return {
+        "symbols": rows,
+        "total": total,
+        "groups": [
+            {"key": k,
+             "label": ASSET_CLASS_LABELS.get(k, k.replace("_", " ").title()),
+             "count": len(v),
+             "symbols": v}
+            for k, v in groups.items()
+        ],
+        "asset_classes": [
+            {"key": k, "label": ASSET_CLASS_LABELS.get(k, k),
+             "count": sum(1 for s in ALL_SYMBOLS if s.get("asset_class") == k)}
+            for k in SYMBOLS
+        ],
+    }
 
 
 _COINGECKO_IDS = {
