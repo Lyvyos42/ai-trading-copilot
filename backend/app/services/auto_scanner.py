@@ -233,7 +233,24 @@ def _score_setup(data: dict) -> tuple[int, str, str]:
 # ── Main auto-scan job ───────────────────────────────────────────────────────
 
 
-async def _scan_symbol(ticker: str) -> tuple[int, str, str, dict] | None:
+# Analysis timeframe per strategy profile, matching the chart interval the
+# dashboard switches to when the profile is picked. Without this the scanner
+# called run_pipeline() with no profile at all, so every auto-scanned signal
+# came back on the "balanced" geometry - a 5-14 DAY window with a 3.5 ATR
+# target - no matter which profile the user had selected. A user on Z Scalper
+# was being handed swing signals.
+_PROFILE_TIMEFRAME = {
+    "scalper":       "5m",
+    "ict_smc":       "15m",
+    "orb":           "15m",
+    "vwap_pullback": "30m",
+    "news_catalyst": "1h",
+    "swing":         "1D",
+    "balanced":      "1D",
+}
+
+
+async def _scan_symbol(ticker: str, profile: str = "balanced") -> tuple[int, str, str, dict] | None:
     """Fetch market data and score a single symbol. Returns None on failure."""
     if not market_status(ticker)["open"]:
         return None
@@ -263,6 +280,8 @@ async def _generate_signal_for_user(
             asset_class=asset_class,
             force_fallback=True,
             user_id=user_id,
+            profile=profile,
+            timeframe=_PROFILE_TIMEFRAME.get(profile, "1D"),
         )
 
         final = state.get("final_signal", {})
@@ -344,7 +363,8 @@ async def _generate_signal_for_user(
         return None
 
 
-async def run_auto_scan_for_user(user_id: str, symbols: list[str], replace_active: bool = False) -> list[dict]:
+async def run_auto_scan_for_user(user_id: str, symbols: list[str], replace_active: bool = False,
+                                 profile: str = "balanced") -> list[dict]:
     """Scan symbols, generate signals where confluence is high enough.
 
     Returns list of result dicts (one per symbol that triggered).
@@ -366,7 +386,7 @@ async def run_auto_scan_for_user(user_id: str, symbols: list[str], replace_activ
         active_tickers = {row[0] for row in existing.all()}
 
     # Scan all symbols concurrently (lightweight -- just fetches data + math)
-    scan_tasks = [_scan_symbol(sym) for sym in symbols]
+    scan_tasks = [_scan_symbol(sym, profile) for sym in symbols]
     scan_results = await asyncio.gather(*scan_tasks, return_exceptions=True)
 
     for sym, result in zip(symbols, scan_results):
@@ -454,18 +474,31 @@ async def auto_scan_job() -> None:
 
     log.info("auto_scan_job_start", configs=len(configs))
 
+    # The user's chosen strategy profile is already persisted on
+    # users.active_profile; the scanner simply never read it.
+    profiles: dict[str, str] = {}
+    async with AsyncSessionLocal() as session:
+        from app.models.user import User
+        rows = await session.execute(
+            select(User.id, User.active_profile)
+            .where(User.id.in_([c.user_id for c in configs]))
+        )
+        profiles = {uid: (prof or "balanced") for uid, prof in rows.all()}
+
     for cfg in configs:
         symbols = cfg.symbols or []
         if not symbols:
             continue
 
+        profile = profiles.get(cfg.user_id, "balanced")
         try:
-            results = await run_auto_scan_for_user(cfg.user_id, symbols)
+            results = await run_auto_scan_for_user(cfg.user_id, symbols, profile=profile)
             if results:
                 log.info(
                     "auto_scan_user_complete",
                     user_id=cfg.user_id,
                     symbols_scanned=len(symbols),
+                    profile=profile,
                     signals_generated=len(results),
                 )
         except Exception as exc:

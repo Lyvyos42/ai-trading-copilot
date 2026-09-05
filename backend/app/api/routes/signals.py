@@ -7,7 +7,6 @@ import asyncio
 import hashlib
 import math
 import os
-import random
 import time
 import uuid
 from collections import defaultdict
@@ -168,125 +167,22 @@ def _cache_signal(user_id: str, ticker: str, signal_dict: dict) -> None:
 _PAID_TIERS = {"retail", "pro", "enterprise", "admin"}
 
 
-# ── Demo signal generator — no Claude API calls ──────────────────────────────
-# Produces realistic-looking signals using deterministic randomness seeded by
-# ticker + date so the same ticker on the same day returns consistent results.
-
-_DEMO_BULL_CASES = [
-    "Price holding above key support with bullish RSI divergence on 4H. Institutional accumulation visible in order flow delta.",
-    "Strong earnings momentum with revenue beat. MACD crossover confirmed on daily, aligned with sector rotation into risk-on.",
-    "Breakout above consolidation range with volume confirmation. Macro backdrop supportive with dovish central bank guidance.",
-    "Multiple timeframe alignment: bullish on daily, 4H, and 1H. Sentiment skewed positive from recent catalyst.",
-]
-_DEMO_BEAR_CASES = [
-    "Approaching major resistance with bearish divergence on RSI. Volume declining on rallies suggests distribution.",
-    "Macro headwinds: rising yields compressing multiples. Sector peers showing relative weakness.",
-    "Overextended from 20-day moving average. Mean reversion probability elevated based on historical Z-score.",
-    "Negative news flow creating sentiment drag. Order flow shows persistent selling pressure at current levels.",
-]
-_DEMO_STRATEGIES = [
-    ["RSI Divergence", "MACD Crossover", "Volume Profile"],
-    ["Mean Reversion", "Bollinger Band Squeeze", "Kelly Criterion"],
-    ["Momentum Breakout", "Fibonacci Retracement", "ATR Trailing Stop"],
-    ["Institutional Order Flow", "Market Profile", "VWAP Deviation"],
-]
-
-def _generate_demo_signal(ticker: str, asset_class: str, timeframe: str) -> dict:
-    """Generate a realistic simulated signal without calling Claude."""
-    # Deterministic seed: same ticker + day = same result
-    seed_str = f"{ticker}:{datetime.utcnow().strftime('%Y-%m-%d')}:{timeframe}"
-    seed = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-    rng = random.Random(seed)
-
-    direction = rng.choice(["LONG", "SHORT"])
-    confidence = round(rng.uniform(52, 85), 1)
-    bullish_pct = round(rng.uniform(35, 80), 1)
-    bearish_pct = round(100 - bullish_pct, 1)
-    if direction == "SHORT":
-        bullish_pct, bearish_pct = bearish_pct, bullish_pct
-
-    # Price levels — realistic relative distances
-    base_prices = {
-        "XAUUSD": 2400, "EURUSD": 1.08, "GBPUSD": 1.27, "USDJPY": 155,
-        "BTC": 65000, "ETH": 3200, "AAPL": 190, "MSFT": 420, "NVDA": 880,
-        "TSLA": 175, "US30": 40000, "US500": 5300, "XAGUSD": 28,
-    }
-    # Find a matching base price or derive one
-    base = None
-    for key, val in base_prices.items():
-        if key in ticker:
-            base = val
-            break
-    if base is None:
-        base = rng.uniform(50, 500)
-
-    entry = round(base * rng.uniform(0.97, 1.03), 2 if base > 100 else 5)
-    atr_pct = rng.uniform(0.008, 0.025)
-    sl_dist = entry * atr_pct
-    if direction == "LONG":
-        sl = round(entry - sl_dist, 2 if base > 100 else 5)
-        tp1 = round(entry + sl_dist * 1.5, 2 if base > 100 else 5)
-        tp2 = round(entry + sl_dist * 2.5, 2 if base > 100 else 5)
-        tp3 = round(entry + sl_dist * 3.5, 2 if base > 100 else 5)
-    else:
-        sl = round(entry + sl_dist, 2 if base > 100 else 5)
-        tp1 = round(entry - sl_dist * 1.5, 2 if base > 100 else 5)
-        tp2 = round(entry - sl_dist * 2.5, 2 if base > 100 else 5)
-        tp3 = round(entry - sl_dist * 3.5, 2 if base > 100 else 5)
-
-    rr = round(abs(tp2 - entry) / abs(sl - entry), 1) if abs(sl - entry) > 0 else 2.0
-    idx = rng.randint(0, len(_DEMO_BULL_CASES) - 1)
-
-    agent_names = ["fundamental", "technical", "sentiment", "macro", "order_flow", "regime_change", "correlation"]
-    agent_votes = {}
-    for name in agent_names:
-        a_dir = direction if rng.random() > 0.25 else ("SHORT" if direction == "LONG" else "LONG")
-        a_conf = round(rng.uniform(45, 90), 1)
-        agent_votes[name] = {
-            "direction": a_dir, "confidence": a_conf,
-            "bullish_contribution": round(rng.uniform(5, 20), 1),
-            "bearish_contribution": round(rng.uniform(5, 20), 1),
-        }
-    agent_votes["risk_approved"] = True
-    agent_votes["quant_validated"] = rng.random() > 0.3
-
-    conviction = "HIGH" if confidence > 72 else "MODERATE" if confidence > 60 else "LOW"
-    window_map = {"1m": "1-4 hours", "5m": "4-12 hours", "15m": "12-24 hours",
-                  "30m": "1-2 days", "1h": "1-3 days", "4h": "3-7 days", "1D": "3-7 days"}
-    analytical_window = window_map.get(timeframe, "3-7 days")
-
-    now = datetime.utcnow()
-    return {
-        "ticker": ticker, "asset_class": asset_class, "timeframe": timeframe,
-        "direction": direction,
-        "entry_price": entry, "stop_loss": sl,
-        "take_profit_1": tp1, "take_profit_2": tp2, "take_profit_3": tp3,
-        "confidence_score": confidence,
-        "probability_score": confidence,
-        "bullish_pct": bullish_pct, "bearish_pct": bearish_pct,
-        "research_target": tp2, "invalidation_level": sl,
-        "risk_reward_ratio": rr,
-        "analytical_window": analytical_window,
-        "bull_case": _DEMO_BULL_CASES[idx],
-        "bear_case": _DEMO_BEAR_CASES[idx],
-        "conviction_tier": conviction,
-        "agent_votes": agent_votes,
-        "reasoning_chain": [
-            f"7 analyst agents ran parallel analysis on {ticker} ({timeframe})",
-            f"Majority consensus: {direction} with {confidence}% confidence",
-            f"Risk Manager approved — R:R {rr}:1, Kelly sizing applied",
-            "Trader agent synthesized final signal with probability model",
-        ],
-        "strategy_sources": _DEMO_STRATEGIES[idx],
-        "timeframe_levels": {},
-        "status": "ACTIVE",
-        "timestamp": now.isoformat() + "Z",
-        "expiry_time": (now + timedelta(hours=24)).isoformat() + "Z",
-        "pipeline_latency_ms": rng.randint(800, 3500),
-        "agent_detail": {name: agent_votes.get(name) for name in agent_names},
-        "is_demo": True,
-    }
-
+# The demo signal generator lived here and has been removed.
+#
+# It built a complete signal from random.Random(ticker + date): direction,
+# confidence, entry, target, invalidation, agent votes, and a bull/bear case
+# picked from four hand-written strings - then tagged the result
+# "is_demo": True, which no frontend file ever read.
+#
+# It was DEAD CODE: nothing called _generate_demo_signal. The free tier runs
+# the real pipeline with force_fallback=True, the deterministic Python path,
+# so this was never serving fabricated signals to anyone.
+#
+# Deleted rather than left dormant because that is exactly how the agent mocks
+# became the production data source - each was written as a harmless
+# convenience and each was one wiring change from being live. A signal
+# generator that invents its own bull case has no safe resting state in a
+# route file.
 
 class GenerateRequest(BaseModel):
     ticker: str

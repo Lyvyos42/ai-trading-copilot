@@ -42,7 +42,8 @@ export async function getToken(): Promise<string | null> {
  *  It names none of them, so it reads like a broken endpoint - which cost two
  *  rounds of investigating a server that was answering in 0.3s the whole time.
  */
-function networkErrorMessage(path: string, err: unknown, delays: number[]): string {
+function networkErrorMessage(path: string, err: unknown, delays: number[],
+                            triedProxy = false): string {
   const detail = err instanceof Error ? err.message : String(err);
   const tries = delays.length + 1;
   const secs = Math.round(delays.reduce((a, b) => a + b, 0) / 1000);
@@ -57,15 +58,16 @@ function networkErrorMessage(path: string, err: unknown, delays: number[]): stri
 
   let host = API_URL;
   try { host = new URL(API_URL).host; } catch {}
-  return `Cannot reach ${host}${path} - ${tries} attempt${tries === 1 ? "" : "s"} over ~${secs}s, no reply. `
-       + `The API answers from outside the browser, so this is local: a blocking `
+  return `Cannot reach ${host}${path} - ${tries} attempt${tries === 1 ? "" : "s"} over ~${secs}s, no reply`
+       + (triedProxy ? ", including a same-origin retry through this site itself" : "")
+       + `. The API answers from outside the browser, so this is local: a blocking `
        + `extension (adblocker / privacy shield), a VPN or proxy, or DNS. [${detail}]`;
 }
 
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
-  opts?: { delays?: number[] },
+  opts?: { delays?: number[]; viaProxy?: boolean },
 ): Promise<T> {
   const token = await getToken();
   const reqOptions: RequestInit = {
@@ -88,12 +90,17 @@ export async function apiFetch<T>(
   // it rather than making the user sit through the full cold-start budget for
   // an attempt it already expects to lose. See resetSignals.
   const DELAYS = opts?.delays ?? [2_000, 5_000, 12_000, 25_000, 30_000];
+  // `base` is normally the API's own origin. When a cross-origin request has
+  // already failed at the network layer, the caller retries through
+  // `/api/be` - this app's own origin - which Next forwards server-side.
+  // See app/api/be/[...path]/route.ts for the measurements behind it.
+  const base = opts?.viaProxy ? "/api/be" : API_URL;
   let lastError: unknown;
   for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
     try {
       // A hung connection had no timeout at all, so it could sit forever and
       // consume the whole retry budget without ever producing an error.
-      const res = await fetch(`${API_URL}${path}`, {
+      const res = await fetch(`${base}${path}`, {
         ...reqOptions,
         signal: (reqOptions as any).signal ?? AbortSignal.timeout(45_000),
       });
@@ -117,9 +124,20 @@ export async function apiFetch<T>(
         await new Promise(r => setTimeout(r, DELAYS[attempt]));
         continue;
       }
-      // Every retry is spent. Replace the browser's opaque wording with
-      // something that names what was tried and where.
-      if (!isHttpError) throw new Error(networkErrorMessage(path, err, DELAYS));
+      // Every retry is spent, and the request never reached the server.
+      //
+      // If this was a cross-origin WRITE, try once more through our own
+      // origin. Reads were succeeding at the same moment writes were being
+      // dropped, which is what a privacy extension or endpoint-security web
+      // shield does to cross-origin state-changing requests. The proxy makes
+      // the request same-origin, so there is nothing for it to object to.
+      if (!isHttpError) {
+        const method = (reqOptions.method || "GET").toUpperCase();
+        if (!opts?.viaProxy && method !== "GET" && method !== "HEAD") {
+          return apiFetch<T>(path, options, { ...opts, viaProxy: true });
+        }
+        throw new Error(networkErrorMessage(path, err, DELAYS, !!opts?.viaProxy));
+      }
       throw err;
     }
   }
@@ -150,6 +168,8 @@ export async function resetSignals(): Promise<{ deleted: number }> {
     );
   } catch (err) {
     if ((err as any)?._httpStatus != null) throw err;
+    // DELETE-blocking is real, so POST is tried next; apiFetch will itself
+    // fall back to the same-origin proxy if that is also dropped.
     return await apiFetch<{ deleted: number }>("/api/v1/signals/reset", { method: "POST" });
   }
 }

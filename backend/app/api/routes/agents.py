@@ -109,9 +109,15 @@ async def agent_status(
     db: AsyncSession = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
-    now = datetime.now(timezone.utc).isoformat()
-    cutoff_today = datetime.now(timezone.utc) - timedelta(hours=24)
-    cutoff_7d = datetime.now(timezone.utc) - timedelta(days=7)
+    # Signal.created_at and Signal.resolved_at are mapped as plain DateTime -
+    # NAIVE columns - and every other query against them uses datetime.utcnow().
+    # Comparing a timezone-AWARE datetime against them raises on Postgres, which
+    # 500'd this endpoint. The dashboard then fell back to a hardcoded agent list
+    # for the rows while the counter read the empty fetch result, so every agent
+    # rendered LIVE under a header saying 0/11 HEALTHY.
+    now = datetime.utcnow().isoformat()
+    cutoff_today = datetime.utcnow() - timedelta(hours=24)
+    cutoff_7d = datetime.utcnow() - timedelta(days=7)
 
     today_result = await db.execute(
         select(func.count()).select_from(Signal).where(Signal.created_at >= cutoff_today)

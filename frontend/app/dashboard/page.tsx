@@ -7,7 +7,7 @@ import { TradingViewChart } from "@/components/TradingViewChart";
 import { OrderFlowChart } from "@/components/OrderFlowChart";
 import { SignalOverlay } from "@/components/SignalOverlay";
 import { AgentStatusPanel } from "@/components/AgentStatus";
-import { generateSignal, listSignals, getAgentStatus, wakeBackend, scanNow, type Signal, type AgentStatus } from "@/lib/api";
+import { generateSignal, listSignals, getAgentStatus, wakeBackend, scanNow, setActiveProfile as saveActiveProfile, type Signal, type AgentStatus } from "@/lib/api";
 
 import { ScannerPanel } from "@/components/ScannerPanel";
 import { ProfileSelector } from "@/components/ProfileSelector";
@@ -175,6 +175,12 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
 
   useEffect(() => {
     localStorage.setItem("dashboard_profile", activeProfile);
+    // Persist server-side too. The profile decides the analytical window and
+    // ATR geometry the auto-scanner uses, and the scanner runs in the backend
+    // with no sight of localStorage - so a selection kept only in the browser
+    // meant every auto-scanned signal came back on the balanced 5-14 DAY
+    // geometry regardless of what was picked here.
+    saveActiveProfile(activeProfile).catch(() => {});
   }, [activeProfile]);
 
   async function loadData() {
@@ -318,7 +324,16 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
   const avgConf       = signals.length
     ? (signals.reduce((a, s) => a + s.confidence_score, 0) / signals.length).toFixed(0)
     : null;
-  const healthyAgents = agents.filter((a) => a.status === "HEALTHY").length;
+  // Agents come from ONE source. The rows used to render from
+  // PLACEHOLDER_AGENTS when the fetch failed while the counter read the empty
+  // `agents` array, so a failing /agents/status produced eleven rows all
+  // showing LIVE beneath a header reading "0/11 HEALTHY" - the display
+  // contradicting itself rather than reporting the outage.
+  const agentsFetched = agents.length > 0;
+  const shownAgents   = agentsFetched ? agents : PLACEHOLDER_AGENTS;
+  const healthyAgents = agentsFetched
+    ? agents.filter((a) => a.status === "HEALTHY").length
+    : null;   // null = not known, rendered as an em dash rather than 0
 
   return (
     <div className="h-[calc(100vh-72px)] flex flex-col bg-background overflow-hidden">
@@ -349,8 +364,8 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
           },
           {
             label: "AGENTS ONLINE",
-            value: `${healthyAgents}`,
-            suffix: `/${agents.length || 11}`,
+            value: healthyAgents === null ? "—" : `${healthyAgents}`,
+            suffix: agentsFetched ? `/${agents.length}` : "",
             icon: Activity,
             color: "text-bull",
           },
@@ -672,11 +687,13 @@ const [upgradeOpen, setUpgradeOpen]       = useState(false);
         <div className="hidden xl:flex flex-col w-64 shrink-0">
           <div className="terminal-header shrink-0">
             <span className="terminal-label">AGENT NETWORK</span>
-            <span className="ml-auto font-mono text-[13px] text-bull">{healthyAgents}/{agents.length || 11} HEALTHY</span>
+            <span className={`ml-auto font-mono text-[13px] ${agentsFetched ? "text-bull" : "text-muted-foreground"}`}>
+              {agentsFetched ? `${healthyAgents}/${agents.length} HEALTHY` : "STATUS UNAVAILABLE"}
+            </span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <AgentStatusPanel agents={agents.length > 0 ? agents : PLACEHOLDER_AGENTS} compact />
+            <AgentStatusPanel agents={shownAgents} compact />
 
             {/* Pipeline card — collapsible */}
             <div className="border-t border-border mt-1 pt-1 px-2.5 pb-2">
