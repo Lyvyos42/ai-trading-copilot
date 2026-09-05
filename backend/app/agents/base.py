@@ -28,13 +28,30 @@ class BaseAgent:
         self.name = name
         self.tier = tier
 
-    async def _call_llm(self, system: str, user: str, max_tokens: int = 2000) -> str:
+    # Tiers that get the LLM reasoning layer on top of the Python engine.
+    LLM_ENRICHMENT_TIERS = ("pro", "enterprise", "admin")
+
+    @staticmethod
+    def llm_allowed(state) -> bool:
+        """Whether this run may call the reasoning layer.
+
+        Deterministic first: a False here is not a degraded signal, it is the
+        normal path. Every agent computes its verdict in Python and only
+        consults the LLM to enrich the narrative when a paid tier asked for it.
+        """
+        if not state:
+            return False
+        return bool(state.get("llm_enrichment"))
+
+    async def _call_llm(self, system: str, user: str, max_tokens: int = 2000,
+                        state=None) -> str:
         return await model_router.complete(
             system=system,
             user=user,
             tier=self.tier,
             max_tokens=max_tokens,
             agent_name=self.name,
+            allow_llm=self.llm_allowed(state),
         )
 
     # Alias — keeps existing call sites working during transition

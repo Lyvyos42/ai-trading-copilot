@@ -44,7 +44,7 @@ Apply strategies 3.2 (earnings momentum) and 3.3 (value factor).
 {format_alt_data(state.get("alternative_data", {}))}
 Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
 
         if raw:
             try:

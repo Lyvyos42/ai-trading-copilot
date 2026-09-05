@@ -90,7 +90,7 @@ Assess:
 5. Regime-adjusted performance
 Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 return json.loads(raw)

@@ -35,3 +35,8 @@ class TradingState(TypedDict, total=False):
     # Metadata
     daily_analysis_count: int                # for Risk Gate rule 8
     strategy_profile: str                    # active profile slug (e.g. "balanced")
+    user_tier: str                           # free / retail / pro / enterprise / admin
+    # Whether the LLM reasoning layer is permitted for THIS run. The engine is
+    # deterministic Python by default; Claude is an enrichment on paid tiers,
+    # never a dependency. See ModelRouter.complete(allow_llm=...).
+    llm_enrichment: bool

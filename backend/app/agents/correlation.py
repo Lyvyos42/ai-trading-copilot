@@ -84,7 +84,7 @@ Apply strategy 3.18 (covariance framework) and 6.5 (target volatility).
 Assess portfolio concentration risk, contagion probability, and Kelly adjustment.
 Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 return json.loads(raw)

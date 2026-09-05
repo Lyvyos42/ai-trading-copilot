@@ -53,8 +53,17 @@ class ModelRouter:
         tier: str = "standard",
         max_tokens: int = 2000,
         agent_name: str = "",
+        allow_llm: bool = False,
     ) -> str:
-        if getattr(settings, "python_engine_mode", True):
+        # python_engine_mode is the DEFAULT, not a kill switch: the nine agents
+        # are deterministic Python and produce a complete signal with no LLM
+        # call at all. `allow_llm` is how a paid-tier run opts into the
+        # reasoning layer on top. Without it this returned "" for every call
+        # regardless of tier, which is why the product ran zero LLM calls in
+        # production while being sold as an LLM committee.
+        if getattr(settings, "python_engine_mode", True) and not allow_llm:
+            return ""
+        if not getattr(settings, "anthropic_api_key", ""):
             return ""
 
         provider_name, model = self._tiers.get(tier, self._tiers["standard"])

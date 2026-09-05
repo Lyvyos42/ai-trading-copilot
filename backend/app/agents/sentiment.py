@@ -119,7 +119,7 @@ class SentimentAnalyst(BaseAgent):
         # voted, and BTC/ETH and EURUSD/GBPUSD came back with identical
         # signals partly because of it. The trader pools votes flagged this
         # way; see MARKET_WIDE_POOL_WEIGHT.
-        result = await self._analyze_with_live_news(ticker, market_data, enriched_ctx, strategy_ctx)
+        result = await self._analyze_with_live_news(ticker, market_data, enriched_ctx, strategy_ctx, state=state)
         if isinstance(result, dict):
             result["symbol_specific"] = bool(ticker_hl)
             result["ticker_mention_count"] = len(ticker_hl)
@@ -127,7 +127,7 @@ class SentimentAnalyst(BaseAgent):
 
     # ── Live news path ────────────────────────────────────────────────────────
 
-    async def _analyze_with_live_news(self, ticker: str, market_data: dict, news_ctx: dict, strategy_ctx: str = "") -> dict:
+    async def _analyze_with_live_news(self, ticker: str, market_data: dict, news_ctx: dict, strategy_ctx: str = "", state=None) -> dict:
         ticker_hl  = news_ctx.get("ticker_headlines", [])
         market_hl  = news_ctx.get("market_headlines", [])
         avg_sent   = news_ctx.get("avg_sentiment", 0.0)
@@ -169,7 +169,7 @@ BROADER MARKET HEADLINES ({len(market_hl)} articles):
 Strategy 18.3: Based on the REAL headlines above, classify overall sentiment.
 Pay special attention to any direct ticker mentions. Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 result = json.loads(raw)

@@ -140,7 +140,7 @@ Recent volumes: {volumes[-10:] if volumes else 'N/A'}
 Apply strategies 3.16 (volume-weighted signals) and 3.17 (liquidity momentum).
 Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 result = json.loads(raw)

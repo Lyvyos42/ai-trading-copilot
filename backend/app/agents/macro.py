@@ -145,13 +145,13 @@ class MacroAnalyst(BaseAgent):
             )
 
         fred_block = format_fred(fred_data)
-        return await self._analyze_with_real_data(ticker, asset_class, news_ctx or {}, fred_data or {}, fred_block, strategy_ctx)
+        return await self._analyze_with_real_data(ticker, asset_class, news_ctx or {}, fred_data or {}, fred_block, strategy_ctx, state=state)
 
     # ── Real data analysis path ───────────────────────────────────────────────
 
     async def _analyze_with_real_data(
         self, ticker: str, asset_class: str, news_ctx: dict, fred_data: dict,
-        fred_block: str = "", strategy_ctx: str = ""
+        fred_block: str = "", strategy_ctx: str = "", state=None
     ) -> dict:
         macro_hl   = news_ctx.get("macro_headlines", [])
         geo_hl     = news_ctx.get("geo_headlines", [])
@@ -204,7 +204,7 @@ Strategy 8.2: Assess FX carry implications.
 Strategy 19.5: Identify any upcoming catalyst events mentioned.
 Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 result = json.loads(raw)

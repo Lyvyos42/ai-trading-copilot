@@ -452,6 +452,17 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
     if user_tier in ("pro", "enterprise", "admin"):
         alt_data = await _optional(get_alternative_data(ticker), "alternative_data", {})
 
+    # The LLM reasoning layer is an ENRICHMENT on paid tiers, on top of the
+    # deterministic Python engine that produces the signal either way. It needs
+    # a configured key and an entitled tier; absent either, the run is pure
+    # Python and says so in `degraded_sources` terms rather than failing.
+    from app.agents.base import BaseAgent as _BA
+    from app.config import settings as _settings
+    _llm_enrichment = bool(
+        user_tier in _BA.LLM_ENRICHMENT_TIERS
+        and getattr(_settings, "anthropic_api_key", "")
+    )
+
     # Build reasoning chain prefix describing news context quality
     reasoning_prefix = []
     if news_ctx.get("has_news"):
@@ -511,6 +522,10 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "memory_context":   memory_context,
         "user_id":          user_id or "",
         "strategy_profile": profile,
+        "user_tier":        user_tier,
+        # Decided once per run rather than per agent, so the nine cannot
+        # disagree about whether this signal had a reasoning layer.
+        "llm_enrichment":   _llm_enrichment,
         "reasoning_chain":  reasoning_prefix,
         # Which optional sources were unavailable for THIS run. A signal built
         # without news or FRED is a weaker signal, and the user is entitled to

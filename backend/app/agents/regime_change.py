@@ -72,7 +72,7 @@ Apply strategy 19.2 (regime classification) and 6.1 (vol regime switching).
 Assess VIX term structure, credit spreads, and sector rotation signals.
 Determine probability of regime change within next 5 sessions. Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 return json.loads(raw)

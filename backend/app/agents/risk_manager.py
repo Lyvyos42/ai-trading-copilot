@@ -115,7 +115,7 @@ Correlation with existing positions: {port_correlation:.2f}
 
 Apply all risk constraints. Output JSON only."""
 
-        raw = await self._call_claude(SYSTEM_PROMPT, user_msg)
+        raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
                 result = json.loads(raw)
