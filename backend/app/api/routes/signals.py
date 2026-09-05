@@ -456,7 +456,14 @@ async def generate_signal(
         # hardcoded ACTIVE told the UI a NO_EDGE result was tradeable, putting it
         # straight back into the feed.
         "status": final.get("status", "ACTIVE"),
-        "status_reasons": final.get("risk_gate_reasons") or None,
+        # The TRADER emits `status_reasons` (insufficient directional votes, dead
+        # feed); the RISK GATE emits `risk_gate_reasons`. Reading only the latter
+        # meant a NO_SIGNAL from the trader arrived with status_reasons=None, so
+        # the UI fell through to a hardcoded sentence and the specific truth -
+        # which analysts abstained and why - never reached the user. Both are
+        # read, trader first, since it owns the NO_SIGNAL decision.
+        "status_reasons": (final.get("status_reasons")
+                           or final.get("risk_gate_reasons") or None),
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "expiry_time": (datetime.utcnow() + timedelta(hours=24)).isoformat() + "Z",
         "pipeline_latency_ms": state.get("pipeline_latency_ms"),
@@ -784,7 +791,7 @@ def _signal_to_dict(signal: Signal, state: dict | None = None, current_price: fl
         # Why a signal is not tradeable. Without this the UI could only see that
         # status != ACTIVE and had nothing to show, so it dropped the card and
         # the signal appeared to vanish a moment after being generated.
-        reasons = _final.get("risk_gate_reasons") or []
+        reasons = _final.get("status_reasons") or _final.get("risk_gate_reasons") or []
         gate = state.get("risk_gate_result") or {}
         if not reasons and gate.get("triggered_rules"):
             reasons = [t.get("reason") for t in gate["triggered_rules"] if t.get("reason")]
