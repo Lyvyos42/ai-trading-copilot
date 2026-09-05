@@ -1,6 +1,6 @@
 import json
 import numpy as np
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, nz
 from app.pipeline.state import TradingState
 
 
@@ -98,7 +98,7 @@ class TechnicalAnalyst(BaseAgent):
         dec = _price_decimals(current_price)
         support = round(min(lows[-20:]) if len(lows) >= 20 else current_price * 0.95, dec)
         resistance = round(max(highs[-20:]) if len(highs) >= 20 else current_price * 1.05, dec)
-        atr = market_data.get("atr", current_price * 0.012)
+        atr = nz(market_data, "atr", (current_price or 0.0) * 0.012)
 
         ema_cross = "BULLISH" if ema12 > ema26 else ("BEARISH" if ema12 < ema26 else "NEUTRAL")
 

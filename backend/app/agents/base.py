@@ -5,6 +5,24 @@ from app.pipeline.state import TradingState
 log = structlog.get_logger()
 
 
+def nz(d: dict, key: str, default):
+    """dict.get that treats an explicit None as missing.
+
+    `d.get(key, default)` only uses the default when the key is ABSENT. Since
+    agents began abstaining, the keys are present with value None - so
+    `market_data.get("atr", close * 0.012)` returned None, and worse, the
+    default expression is evaluated eagerly, so it raised TypeError before the
+    lookup even happened when `close` was itself None.
+
+    That combination crashed the pipeline on any symbol whose feed was down:
+    quant.py:63 and technical.py:101 both hit it, and the trader would have hit
+    it on `tech.get("support", current_price * 0.95)` whenever the technical
+    agent abstained but a live spot price existed.
+    """
+    v = d.get(key)
+    return default if v is None else v
+
+
 class BaseAgent:
     def __init__(self, name: str, tier: str = "standard"):
         self.name = name

@@ -1,6 +1,6 @@
 import json
 import math
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, nz
 from app.pipeline.state import TradingState
 
 
@@ -60,7 +60,9 @@ class QuantAnalyst(BaseAgent):
         consensus_dir = "LONG" if long_count > short_count else ("SHORT" if short_count > long_count else "NEUTRAL")
 
         close = market_data.get("close", 100)
-        atr = market_data.get("atr", close * 0.012)
+        # close can be None on a dead feed; nz() also guards the eager default.
+        close = nz(market_data, "close", 0.0)
+        atr = nz(market_data, "atr", close * 0.012)
 
         analyst_summary = "\n".join(
             f"  - {name}: {a['direction']} ({a['confidence']:.0f}%)"

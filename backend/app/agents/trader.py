@@ -1,5 +1,5 @@
 import json
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, nz
 from app.pipeline.state import TradingState
 
 
@@ -82,7 +82,41 @@ class TraderAgent(BaseAgent):
         bear = state.get("bear_case", "")
         market_data = state.get("market_data", {})
 
-        current_price = market_data.get("close", 100.0)
+        # DEAD FEED — checked first, before anything reads or formats a price.
+        #
+        # This guard used to sit further down, inside _compute_probability_signal,
+        # which was too late: analyze() formats current_price into the prompt at
+        # `CURRENT PRICE: {current_price:{_pfmt}}` long before that, and a None
+        # price raised TypeError there. So a symbol whose feed was down crashed
+        # the pipeline instead of producing NO_SIGNAL - trading one failure mode
+        # for a worse one. Found by scripts/preflight_live_pipeline.py.
+        #
+        # Note `.get("close", 100.0)` cannot help: the key EXISTS with value
+        # None on an unavailable payload, so the default never fires. That
+        # default is also why a dead feed once priced signals at 100.0.
+        current_price = market_data.get("close")
+        if current_price is None or market_data.get("data_source") in ("mock", "unavailable"):
+            why = ("Price feed unavailable - no live quote for this symbol."
+                   if current_price is None else
+                   "Bars for this symbol are not live market data.")
+            return {
+                "direction": "NEUTRAL",
+                "status": "NO_SIGNAL",
+                "probability_score": None,
+                "confidence_score": 0.0,
+                "confidence": 0.0,
+                "entry_price": None,
+                "research_target": None,
+                "invalidation_level": None,
+                "risk_reward_ratio": None,
+                "position_size_pct": None,
+                "status_reasons": [why, "No tradeable level can be quoted without a real price."],
+                "reasoning_chain": [f"{ticker}: no live market data.", why,
+                                    "No signal is published."],
+                "strategy_sources": [],
+                "agent_attribution": [],
+            }
+
         _dec = _price_decimals(current_price, ticker)
         _pfmt = f".{_dec}f"
 
@@ -156,8 +190,8 @@ Bull case: {bull[:300]}
 Bear case: {bear[:300]}
 
 RISK PARAMETERS:
-- Support: {tech.get('support', current_price * 0.95):{_pfmt}}
-- Resistance: {tech.get('resistance', current_price * 1.06):{_pfmt}}
+- Support: {nz(tech, 'support', current_price * 0.95):{_pfmt}}
+- Resistance: {nz(tech, 'resistance', current_price * 1.06):{_pfmt}}
 
 STRATEGY PROFILE: {profile_slug.upper()}
 DIRECTION LEAN: {direction} (based on analyst vote aggregation)
@@ -185,7 +219,7 @@ Output JSON only."""
                 # Validate research_target / invalidation_level
                 rt = result.get("research_target", 0)
                 il = result.get("invalidation_level", 0)
-                atr = tech.get("atr", market_data.get("atr", current_price * 0.012))
+                atr = nz(tech, "atr", nz(market_data, "atr", current_price * 0.012))
                 if atr <= 0:
                     atr = current_price * 0.012
 
@@ -212,7 +246,7 @@ Output JSON only."""
                     result["take_profit_3"] = round(rt + (rt - current_price) * 1.0, _dec) if rt != current_price else rt
                     result["risk_reward_ratio"] = round(abs(rt - current_price) / max(abs(current_price - result["stop_loss"]), 1e-9), 1)
 
-                    atr_15m = market_data.get("atr_15m", atr * 0.196)
+                    atr_15m = nz(market_data, "atr_15m", atr * 0.196)
                     result["timeframe_levels"] = self._compute_timeframe_levels(current_price, direction, atr, atr_15m, _dec)
 
                 return result
@@ -315,10 +349,10 @@ Output JSON only."""
         t_upper = ticker.upper().replace("/", "").replace("-", "").replace("=X", "")
         is_forex = t_upper in _FOREX_5DP or t_upper in _FOREX_3DP
         default_atr_pct = 0.005 if is_forex else 0.012
-        atr = tech.get("atr", market_data.get("atr", price * default_atr_pct))
+        atr = nz(tech, "atr", nz(market_data, "atr", price * default_atr_pct))
         if atr <= 0:
             atr = price * default_atr_pct
-        atr_15m = market_data.get("atr_15m", atr * 0.196)
+        atr_15m = nz(market_data, "atr_15m", atr * 0.196)
 
         entry = round(price, dec)
 
@@ -452,21 +486,31 @@ Output JSON only."""
         risk_reward_ratio = round(abs(research_target - entry) / max(abs(entry - invalidation_level), 1e-9), 1)
         target_pct = round(abs(research_target - entry) / entry * 100, 1)
 
-        # Determine strategy sources
+        # Determine strategy sources.
+        #
+        # Every threshold here reads a value an agent may now legitimately
+        # report as None. `.get(key, 0)` does not help - the key EXISTS with
+        # value None on an abstention, so the default never fires and the
+        # comparison raises. nz() treats None as missing, which is what the
+        # original `, 0` default was trying to express.
+        #
+        # A strategy is only credited when the agent that owns it actually
+        # measured something, so an abstaining fundamental agent no longer
+        # contributes "earnings_momentum_3.2" to a signal's provenance.
         strategy_sources = []
         if tech.get("ema_crossover") in ["BULLISH", "BEARISH"]:
             strategy_sources.append("ema_crossover_3.11-3.13")
-        if abs(tech.get("momentum_score", 0)) > 0.2:
+        if abs(nz(tech, "momentum_score", 0)) > 0.2:
             strategy_sources.append("price_momentum_3.1")
-        if abs(tech.get("mean_reversion_signal", 0)) > 0.3:
+        if abs(nz(tech, "mean_reversion_signal", 0)) > 0.3:
             strategy_sources.append("mean_reversion_3.9")
-        if fund.get("earnings_momentum", 0) > 0.2:
+        if nz(fund, "earnings_momentum", 0) > 0.2:
             strategy_sources.append("earnings_momentum_3.2")
-        if abs(fund.get("value_score", 0)) > 0.3:
+        if abs(nz(fund, "value_score", 0)) > 0.3:
             strategy_sources.append("value_factor_3.3")
         if macro.get("macro_regime") in ["RISK_ON", "RISK_OFF"]:
             strategy_sources.append("macro_momentum_19.2")
-        if sent.get("news_sentiment") and abs(sent.get("news_sentiment", 0)) > 0.2:
+        if abs(nz(sent, "news_sentiment", 0)) > 0.2:
             strategy_sources.append("sentiment_nlp_18.3")
         if not strategy_sources:
             strategy_sources = ["multi_factor_alpha_3.20"]
@@ -475,9 +519,9 @@ Output JSON only."""
         lean = "BULLISH" if probability_score >= 50 else "BEARISH"
         reasoning_chain = [
             f"Probability assessment: {probability_score:.0f}% {lean} ({bullish_pct:.0f}% bull / {bearish_pct:.0f}% bear)",
-            f"Technical: EMA crossover {tech.get('ema_crossover', 'N/A')}, RSI {tech.get('rsi', 50):.0f}",
-            f"Fundamental: Earnings momentum {fund.get('earnings_momentum', 0):+.2f}, value score {fund.get('value_score', 0):+.2f}",
-            f"Sentiment: News {sent.get('news_sentiment', 0):+.2f}, social {sent.get('social_sentiment', 0):+.2f}",
+            f"Technical: EMA crossover {tech.get('ema_crossover', 'N/A')}, RSI {nz(tech, 'rsi', 50):.0f}",
+            f"Fundamental: Earnings momentum {nz(fund, 'earnings_momentum', 0):+.2f}, value score {nz(fund, 'value_score', 0):+.2f}",
+            f"Sentiment: News {nz(sent, 'news_sentiment', 0):+.2f}, social {nz(sent, 'social_sentiment', 0):+.2f}",
             f"Macro regime: {macro.get('macro_regime', 'N/A')}, Fed {macro.get('fed_stance', 'N/A')}",
             f"Research target {research_target:{fmt}} (+{target_pct:.1f}%), invalidation below {invalidation_level:{fmt}}",
             f"Potential R/R: {risk_reward_ratio:.1f}:1",
