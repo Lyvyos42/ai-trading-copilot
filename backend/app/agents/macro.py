@@ -204,9 +204,18 @@ Output JSON only."""
         yc_trend = yc_info.get("trend", "")
         yield_curve_inverted = (yc_val is not None and yc_val < 0) or (yc_trend == "INVERTED")
 
-        # 5. Unemployment trend
+        # 5. Unemployment trend.
+        #
+        # Both directions are read. Rising unemployment used to be a risk-off
+        # reason with no risk-on counterpart, so a labour market that was
+        # visibly improving contributed nothing while a deteriorating one
+        # voted SHORT. That is the same one-sided-ledger defect that produced
+        # 50 consecutive shorts, in miniature: with every other indicator
+        # neutral, RISING returned RISK_OFF/SHORT at 55 while FALLING returned
+        # TRANSITIONAL/NEUTRAL at 50.
         unemp_info = fred_data.get("unemployment", {})
         unemp_rising = unemp_info.get("trend") == "RISING"
+        unemp_falling = unemp_info.get("trend") == "FALLING"
 
         # 6. Regime evaluation: symmetric comparison grounded in verified indicators
         risk_off_reasons = []
@@ -234,6 +243,8 @@ Output JSON only."""
             risk_on_reasons.append("expansionary_gdp")
         if yc_val is not None and yc_val > 0.5:
             risk_on_reasons.append("steep_yield_curve")
+        if unemp_falling:
+            risk_on_reasons.append("falling_unemployment")
         if avg_sent > 0.1:
             risk_on_reasons.append("bullish_news_sentiment")
 
