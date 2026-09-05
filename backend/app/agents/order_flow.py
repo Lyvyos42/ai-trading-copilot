@@ -181,8 +181,21 @@ Assess VPIN, bid/ask imbalance, and block trade activity. Output JSON only."""
 
         dark_pool = "HIGH" if vol_ratio > 1.8 else ("MODERATE" if vol_ratio > 1.2 else "LOW")
 
-        # Smart money flow composite
-        smf = ba_imbalance * 0.4 + (1 if obv_trend == "RISING" else -1) * 0.3
+        # Smart money flow composite.
+        #
+        # The OBV term was a CONSTANT +/-0.3 that dominated everything else:
+        # ba_imbalance is vwap_dev/2 and typically runs 0.05-0.2, so the
+        # composite landed near +/-0.15 on essentially every symbol and
+        # confidence came out at 56-58 every time. Measured on BTC-USD,
+        # ETH-USD, EURUSD and GBPUSD it returned 56, 56, 58, 58 - four
+        # instruments, effectively one number.
+        #
+        # The OBV term is now scaled by how far volume is from its own
+        # average, so a trend confirmed on heavy participation counts for more
+        # than one drifting on nothing.
+        _obv_dir = 1 if obv_trend == "RISING" else (-1 if obv_trend == "FALLING" else 0)
+        _obv_conviction = min(1.0, max(0.15, abs(vol_ratio - 1.0) * 1.5))
+        smf = ba_imbalance * 0.4 + _obv_dir * 0.45 * _obv_conviction
         smf = max(-1.0, min(1.0, smf))
 
         composite = smf * 0.5 + ba_imbalance * 0.3 + (vpin - 0.5) * 0.2

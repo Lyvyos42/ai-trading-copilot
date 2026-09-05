@@ -154,9 +154,32 @@ class TechnicalAnalyst(BaseAgent):
         elif zscore > 2:
             signals.append(-1)  # Mean reversion short
 
+        # Composite from signal AGREEMENT, confidence from signal STRENGTH.
+        #
+        # This used to be `sum(signals) / len(signals)` over +/-1 votes, which
+        # can only take a handful of discrete values - and whenever every
+        # component agreed it returned exactly 1.0, so confidence pinned to
+        # exactly 85. Measured across AAPL, NVDA, EURUSD and GBPUSD, this agent
+        # returned 85 on all four: the number carried no information beyond
+        # "the signs agree", and identical confidences on unrelated
+        # instruments were a large part of why signals looked interchangeable.
+        #
+        # Direction still comes from agreement. Confidence now scales with how
+        # far the underlying measurements actually are from neutral, so a
+        # marginal setup and a screaming one no longer report the same number.
         composite = sum(signals) / max(len(signals), 1)
         direction = "LONG" if composite > 0.2 else ("SHORT" if composite < -0.2 else "NEUTRAL")
-        confidence = min(92, max(30, 50 + composite * 35))
+
+        # Magnitudes, each normalised to roughly 0-1 over its useful range.
+        _rsi_extremity = min(1.0, abs(rsi - 50) / 30.0)          # 50 -> 0, 20/80 -> 1
+        _mom_strength = min(1.0, abs(momentum) / 0.25)            # 25% move -> 1
+        _rev_strength = min(1.0, abs(zscore) / 3.0)               # 3 sigma -> 1
+        _ema_gap = min(1.0, abs(ema12 - ema26) / max(abs(ema26), 1e-9) / 0.05)
+        strength = (_rsi_extremity + _mom_strength + _rev_strength + _ema_gap) / 4.0
+
+        # Agreement gates it: unanimous but weak should not outrank split but
+        # extreme, and neither should reach the ceiling on its own.
+        confidence = min(92, max(30, 40 + abs(composite) * 25 + strength * 27))
 
         trend = "BULLISH" if ema12 > ema26 and momentum > 0 else ("BEARISH" if ema12 < ema26 and momentum < 0 else "SIDEWAYS")
 

@@ -110,7 +110,20 @@ class SentimentAnalyst(BaseAgent):
             "has_news": True,
         }
 
-        return await self._analyze_with_live_news(ticker, market_data, enriched_ctx, strategy_ctx)
+        # Declare whether this read is actually ABOUT this symbol.
+        #
+        # With no direct ticker mentions the agent is scoring the same
+        # market-wide headline pool the macro agent reads, so its vote is not
+        # an independent second opinion - it is the same opinion counted
+        # twice. BTC-USD showed "0 direct mentions" while sentiment still
+        # voted, and BTC/ETH and EURUSD/GBPUSD came back with identical
+        # signals partly because of it. The trader pools votes flagged this
+        # way; see MARKET_WIDE_POOL_WEIGHT.
+        result = await self._analyze_with_live_news(ticker, market_data, enriched_ctx, strategy_ctx)
+        if isinstance(result, dict):
+            result["symbol_specific"] = bool(ticker_hl)
+            result["ticker_mention_count"] = len(ticker_hl)
+        return result
 
     # ── Live news path ────────────────────────────────────────────────────────
 

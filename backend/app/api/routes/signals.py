@@ -26,6 +26,7 @@ from app.pipeline.graph import run_pipeline
 from app.data.market_data import resolve_ticker, resolve_asset_class, _fetch_rest_spot_price, _fetch_tv_ta_spot
 from app.services.market_hours import market_status
 from app.services.signal_resolver import resolve_open_signals, window_to_hours
+from app.services import decision_log
 
 
 # Shared with the auto-scanner and the resolver so every code path agrees on
@@ -330,6 +331,14 @@ async def generate_signal(
         _reasons = (final.get("status_reasons")
                     or final.get("risk_gate_reasons")
                     or ["The pipeline did not reach a directional view."])
+        # Record the decline. This is the case that used to vanish entirely -
+        # the pipeline did full work, declined, and left nothing to measure.
+        await decision_log.record(
+            db, state=state, final=final, ticker=ticker,
+            asset_class=resolved_asset_class, timeframe=body.timeframe,
+            profile=profile_slug, origin="manual",
+            user_id=(user.get("sub") or user.get("id") or user.get("user_id")) if user else None,
+        )
         return {
             "signal_id": None,
             "ticker": ticker,
@@ -562,6 +571,13 @@ async def generate_signal(
                     "profile": profile_slug,
                 },
             ))
+
+    await decision_log.record(
+        db, state=state, final=final, ticker=ticker,
+        asset_class=resolved_asset_class, timeframe=body.timeframe,
+        profile=profile_slug, origin="manual", user_id=user_id,
+        signal_id=signal_id,
+    )
 
     return result
 

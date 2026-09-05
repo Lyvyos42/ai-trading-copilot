@@ -1,7 +1,7 @@
 import uuid
 import json as _json
 from datetime import datetime, timedelta
-from sqlalchemy import String, Float, DateTime, func, ForeignKey, Text
+from sqlalchemy import String, Float, Integer, DateTime, func, ForeignKey, Text
 from sqlalchemy.types import TypeDecorator, TEXT
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
@@ -64,3 +64,57 @@ class Signal(Base):
     signal_mode: Mapped[str | None] = mapped_column(String(20), nullable=True, default="AI")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expiry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class SignalDecision(Base):
+    """EVERY pipeline run, including the ones that produced no signal.
+
+    The Signal table deliberately holds only tradeable results: rejections
+    used to be written there and refilled Signal History within a minute of
+    any RESET, which is why persisting them was removed.
+
+    But that left no record of the decisions themselves, and a signal engine
+    cannot be evaluated from its successes alone. How often does it decline?
+    Which analysts abstain, on which asset classes? Did a change raise the
+    signal rate or just move the threshold? Are two symbols producing
+    identical votes? None of that is answerable from a table of accepted
+    signals.
+
+    So this is the AUDIT LOG, separate from the product surface. It is
+    append-only, never shown to users, and never counted in the track record.
+    One row per pipeline run, whatever the outcome.
+    """
+    __tablename__ = "signal_decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    ticker: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    asset_class: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    timeframe: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    profile: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # "manual" (a user pressed Analyze) or "auto_scan"
+    origin: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+
+    # What came out. status is NO_SIGNAL, FILTERED, RISK_GATE_BLOCKED or ACTIVE.
+    status: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
+    direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    probability_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # How the decision was reached: every analyst's direction and confidence,
+    # who abstained, how many formed a directional view, and which optional
+    # data sources were unavailable for this run.
+    agent_votes: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
+    abstained: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
+    directional_votes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status_reasons: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
+    degraded_sources: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
+    data_source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    # Set only when the run produced a tradeable signal, so a decision can be
+    # joined to its eventual outcome.
+    signal_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    entry_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

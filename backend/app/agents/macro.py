@@ -36,6 +36,66 @@ Respond ONLY with a valid JSON object:
 The "key_news_drivers" field must list the 2-3 real headlines that most shaped your regime assessment."""
 
 
+# One macro regime does NOT mean one direction.
+#
+# Until now this agent emitted a single direction for the whole market, so
+# every symbol in a scan received an identical macro vote. That is how EURUSD
+# and GBPUSD came back with byte-identical signals, and BTC-USD and ETH-USD
+# likewise: two of the four voters were the same market-wide opinion applied
+# undifferentiated.
+#
+# A risk-off regime is not bearish for everything. It is bearish for equities,
+# crypto and high-beta currencies, and BULLISH for the classic havens - gold,
+# the dollar, the yen, the franc, Treasuries. Translating one regime through
+# the asset being analysed produces genuine per-symbol differentiation from a
+# single honest macro read, rather than manufacturing diversity that is not
+# there.
+_HAVEN_PREFIXES = ("XAU", "XAG", "XPT")          # precious metals
+_HAVEN_CCY = ("USD", "JPY", "CHF")               # funding / safe-haven currencies
+_HIGH_BETA_CCY = ("AUD", "NZD", "ZAR", "MXN", "TRY", "BRL", "NOK", "SEK")
+
+
+def _risk_off_bias(ticker: str, asset_class: str) -> int:
+    """+1 if a RISK-OFF regime is BULLISH for this instrument, -1 if bearish.
+
+    Returns 0 when the mapping is genuinely ambiguous, in which case the macro
+    agent declines to take a directional view on this symbol rather than
+    guessing - a cross like EURGBP has no clean haven interpretation.
+    """
+    t = (ticker or "").upper().replace("=X", "").replace("-USD", "")
+
+    if any(t.startswith(p) for p in _HAVEN_PREFIXES):
+        return +1                                  # gold rallies in risk-off
+    if asset_class in ("crypto",):
+        return -1                                  # crypto trades as high beta
+    if asset_class in ("stocks", "etfs", "indices", "futures"):
+        return -1                                  # equities sell off
+    if asset_class == "fixed_income":
+        return +1                                  # bonds bid
+
+    if asset_class == "fx" and len(t) == 6:
+        base, quote = t[:3], t[3:]
+        base_haven = base in _HAVEN_CCY
+        quote_haven = quote in _HAVEN_CCY
+        base_beta = base in _HIGH_BETA_CCY
+        quote_beta = quote in _HIGH_BETA_CCY
+        # The pair rises when the BASE strengthens.
+        if base_haven and not quote_haven:
+            return +1
+        if quote_haven and not base_haven:
+            return -1
+        if base_beta and not quote_beta:
+            return -1
+        if quote_beta and not base_beta:
+            return +1
+        return 0                                   # haven-vs-haven, or neither
+
+    if asset_class == "commodities":
+        return -1                                  # industrial demand proxy
+
+    return 0
+
+
 class MacroAnalyst(BaseAgent):
     def __init__(self):
         super().__init__("MacroAnalyst", tier="standard")
@@ -157,12 +217,14 @@ Output JSON only."""
                 pass
 
         return self._derive_from_macro_and_news(
-            ticker, macro_hl, geo_hl, crisis_hl, avg_sent, geo_risk_est, fred_data
+            ticker, macro_hl, geo_hl, crisis_hl, avg_sent, geo_risk_est, fred_data,
+            asset_class,
         )
 
     def _derive_from_macro_and_news(
         self, ticker: str, macro_hl: list, geo_hl: list, crisis_hl: list,
-        avg_sent: float, geo_risk: float, fred_data: dict
+        avg_sent: float, geo_risk: float, fred_data: dict,
+        asset_class: str = "stocks",
     ) -> dict:
         """Deterministic derivation using verified FRED indicators and news headlines."""
         all_text = " ".join(macro_hl + geo_hl + crisis_hl).lower()
@@ -251,15 +313,29 @@ Output JSON only."""
         risk_off = len(risk_off_reasons)
         risk_on = len(risk_on_reasons)
 
+        # The regime is market-wide; the DIRECTION is per-instrument.
+        # See _risk_off_bias: risk-off is bearish for equities and crypto and
+        # bullish for gold, the dollar and the yen, so one honest macro read
+        # now produces different calls for different assets instead of the
+        # same vote on every symbol in a scan.
+        bias = _risk_off_bias(ticker, asset_class)
         if risk_off > risk_on:
-            regime, direction = "RISK_OFF", "SHORT"
-            confidence = min(70.0, 50.0 + (risk_off - risk_on) * 5.0)
+            regime, strength = "RISK_OFF", risk_off - risk_on
         elif risk_on > risk_off:
-            regime, direction = "RISK_ON", "LONG"
-            confidence = min(70.0, 50.0 + (risk_on - risk_off) * 5.0)
+            regime, strength = "RISK_ON", risk_on - risk_off
         else:
-            regime, direction = "TRANSITIONAL", "NEUTRAL"
+            regime, strength = "TRANSITIONAL", 0
+
+        if regime == "TRANSITIONAL" or bias == 0:
+            # No regime, or no clean read for this instrument - a haven-vs-haven
+            # cross like USDCHF has no unambiguous risk-off interpretation, and
+            # guessing one would be exactly the fabrication we removed.
+            direction = "NEUTRAL"
             confidence = 50.0
+        else:
+            lean = bias if regime == "RISK_OFF" else -bias
+            direction = "LONG" if lean > 0 else "SHORT"
+            confidence = min(70.0, 50.0 + strength * 5.0)
 
         events = []
         if "fomc" in all_text or "federal reserve" in all_text:
@@ -287,6 +363,8 @@ Output JSON only."""
         reasoning = (
             f"Macro regime from real data ({evidence_str}): {regime}. "
             f"Fed stance: {fed_stance}. Inflation: {inflation}. GDP: {gdp}. "
+            f"For {ticker} ({asset_class}) this regime reads {direction} - "
+            f"{'treated as a haven' if bias > 0 else 'treated as a risk asset' if bias < 0 else 'no clean haven mapping, so no directional call'}. "
             f"Signals favoring risk-off: {risk_off} ({', '.join(risk_off_reasons) or 'none'}), "
             f"risk-on: {risk_on} ({', '.join(risk_on_reasons) or 'none'}). "
             f"{'Crisis headlines present. ' if crisis_hl else ''}"

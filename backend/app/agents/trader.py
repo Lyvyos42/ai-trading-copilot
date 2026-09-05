@@ -128,7 +128,21 @@ class TraderAgent(BaseAgent):
         # to happen and which quietly manufactured a vote for every agent
         # whose output was missing a field.
         all_analyses = [fund, tech, sent, macro, oflow, regime, corr]
+
+        # Market-wide opinions are pooled, not counted as independent votes.
+        #
+        # Two agents read the same global news feed: macro always, and
+        # sentiment whenever a symbol has no direct coverage. Counting both in
+        # full made one market view weigh as two analysts, which is how
+        # EURUSD and GBPUSD - and BTC-USD and ETH-USD - came back with
+        # byte-identical votes and identical probabilities to one decimal.
+        #
+        # An opinion that is not about THIS instrument still carries
+        # information, so it is not discarded; the whole market-wide group is
+        # capped at the weight of a single symbol-specific analyst. Diversity
+        # has to come from agents that actually looked at this symbol.
         votes = []
+        market_wide = []
         for analysis in all_analyses:
             if not analysis or analysis.get("abstained"):
                 continue
@@ -136,7 +150,21 @@ class TraderAgent(BaseAgent):
             c = analysis.get("confidence", 0)
             if c <= 0:
                 continue
-            votes.append((d, c))
+            if analysis.get("symbol_specific") is False:
+                market_wide.append((d, c))
+            else:
+                votes.append((d, c))
+
+        if market_wide:
+            # Net the pooled group, then admit it as ONE vote whose confidence
+            # is the group's average scaled by the cap.
+            _long = sum(c for d, c in market_wide if d == "LONG")
+            _short = sum(c for d, c in market_wide if d == "SHORT")
+            if _long != _short:
+                _dir = "LONG" if _long > _short else "SHORT"
+                _conf = (max(_long, _short) / len(market_wide)) * self.MARKET_WIDE_POOL_WEIGHT
+                if _conf > 0:
+                    votes.append((_dir, _conf))
 
         # How many analysts actually formed a directional opinion. This is the
         # number that decides whether there is a signal at all.
@@ -323,6 +351,11 @@ Output JSON only."""
     # Minimum analysts that must have data AND a direction before a signal
     # is published at all. See the NO_SIGNAL branch below.
     MIN_DIRECTIONAL_VOTES = 2
+
+    # How much the pooled market-wide group counts for, relative to one
+    # symbol-specific analyst. Below 1.0 because an opinion formed without
+    # looking at the instrument should not outweigh one that did.
+    MARKET_WIDE_POOL_WEIGHT = 0.7
 
     # Profile → analytical window and ATR multipliers
     _PROFILE_PARAMS = {

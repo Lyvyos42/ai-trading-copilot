@@ -289,6 +289,19 @@ async def _generate_signal_for_user(
             log.warning("auto_scan_pipeline_empty", ticker=ticker)
             return None
 
+        # A scan that declines is as informative as one that fires - more so
+        # while the abstention thresholds are being tuned - so it is recorded
+        # before the early return below discards it.
+        if final.get("status") == "NO_SIGNAL" or final.get("direction") not in ("LONG", "SHORT"):
+            from app.services import decision_log
+            async with AsyncSessionLocal() as session:
+                await decision_log.record(
+                    session, state=state, final=final, ticker=ticker,
+                    asset_class=asset_class, profile=profile,
+                    origin="auto_scan", user_id=user_id,
+                )
+            return None
+
         signal_direction = final.get("direction", direction)
         if signal_direction not in ("LONG", "SHORT"):
             signal_direction = direction
@@ -355,6 +368,17 @@ async def _generate_signal_for_user(
             session.add(signal)
             await session.commit()
             await session.refresh(signal)
+
+        # Audit trail. The scanner is the highest-volume caller of the
+        # pipeline, so most of what there is to learn about the engine's
+        # behaviour happens here rather than on a manual Analyze click.
+        from app.services import decision_log
+        async with AsyncSessionLocal() as session:
+            await decision_log.record(
+                session, state=state, final=final, ticker=ticker,
+                asset_class=asset_class, profile=profile, origin="auto_scan",
+                user_id=user_id, signal_id=str(signal.id),
+            )
 
         return signal
 
