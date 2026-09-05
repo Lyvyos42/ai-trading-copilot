@@ -87,6 +87,10 @@ export function TradingCanvasHUD({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // The picker is portalled to document.body to escape the ribbon's
+  // overflow-x-auto and the dashboard's overflow-hidden, so it needs an
+  // anchor element to measure its position from.
+  const addSymbolRef = useRef<HTMLButtonElement>(null);
 
   // Save pinned tabs to localStorage, and tell the parent.
   //
@@ -231,6 +235,7 @@ export function TradingCanvasHUD({
           {/* Add Symbol / Search Dialog Button */}
           <div className="relative">
             <button
+              ref={addSymbolRef}
               onClick={() => setSearchOpen(!searchOpen)}
               className={cn(
                 "flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono border transition-colors",
@@ -252,14 +257,13 @@ export function TradingCanvasHUD({
                  backend has carried 283 instruments across 11 asset classes
                  all along; SymbolPicker reads them. Multi-add keeps the panel
                  open so several can be pinned in one pass. */
-              <div className="absolute left-0 top-full mt-1.5 z-50 animate-fade-in">
-                <SymbolPicker
-                  selected={pinnedTabs}
-                  multi
-                  onSelect={handleSelectSymbol}
-                  onClose={() => setSearchOpen(false)}
-                />
-              </div>
+              <SymbolPicker
+                anchorRef={addSymbolRef}
+                selected={pinnedTabs}
+                multi
+                onSelect={handleSelectSymbol}
+                onClose={() => setSearchOpen(false)}
+              />
             )}
           </div>
         </div>

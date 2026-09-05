@@ -13,7 +13,8 @@
  * it, grouped by sub-category, with the full name beside every ticker. Typing
  * still works and now filters the real catalogue rather than eleven entries.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, Check, Loader2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,10 @@ interface AssetClass {
 }
 
 interface SymbolPickerProps {
+  /** The element to hang the panel under. Required, because the panel is
+   *  PORTALLED to document.body and therefore has no layout relationship to
+   *  its trigger any more - see the note on positioning below. */
+  anchorRef?: React.RefObject<HTMLElement | null>;
   /** Already on the watchlist - shown ticked, and re-clicking removes. */
   selected?: string[];
   onSelect: (symbol: string) => void;
@@ -41,7 +46,8 @@ interface SymbolPickerProps {
   multi?: boolean;
 }
 
-export function SymbolPicker({ selected = [], onSelect, onClose, multi = true }: SymbolPickerProps) {
+export function SymbolPicker({ selected = [], onSelect, onClose, multi = true,
+                               anchorRef }: SymbolPickerProps) {
   const [all, setAll] = useState<CatalogSymbol[]>([]);
   const [classes, setClasses] = useState<AssetClass[]>([]);
   const [activeClass, setActiveClass] = useState<string>("");
@@ -107,8 +113,67 @@ export function SymbolPicker({ selected = [], onSelect, onClose, multi = true }:
 
   const isOn = (sym: string) => selected.includes(sym);
 
-  return (
-    <div className="w-[26rem] max-w-[92vw] rounded-md border border-border/80 bg-surface-3 shadow-2xl z-50 flex flex-col max-h-[28rem]">
+  // PORTALLED, because absolute positioning could not escape its containers.
+  //
+  // The trigger sits inside TradingCanvasHUD's ribbon row, which is
+  // `overflow-x-auto` - and a scroll container on one axis clips the other
+  // too - and that row sits inside the dashboard's `overflow-hidden` chart
+  // column. An absolutely positioned dropdown is cut off by BOTH: the search
+  // box rendered, everything below it was clipped away, and the picker looked
+  // like it had loaded nothing.
+  //
+  // Rendering into document.body escapes every overflow ancestor. The cost is
+  // that the panel no longer inherits its position from the trigger, so it is
+  // measured from the anchor's bounding rect and re-measured on scroll and
+  // resize.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useLayoutEffect(() => {
+    if (!anchorRef?.current) return;
+    const place = () => {
+      const a = anchorRef.current?.getBoundingClientRect();
+      if (!a) return;
+      const W = 416;              // matches w-[26rem]
+      const margin = 8;
+      // Keep it on screen when the trigger is near the right edge.
+      const left = Math.max(margin, Math.min(a.left, window.innerWidth - W - margin));
+      setPos({ top: a.bottom + 6, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);   // capture: inner scrollers too
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [anchorRef]);
+
+  // Escape, and clicks outside both the panel and its trigger.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose?.(); };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (panelRef.current?.contains(t)) return;
+      if (anchorRef?.current?.contains(t)) return;   // let the trigger toggle
+      onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [onClose, anchorRef]);
+
+  const panel = (
+    <div
+      ref={panelRef}
+      style={pos ? { position: "fixed", top: pos.top, left: pos.left } : { position: "fixed", visibility: "hidden" }}
+      className="w-[26rem] max-w-[92vw] rounded-md border border-border/80 bg-surface-3 shadow-2xl z-[200] flex flex-col max-h-[28rem]">
       {/* Search */}
       <div className="p-2 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-1 border border-border/50">
@@ -228,4 +293,8 @@ export function SymbolPicker({ selected = [], onSelect, onClose, multi = true }:
       </div>
     </div>
   );
+
+  // document.body does not exist during SSR, so the portal waits for mount.
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(panel, document.body);
 }
