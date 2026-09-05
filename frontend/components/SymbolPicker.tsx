@@ -170,10 +170,23 @@ export function SymbolPicker({ selected = [], onSelect, onClose, multi = true,
   }, [onClose, anchorRef]);
 
   const panel = (
+    <>
+      {/* Backdrop, because the chart is an IFRAME.
+          Clicking inside a cross-origin iframe does not deliver mousedown to
+          the parent document at all, so the outside-click handler below never
+          fired when clicking on the chart - the panel simply would not close.
+          A transparent full-screen layer beneath the panel catches those
+          clicks before they reach the iframe. It is the only way to close on
+          a chart click without control of the iframe's contents. */}
+      <div
+        className="fixed inset-0 z-[199]"
+        onMouseDown={() => onClose?.()}
+        aria-hidden
+      />
     <div
       ref={panelRef}
       style={pos ? { position: "fixed", top: pos.top, left: pos.left } : { position: "fixed", visibility: "hidden" }}
-      className="w-[26rem] max-w-[92vw] rounded-md border border-border/80 bg-surface-3 shadow-2xl z-[200] flex flex-col max-h-[28rem]">
+      className="w-[26rem] max-w-[92vw] rounded-md border border-border/80 bg-surface-3 shadow-2xl z-[200] flex flex-col max-h-[28rem] backdrop-blur-none">
       {/* Search */}
       <div className="p-2 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-1 border border-border/50">
@@ -292,6 +305,7 @@ export function SymbolPicker({ selected = [], onSelect, onClose, multi = true,
         {multi && selected.length > 0 && ` · ${selected.length} on watchlist`}
       </div>
     </div>
+    </>
   );
 
   // document.body does not exist during SSR, so the portal waits for mount.

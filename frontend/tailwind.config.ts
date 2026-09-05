@@ -9,6 +9,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // The elevation ladder. globals.css defined --surface-0..4 and a set
+        // of PLAIN classes (.surface-1 etc), but never registered "surface"
+        // with Tailwind - so the 93 uses of bg-surface-N across the app
+        // resolved to no background at all. Most looked fine because their
+        // parent had one; anything portalled to document.body, like
+        // SymbolPicker, rendered fully transparent over the chart.
+        surface: {
+          0: "hsl(var(--surface-0))",
+          1: "hsl(var(--surface-1))",
+          2: "hsl(var(--surface-2))",
+          3: "hsl(var(--surface-3))",
+          4: "hsl(var(--surface-4))",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
