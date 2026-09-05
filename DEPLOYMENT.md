@@ -55,7 +55,7 @@
 6. Click **Create Web Service** — Render will build and deploy.
 7. Once live, your backend URL will be:
    ```
-   https://ai-trading-copilot-api.onrender.com
+   https://ai-trading-copilot-api-xbvl.onrender.com
    ```
 
 ---
@@ -69,8 +69,8 @@
 
    | Key | Value |
    |-----|-------|
-   | `NEXT_PUBLIC_API_URL` | `https://ai-trading-copilot-api.onrender.com` |
-   | `NEXT_PUBLIC_WS_URL` | `wss://ai-trading-copilot-api.onrender.com` |
+   | `NEXT_PUBLIC_API_URL` | `https://ai-trading-copilot-api-xbvl.onrender.com` |
+   | `NEXT_PUBLIC_WS_URL` | `wss://ai-trading-copilot-api-xbvl.onrender.com` |
 
 3. Push the `frontend/` folder to GitHub (same repo, or a new one).
 4. In Vercel, connect the repo and set **Root Directory** to `frontend`.
