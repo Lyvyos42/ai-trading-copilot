@@ -75,6 +75,65 @@ def _pick_interval(start: datetime, now: datetime, window_hours: int = 24) -> st
     return "1d"
 
 
+# The coarsest bar allowed to resolve a signal of a given horizon.
+#
+# A bar cannot measure a distance smaller than its own range, and it cannot
+# say WHEN inside itself the price got there. Resolving a 30-minute signal on
+# a daily bar is not an approximation, it is a different question: the bar
+# covers hours the signal did not exist for.
+_MAX_INTERVAL_FOR_WINDOW = [
+    # (window_hours_at_most, coarsest interval, its length in seconds)
+    (2,    "5m",  300),
+    (8,    "30m", 1800),
+    (48,   "1h",  3600),
+    (10**6, "1d", 86400),
+]
+
+_INTERVAL_SECONDS_MAP = {"1m": 60, "5m": 300, "30m": 1800, "1h": 3600, "1d": 86400}
+
+
+def _allowed_intervals(window_hours: int, start: datetime, now: datetime) -> list[str]:
+    """Intervals to try, finest first, none coarser than the horizon allows.
+
+    The old fallback was `if not bars: retry with "1d"`, unconditionally. When
+    Yahoo has no intraday bars yet - which is the normal state for the first
+    minutes after the FX week opens on Sunday - a 5-30 MINUTE signal was being
+    resolved against a bar spanning the whole session. Measured at the Sunday
+    open on 2026-09-06: USDJPY's daily bar spanned 38 pips and EURJPY's 86,
+    against an 11-pip invalidation. Both resolved LOSS on the first look.
+    AUDUSD, whose daily bar happened to span only 9 pips, stayed pending -
+    which is why the same two symbols failed twice and the third never did.
+
+    Falling back to a coarser bar trades a missing answer for a wrong one.
+    Returning nothing leaves the signal ACTIVE, which is what it is.
+    """
+    coarsest = "1d"
+    for max_hours, interval, _secs in _MAX_INTERVAL_FOR_WINDOW:
+        if window_hours <= max_hours:
+            coarsest = interval
+            break
+    limit = _INTERVAL_SECONDS_MAP[coarsest]
+
+    preferred = _pick_interval(start, now, window_hours)
+    order = ["1m", "5m", "30m", "1h", "1d"]
+    if preferred in order:
+        order = [preferred] + [i for i in order if i != preferred]
+
+    out, seen = [], set()
+    for iv in order:
+        if _INTERVAL_SECONDS_MAP[iv] <= limit and iv not in seen:
+            # Yahoo retention: 1m ~7d, 5m ~60d. Asking beyond it returns
+            # nothing and wastes a request.
+            age_days = (now - start).total_seconds() / 86400
+            if iv == "1m" and age_days > 6:
+                continue
+            if iv == "5m" and age_days > 55:
+                continue
+            out.append(iv)
+            seen.add(iv)
+    return out or ["1d"]
+
+
 def _fetch_bars_sync(symbol: str, start: datetime, end: datetime, interval: str) -> list[tuple[datetime, float, float, float]]:
     """Fetch (timestamp, high, low, close) bars from the Yahoo chart REST API."""
     safe = _urlpar.quote(symbol, safe="=^.")
@@ -238,15 +297,41 @@ async def resolve_signal(signal: Signal, now: datetime) -> dict | None:
     if end <= start:
         end = start + timedelta(hours=1)
 
-    interval = _pick_interval(start, now,
-                              window_to_hours(signal.analytical_window))
-    bars = await fetch_bars(signal.ticker, start, end, interval)
-    # Daily bars are always available — fall back when the fine interval is empty.
-    if not bars and interval != "1d":
-        bars = await fetch_bars(signal.ticker, start, end, "1d")
-    # Only count bars that opened at or after the signal existed.
-    bars = [b for b in bars if b[0] >= start]
-    return resolve_against_bars(signal, bars, now)
+    window_hours = window_to_hours(signal.analytical_window)
+
+    bars: list = []
+    used_interval = None
+    for interval in _allowed_intervals(window_hours, start, now):
+        candidate = await fetch_bars(signal.ticker, start, end, interval)
+        # Only count bars that opened at or after the signal existed.
+        #
+        # This filter is necessary but NOT sufficient on its own: Yahoo stamps
+        # the bar still forming at the CURRENT time rather than at the period
+        # it covers, so an in-progress daily bar arrives stamped "now" while
+        # its high and low describe the whole session. The interval cap above
+        # is what actually contains that - one minute of slop on a 1m bar is
+        # nothing, a whole day of it is the bug.
+        candidate = [b for b in candidate if b[0] >= start]
+        if candidate:
+            bars, used_interval = candidate, interval
+            break
+
+    if not bars:
+        # Nothing usable at an honest granularity. The signal stays ACTIVE
+        # rather than being scored against a bar that cannot answer.
+        log.debug("resolver_no_usable_bars", ticker=signal.ticker,
+                  window_hours=window_hours)
+        return None
+
+    result = resolve_against_bars(signal, bars, now)
+    # Recorded in the log rather than on the row: every key in the returned
+    # dict is setattr'd onto the Signal, and a name that is not a column would
+    # be silently attached as a plain attribute.
+    if result and result.get("outcome"):
+        log.info("signal_resolved", ticker=signal.ticker,
+                 outcome=result["outcome"], interval=used_interval,
+                 bars=len(bars))
+    return result
 
 
 async def resolve_open_signals(
