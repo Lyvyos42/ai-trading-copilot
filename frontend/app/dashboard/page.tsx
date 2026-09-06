@@ -170,6 +170,11 @@ export default function DashboardPage() {
   }
 
   // Load signals from API
+  // Set once the symbol on screen is the user's doing - either because they
+  // picked it, or because the opening default has already been applied. It
+  // stops the 30-second refresh from reasserting a default over a choice.
+  const pickedTickerRef = useRef(false);
+
   const loadData = useCallback(async () => {
     const [sigs, agentData] = await Promise.allSettled([listSignals(20), getAgentStatus()]);
     if (sigs.status === "fulfilled") {
@@ -204,13 +209,31 @@ export default function DashboardPage() {
         });
       });
 
-      if (activeOnly.length > 0 && !selectedSignal) {
-        const matchActive = activeOnly.find((s) => s.ticker.toUpperCase() === activeTicker.toUpperCase());
+      // Keep the signal panel in step with the symbol on screen.
+      //
+      // This used to reach for activeOnly[0] and CHANGE THE SYMBOL whenever
+      // the selected one had no signal. loadData runs every 30 seconds, so
+      // choosing a symbol without an active setup - XAUUSD, say - held for at
+      // most half a minute before the next poll dragged the chart back to
+      // whichever symbol did have one. The user's own choice lost to a
+      // background refresh, repeatedly, with nothing on screen to explain it.
+      //
+      // A default is only a default on the way in. After that the symbol
+      // belongs to the user, and a symbol with no signal shows no signal
+      // rather than borrowing another symbol's.
+      if (activeOnly.length > 0) {
+        const matchActive = activeOnly.find(
+          (s) => s.ticker.toUpperCase() === activeTicker.toUpperCase()
+        );
         if (matchActive) {
           setSelectedSignal(matchActive);
-        } else {
+          pickedTickerRef.current = true;
+        } else if (!pickedTickerRef.current && !selectedSignal) {
+          pickedTickerRef.current = true;
           setSelectedSignal(activeOnly[0]);
           setActiveTicker(activeOnly[0].ticker);
+        } else {
+          setSelectedSignal(null);
         }
       }
     }
@@ -231,6 +254,7 @@ export default function DashboardPage() {
 
   // Handle Signal Selection from radar or list
   function handleSelectSignal(sig: Signal) {
+    pickedTickerRef.current = true;
     setSelectedSignal(sig);
     setActiveTicker(sig.ticker);
     setAnalysisError(null);
@@ -241,6 +265,7 @@ export default function DashboardPage() {
   function handleSelectTicker(tickerName: string) {
     const clean = tickerName.trim().toUpperCase();
     if (!clean) return;
+    pickedTickerRef.current = true;
     setActiveTicker(clean);
     setAnalysisError(null);
     setMobileTab("chart");

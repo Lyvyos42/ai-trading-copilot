@@ -388,6 +388,90 @@ async def fetch_yahoo(client: httpx.AsyncClient, symbol: str, interval: str,
 
 
 # --------------------------------------------------------------------------
+# Spot FX bars from the CME contract
+# --------------------------------------------------------------------------
+#
+# Yahoo's "=X" FX pairs are an indicative composite stitched from contributors,
+# not a tape, and it shows. Measured on 5 days of 15m bars, counting bars that
+# OPEN more than half the previous bar's range away from its close - which on a
+# contiguous series should be near zero:
+#
+#     BTCUSDT  (Binance, a venue)          0.0%
+#     AAPL     (Yahoo, an exchange tape)   0.8%
+#     XAUUSD   (Yahoo via GC=F, futures)   0.9%
+#     AUDUSD=X (Yahoo FX composite)       24.5%
+#     EURUSD=X (Yahoo FX composite)       17.5%
+#     GBPUSD=X (Yahoo FX composite)        9.9%
+#
+# Every real tape sits at or under 1%. The composite gaps on a quarter of bars,
+# which is what the chart was drawing: holes that are in the feed, not in the
+# market. It is the same defect as the missing volume, from the same cause.
+#
+# The CME contract for the same pair is a real tape - continuously quoted, with
+# real volume - so the BARS come from there and the LEVEL is anchored to spot's
+# own last close, which is the pattern already used for metals (XAUUSD -> GC=F).
+#
+# Only these three: they are the measured wins AND are quoted the same way
+# round as spot. 6J is quoted as JPY per USD (0.00641), the reciprocal of
+# USDJPY, so it would need inverting rather than offsetting - and USDJPY spot
+# gaps on 0.2% of bars, so there is nothing to fix there anyway.
+_FX_FUTURES_PROXY = {
+    "AUDUSD=X": "6A=F", "AUDUSD": "6A=F",
+    "EURUSD=X": "6E=F", "EURUSD": "6E=F",
+    "GBPUSD=X": "6B=F", "GBPUSD": "6B=F",
+}
+
+# Only intraday. The offset is measured once, at the right-hand edge, so it
+# only holds while the basis is roughly constant across the window. Over a
+# session that is true; over a year of daily bars the carry moves and every
+# old bar would be shifted by today's basis.
+_FX_PROXY_INTERVALS = {"1m", "5m", "15m", "30m", "1h"}
+
+
+async def fetch_fx_via_futures(client: httpx.AsyncClient, ticker: str, interval: str,
+                               period: str) -> tuple[list[Candle], Provenance]:
+    fut = _FX_FUTURES_PROXY[ticker.upper()]
+    bars, _ = await fetch_yahoo(client, fut, interval, period, ticker)
+    if not bars:
+        raise ValueError(f"no bars for {fut}")
+
+    # Anchor to spot. The composite is unreliable as a PATH; as a level it is
+    # fine, and it is the number the user expects to see.
+    spot_sym = ticker.upper() if ticker.upper().endswith("=X") else ticker.upper() + "=X"
+    spot, _ = await fetch_yahoo(client, spot_sym, "1d", "5d", ticker)
+    if not spot:
+        raise ValueError(f"no spot reference for {spot_sym}")
+
+    offset = spot[-1]["close"] - bars[-1]["close"]
+    if abs(offset) > spot[-1]["close"] * 0.02:
+        # Too far apart to be a basis. Something is mismatched; do not shift.
+        raise ValueError(
+            f"{ticker}: {fut} sits {offset:.5f} from spot, beyond a plausible basis")
+
+    for b in bars:
+        for k in ("open", "high", "low", "close"):
+            b[k] = round(b[k] + offset, 8)
+
+    return bars, Provenance(
+        source="yahoo",
+        venue=f"CME {fut}, shifted onto spot",
+        is_realtime=False,
+        has_volume=any(b["volume"] > 0 for b in bars),
+        volume_kind=VOL_TRADED,
+        license="consumer_endpoint",
+        quote_currency="USD",
+        requested_symbol=ticker,
+        resolved_symbol=fut,
+        note=(f"Bars from the CME {fut} contract - a real tape - shifted by "
+              f"{offset:+.5f} onto spot's last close. Yahoo's {spot_sym} "
+              f"composite is used for the level only: as a price path it gaps "
+              f"on up to a quarter of bars, which the chart drew as holes in "
+              f"the data. Volume is the futures contract's, not spot's - "
+              f"there is no volume for spot FX anywhere."),
+    )
+
+
+# --------------------------------------------------------------------------
 # Router
 # --------------------------------------------------------------------------
 
@@ -404,11 +488,18 @@ async def fetch(ticker: str, interval: str, period: str, asset_class: str,
         attempts = ["binance", "coinbase"]
     elif asset_class in ("fx", "stocks") and twelvedata_key():
         attempts = ["twelvedata"]
+    elif (asset_class == "fx"
+          and ticker.upper() in _FX_FUTURES_PROXY
+          and interval in _FX_PROXY_INTERVALS):
+        attempts = ["fx_futures"]
 
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         for name in attempts:
             try:
-                if name == "binance":
+                if name == "fx_futures":
+                    candles, prov = await fetch_fx_via_futures(
+                        client, ticker, interval, period)
+                elif name == "binance":
                     candles, prov = await fetch_binance(client, ticker, interval, period)
                 elif name == "coinbase":
                     candles, prov = await fetch_coinbase(client, ticker, interval, period)

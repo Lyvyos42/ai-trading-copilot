@@ -796,7 +796,12 @@ export function OrderFlowChart({
 
       // --- LAYER 5: Institutional Candlesticks Skeleton ---
       ctx.save();
-      const candleBodyW = Math.max(2, Math.min(24, barSpacing * 0.65));
+      // 0.82 of the slot, not 0.65. At 0.65 more than a third of every slot is
+      // empty, which on a 24/5 FX series - where the bars ARE contiguous, 475
+      // of them with no missing 15m step - reads as gaps in the data rather
+      // than as spacing. Platforms sit around 0.8; the remaining sliver is
+      // enough to separate neighbours.
+      const candleBodyW = Math.max(2, Math.min(24, barSpacing * 0.82));
 
       for (let i = 0; i < count; i++) {
         const x = indexToX(i);
