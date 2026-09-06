@@ -17,13 +17,22 @@ interface HeatmapData {
   grid: Float32Array;
   rows: number;
   cols: number;
-  v95: number;
+  /** High percentile of the grid's OWN cells - the normalisation reference. */
+  cellRef: number;
   max: number;
-  rowProfile: Float32Array;
-  rowMax: number;
+  /** False when the feed carries no volume at all (spot FX). */
+  hasVolume: boolean;
   hi: number;
   lo: number;
   step: number;
+}
+
+interface VolumeBubble {
+  index: number;
+  price: number;
+  ratio: number;
+  volume: number;
+  isBull: boolean;
 }
 
 interface SRLevels {
@@ -130,95 +139,175 @@ function computeSRLevels(candles: Candle[]): SRLevels | null {
   };
 }
 
+/**
+ * A rolling profile of activity at price, drawn as a spectrogram.
+ *
+ * Two things this deliberately does not do, both of which the previous
+ * version did.
+ *
+ * IT DOES NOT INVENT VOLUME. Yahoo publishes no volume for spot FX - checked,
+ * 1440 consecutive USDJPY bars, every one of them zero - and `c.volume || 1`
+ * turned that absence into a uniform 1 per bar, which then flowed into the
+ * profile, the bubbles and the depth ladder as though it were data. Where
+ * there is no volume this builds a TIME-at-price profile instead: every bar
+ * contributes equally, which is exactly what a TPO profile is, and is a real
+ * thing rather than a fabricated one. `hasVolume` travels with the result so
+ * the UI can say which of the two it is showing.
+ *
+ * IT DOES NOT NORMALISE AGAINST A DIFFERENT SCALE. Each cell here is an
+ * accumulation over many bars. The old code divided it by v95 - the 95th
+ * percentile of a SINGLE bar's volume - so the ratio was far above 1 almost
+ * everywhere, `min(1, v / v95)` clamped nearly every cell to 1.0, and 1.0 is
+ * the top of the colour ramp: opaque white. That was the white rectangle. It
+ * was wrong on volume-bearing symbols too, just less visibly. The reference
+ * is now a high percentile of the grid itself.
+ */
 function buildHeatmap(candles: Candle[]): HeatmapData | null {
   if (!candles || candles.length < 2) return null;
 
+  const hasVolume = candles.some((c) => (c.volume || 0) > 0);
+
   let hi = -Infinity;
   let lo = Infinity;
-  const vols: number[] = [];
-
-  candles.forEach((c) => {
+  for (const c of candles) {
     if (c.high > hi) hi = c.high;
     if (c.low < lo) lo = c.low;
-    vols.push(c.volume || 1);
-  });
+  }
+  if (!isFinite(hi) || !isFinite(lo) || hi <= lo) return null;
 
-  const range = hi - lo || hi * 0.01 || 1;
-  const pad = range * 0.10;
+  const pad = (hi - lo) * 0.08;
   hi += pad;
   lo -= pad;
 
-  vols.sort((a, b) => a - b);
-  const v95 = vols[Math.floor(vols.length * 0.95)] || 1;
-
-  const rows = 120;
+  const rows = 160;
   const cols = candles.length;
   const step = (hi - lo) / rows;
+  if (step <= 0) return null;
 
-  const synth = new Map<number, number>();
-  candles.forEach((c) => {
-    const mid = (c.high + c.low) / 2;
-    const key = Math.round(mid / step);
-    synth.set(key, (synth.get(key) || 0) + (c.volume || 1));
-  });
+  // The profile decays as it walks forward, so a column shows what was
+  // trading recently rather than the sum of everything that ever happened.
+  // Without the decay the right-hand edge is always the hottest part of the
+  // chart by construction, which tells the reader nothing.
+  const halfLife = Math.max(12, Math.min(60, cols * 0.15));
+  const decay = Math.pow(0.5, 1 / halfLife);
 
-  const profile = Array.from(synth.entries()).map(([k, v]) => ({
-    price: k * step,
-    volume: v,
-  }));
-
-  let maxProfileVol = 1;
-  profile.forEach((p) => {
-    if (p.volume > maxProfileVol) maxProfileVol = p.volume;
-  });
-
-  const sigma = step * 8;
-  const ambientFloor = maxProfileVol * 0.05;
-  const rowProfile = new Float32Array(rows);
-  for (let row = 0; row < rows; row++) {
-    const price = lo + (row + 0.5) * step;
-    let h = ambientFloor;
-    for (let p = 0; p < profile.length; p++) {
-      const lv = profile[p];
-      const d = price - lv.price;
-      h += lv.volume * Math.exp(-(d * d) / (2 * sigma * sigma));
-    }
-    rowProfile[row] = h;
-  }
-
-  let rowMax = 1;
-  for (let row = 0; row < rows; row++) {
-    if (rowProfile[row] > rowMax) rowMax = rowProfile[row];
-  }
-
-  const beamSigma = Math.max(range * 0.025, step * 4);
+  const acc = new Float32Array(rows);
   const grid = new Float32Array(rows * cols);
-  let cellMax = 1;
+  const share = new Float32Array(rows);
+  let cellMax = 0;
 
   for (let col = 0; col < cols; col++) {
     const c = candles[col];
-    const bodyHi = Math.max(c.open, c.close);
-    const bodyLo = Math.min(c.open, c.close);
-    const mid = (c.high + c.low) / 2;
-    const colVolNorm = v95 ? Math.min(1.5, c.volume / v95) : 0.5;
-    const beamStrength = 0.35 + colVolNorm * 0.65;
+    for (let r = 0; r < rows; r++) acc[r] *= decay;
 
-    for (let row = 0; row < rows; row++) {
-      const price = lo + (row + 0.5) * step;
-      let factor = 0.40;
-      if (price >= c.low && price <= c.high) {
-        factor = price >= bodyLo && price <= bodyHi ? 1.85 : 1.25;
+    // Spread the bar's weight across the prices it actually traded through,
+    // body heavier than wick. The old code keyed the whole bar at its
+    // midpoint, collapsing a range into a single row - which is why the
+    // result read as a horizontal smear instead of structure.
+    const weight = hasVolume ? c.volume : 1;
+    if (weight > 0) {
+      const rLo = Math.max(0, Math.min(rows - 1, Math.floor((c.low - lo) / step)));
+      const rHi = Math.max(0, Math.min(rows - 1, Math.floor((c.high - lo) / step)));
+      const bodyLo = Math.min(c.open, c.close);
+      const bodyHi = Math.max(c.open, c.close);
+
+      let wsum = 0;
+      for (let r = rLo; r <= rHi; r++) {
+        const price = lo + (r + 0.5) * step;
+        const w = price >= bodyLo && price <= bodyHi ? 1.0 : 0.35;
+        share[r] = w;
+        wsum += w;
       }
-      const bd = price - mid;
-      factor += beamStrength * Math.exp(-(bd * bd) / (2 * beamSigma * beamSigma));
+      if (wsum > 0) {
+        for (let r = rLo; r <= rHi; r++) acc[r] += (weight * share[r]) / wsum;
+      }
+    }
 
-      const v = rowProfile[row] * factor;
-      grid[row * cols + col] = v;
+    for (let r = 0; r < rows; r++) {
+      const v = acc[r];
+      grid[r * cols + col] = v;
       if (v > cellMax) cellMax = v;
     }
   }
 
-  return { grid, rows, cols, v95, max: cellMax, rowProfile, rowMax, hi, lo, step };
+  // Normalise against a high percentile of the grid's own non-empty cells.
+  // The maximum alone would let one hot cell wash everything else down into
+  // the dark end of the ramp; a percentile keeps the body of the picture
+  // inside the colours and lets the genuine peaks clip.
+  const stride = Math.max(1, Math.floor(grid.length / 20000));
+  const sample: number[] = [];
+  for (let i = 0; i < grid.length; i += stride) {
+    if (grid[i] > 0) sample.push(grid[i]);
+  }
+  sample.sort((a, b) => a - b);
+  const cellRef =
+    sample.length > 20 ? sample[Math.floor(sample.length * 0.97)] : cellMax;
+
+  return {
+    grid,
+    rows,
+    cols,
+    cellRef: cellRef > 0 ? cellRef : 1,
+    max: cellMax,
+    hasVolume,
+    hi,
+    lo,
+    step,
+  };
+}
+
+/**
+ * Bars whose volume is a genuine outlier against a trailing median.
+ *
+ * That is all this claims to be. It is NOT absorption and NOT delta: the feed
+ * behind this chart is OHLCV, so there is no bid/ask split from which a delta
+ * could be computed. The previous version drew a signed "+42k" that was only
+ * the candle's direction wearing a delta's clothes, thresholded at the 85th
+ * percentile so roughly one bar in seven qualified, and on a feed with no
+ * volume at all it marked every bar on the chart.
+ *
+ * Computed once per fetch rather than per frame - the render loop runs at
+ * 60fps and this does not change between ticks.
+ */
+function computeVolumeBubbles(candles: Candle[]): VolumeBubble[] {
+  const WINDOW = 30;
+  const MIN_HISTORY = 8;
+  const MIN_RATIO = 2.0;
+
+  const out: VolumeBubble[] = [];
+  if (!candles.some((c) => (c.volume || 0) > 0)) return out;
+
+  for (let i = 0; i < candles.length; i++) {
+    const v = candles[i].volume || 0;
+    if (v <= 0) continue;
+
+    const win: number[] = [];
+    for (let j = Math.max(0, i - WINDOW); j < i; j++) {
+      const w = candles[j].volume || 0;
+      if (w > 0) win.push(w);
+    }
+    if (win.length < MIN_HISTORY) continue;
+
+    // Median, not mean: one spike in the window would drag a mean upward and
+    // hide the next spike behind it.
+    win.sort((a, b) => a - b);
+    const med = win[Math.floor(win.length / 2)];
+    if (med <= 0) continue;
+
+    const ratio = v / med;
+    if (ratio < MIN_RATIO) continue;
+
+    const c = candles[i];
+    const isBull = c.close >= c.open;
+    out.push({
+      index: i,
+      price: isBull ? c.high : c.low,
+      ratio,
+      volume: v,
+      isBull,
+    });
+  }
+  return out;
 }
 
 export function OrderFlowChart({
@@ -234,6 +323,9 @@ export function OrderFlowChart({
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [showBubbles, setShowBubbles] = useState(true);
   const [showDOM, setShowDOM] = useState(true);
+  // Whether the feed carries volume at all. Spot FX does not, and the
+  // volume-derived layers must say so rather than draw invented structure.
+  const [hasVolume, setHasVolume] = useState(true);
 
   useEffect(() => {
     setLocalInterval(externalInterval);
@@ -245,6 +337,8 @@ export function OrderFlowChart({
     candles: [] as Candle[],
     levels: null as SRLevels | null,
     heatmap: null as HeatmapData | null,
+    bubbles: [] as VolumeBubble[],
+    hasVolume: true,
     heatCanvas: null as HTMLCanvasElement | null,
     ticker: "",
     interval: "",
@@ -325,7 +419,11 @@ export function OrderFlowChart({
           const s = state.current;
           s.candles = candles;
           s.levels = computeSRLevels(candles);
-          s.heatmap = buildHeatmap(candles);
+          const hm = buildHeatmap(candles);
+          s.heatmap = hm;
+          s.bubbles = computeVolumeBubbles(candles);
+          s.hasVolume = hm ? hm.hasVolume : false;
+          setHasVolume(s.hasVolume);
           s.ticker = ticker;
           s.interval = interval;
           setLoading(false);
@@ -400,7 +498,7 @@ export function OrderFlowChart({
       }
 
       // Layout partitioning
-      const rightMargin = s.showDOM ? 160 : 75; // Right price scale & L2 DOM ladder gutter
+      const rightMargin = s.showDOM && s.hasVolume ? 160 : 75; // Right price scale & L2 DOM ladder gutter
       const timeAxisH = 22;
       const plotW = Math.max(100, W - rightMargin);
       const plotH = Math.max(100, H - timeAxisH);
@@ -509,17 +607,20 @@ export function OrderFlowChart({
         if (octx) {
           const imgData = octx.createImageData(hCols, hRows);
           const pixels = imgData.data;
-          const vRef = hm.v95 > 0 ? hm.v95 : hm.max;
+          // The grid's own scale - see buildHeatmap. Using a single bar's
+          // volume here is what painted the plot white.
+          const vRef = hm.cellRef > 0 ? hm.cellRef : hm.max;
 
           for (let row = 0; row < hRows; row++) {
             const imgRow = hRows - 1 - row;
             for (let col = 0; col < hCols; col++) {
               const v = hm.grid[row * hCols + col];
-              // Square-root normalization sqrt(v / v95) illuminates ambient depth and resting walls
-              const norm = Math.sqrt(Math.min(1, Math.max(0, v / vRef)));
-              if (norm < 0.02) continue;
+              // Gamma below 1 lifts the mid range without flattening the top,
+              // so resting structure is visible and peaks still clip to white.
+              const norm = Math.pow(Math.min(1, Math.max(0, v / vRef)), 0.7);
+              if (norm < 0.05) continue;
 
-              const [r, g, b, a] = heatColorRGBA(norm, 1.35);
+              const [r, g, b, a] = heatColorRGBA(norm, 1.0);
               const idx = (imgRow * hCols + col) * 4;
               pixels[idx] = r;
               pixels[idx + 1] = g;
@@ -544,6 +645,24 @@ export function OrderFlowChart({
           const leftX = indexToX(0) - barSpacing / 2;
           const totalW = count * barSpacing;
           ctx.drawImage(oc, 0, 0, hCols, hRows, leftX, hmTopY, totalW, hmScreenH);
+          ctx.restore();
+
+          // Say which profile this is, on the canvas, for the same reason the
+          // ladder's caption is on the canvas: it has to survive a screenshot.
+          // Time-at-price and volume-at-price look identical and mean
+          // different things.
+          ctx.save();
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+          ctx.font = "8px JetBrains Mono, monospace";
+          ctx.fillStyle = hm.hasVolume
+            ? "rgba(56,189,248,0.55)"
+            : "rgba(245,158,11,0.75)";
+          ctx.fillText(
+            hm.hasVolume
+              ? "VOLUME AT PRICE - FROM BARS, NOT ORDER BOOK"
+              : "TIME AT PRICE - THIS FEED PUBLISHES NO VOLUME",
+            8, plotH - 4);
           ctx.restore();
         }
       }
@@ -670,79 +789,68 @@ export function OrderFlowChart({
       }
       ctx.restore();
 
-      // --- LAYER 6: Adaptive Trade Volume & Absorption Bubbles (No Caterpillar Overlap) ---
-      if (s.showBubbles) {
+      // --- LAYER 6: Relative-Volume Bubbles ---
+      // Marks bars whose volume is an outlier against a trailing median, and
+      // claims nothing more than that. Precomputed in computeVolumeBubbles;
+      // empty by construction when the feed carries no volume, so nothing is
+      // drawn rather than a bubble on every bar.
+      if (s.showBubbles && s.bubbles.length) {
         ctx.save();
-        const vols = candles.map((c) => c.volume || 1).sort((a, b) => a - b);
-        const v85 = vols[Math.floor(vols.length * 0.85)] || 1;
 
-        let maxVolIdx = -1;
-        let maxV = -Infinity;
-        for (let i = 0; i < count; i++) {
-          const v = candles[i].volume || 1;
-          if (v > maxV) {
-            maxV = v;
-            maxVolIdx = i;
+        let topIdx = -1;
+        let topRatio = 0;
+        for (const b of s.bubbles) {
+          if (b.ratio > topRatio) {
+            topRatio = b.ratio;
+            topIdx = b.index;
           }
         }
 
-        const maxBubbleR = Math.max(3.0, Math.min(16.0, barSpacing * 0.65));
-        const minBubbleR = Math.max(2.5, Math.min(4.5, barSpacing * 0.35));
+        const maxBubbleR = Math.max(4.0, Math.min(15.0, barSpacing * 0.6));
+        const minBubbleR = Math.max(3.0, Math.min(5.0, barSpacing * 0.3));
 
-        for (let i = 0; i < count; i++) {
-          const c = candles[i];
-          const v = c.volume || 1;
-          if (v < v85) continue;
-
-          const x = indexToX(i);
+        for (const b of s.bubbles) {
+          if (b.index >= count) continue;
+          const x = indexToX(b.index);
           if (x < -30 || x > plotW + 30) continue;
 
-          const isBull = c.close >= c.open;
-          const norm = Math.min(1, Math.max(0, (v - v85) / Math.max(v85, 1)));
-          const radius = Math.min(maxBubbleR, minBubbleR + Math.sqrt(norm) * (maxBubbleR - minBubbleR));
+          // Log scale: 2x is a small mark, 16x is a big one. A linear map
+          // saturates immediately and makes every outlier the same size.
+          const mag = Math.min(1, Math.log2(b.ratio) / 4);
+          const radius = minBubbleR + mag * (maxBubbleR - minBubbleR);
 
-          let bubbleY: number;
-          let anchorY: number;
-
-          if (isBull) {
-            anchorY = priceToY(c.high);
-            bubbleY = anchorY - radius - 5;
-          } else {
-            anchorY = priceToY(c.low);
-            bubbleY = anchorY + radius + 5;
-          }
-
+          const anchorY = priceToY(b.price);
           if (anchorY < 0 || anchorY > plotH) continue;
+          const bubbleY = b.isBull ? anchorY - radius - 6 : anchorY + radius + 6;
           if (bubbleY - radius < 2 || bubbleY + radius > plotH - 2) continue;
 
-          const isTopEvent = i === maxVolIdx;
-          const fillColor = isBull
-            ? "rgba(201, 168, 76, 0.45)"
-            : "rgba(74, 158, 176, 0.40)";
-          const strokeColor = isBull
+          const isTopEvent = b.index === topIdx;
+          const fillColor = b.isBull
+            ? "rgba(201, 168, 76, 0.42)"
+            : "rgba(74, 158, 176, 0.38)";
+          const strokeColor = b.isBull
             ? "rgba(233, 208, 130, 0.85)"
             : "rgba(126, 205, 224, 0.85)";
 
-          // Dashed connector to candle wick
-          ctx.strokeStyle = isBull ? "rgba(201, 168, 76, 0.5)" : "rgba(74, 158, 176, 0.5)";
+          ctx.strokeStyle = b.isBull
+            ? "rgba(201, 168, 76, 0.45)"
+            : "rgba(74, 158, 176, 0.45)";
           ctx.lineWidth = 0.8;
           ctx.setLineDash([2, 2]);
           ctx.beginPath();
           ctx.moveTo(x, anchorY);
-          ctx.lineTo(x, isBull ? bubbleY + radius : bubbleY - radius);
+          ctx.lineTo(x, b.isBull ? bubbleY + radius : bubbleY - radius);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Absorption Bubble Body
           ctx.beginPath();
           ctx.arc(x, bubbleY, radius, 0, Math.PI * 2);
           ctx.fillStyle = fillColor;
           ctx.fill();
           ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = isBull ? 1.2 : 2.0;
+          ctx.lineWidth = 1.2;
           ctx.stroke();
 
-          // Outer surveillance ring on top volume event
           if (isTopEvent) {
             ctx.beginPath();
             ctx.arc(x, bubbleY, radius + 3.5, 0, Math.PI * 2);
@@ -753,15 +861,17 @@ export function OrderFlowChart({
             ctx.setLineDash([]);
           }
 
-          // Delta text on hover or top event
-          const isHovered = s.mouseX >= 0 && Math.abs(s.mouseX - x) < Math.max(radius, barSpacing / 2);
-          if (isTopEvent || isHovered) {
+          // The multiple, not a signed figure. There is no delta in this feed
+          // to put a sign on.
+          const isHovered =
+            s.mouseX >= 0 &&
+            Math.abs(s.mouseX - x) < Math.max(radius, barSpacing / 2);
+          if ((isTopEvent || isHovered) && radius >= 7) {
             ctx.fillStyle = "#ffffff";
             ctx.font = "bold 8.5px JetBrains Mono, monospace";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            const sign = isBull ? "+" : "-";
-            ctx.fillText(`${sign}${Math.round(v / 1000)}k`, x, bubbleY);
+            ctx.fillText(`${b.ratio.toFixed(1)}x`, x, bubbleY);
           }
         }
         ctx.restore();
@@ -814,7 +924,7 @@ export function OrderFlowChart({
       ctx.lineTo(ladderX, H);
       ctx.stroke();
 
-      if (s.showDOM) {
+      if (s.showDOM && s.hasVolume) {
         // Table Header
         ctx.fillStyle = "#0d1424";
         ctx.fillRect(ladderX, 0, ladderW, 20);
@@ -1027,7 +1137,7 @@ export function OrderFlowChart({
     function onMouseDown(e: MouseEvent) {
       const rect = canvas!.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const rightMargin = s.showDOM ? 160 : 75;
+      const rightMargin = s.showDOM && s.hasVolume ? 160 : 75;
       const plotW = rect.width - rightMargin;
       const isNearPriceScale = mouseX > plotW;
 
@@ -1055,7 +1165,7 @@ export function OrderFlowChart({
       s.mouseX = e.clientX - rect.left;
       s.mouseY = e.clientY - rect.top;
 
-      const rightMargin = s.showDOM ? 160 : 75;
+      const rightMargin = s.showDOM && s.hasVolume ? 160 : 75;
       const plotW = rect.width - rightMargin;
       const isNearPriceScale = s.mouseX > plotW;
 
@@ -1079,7 +1189,7 @@ export function OrderFlowChart({
       s.isDraggingPriceScale = false;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        const rightMargin = s.showDOM ? 160 : 75;
+        const rightMargin = s.showDOM && s.hasVolume ? 160 : 75;
         const isNearPriceScale = s.mouseX > rect.width - rightMargin;
         canvas.style.cursor = isNearPriceScale ? "ns-resize" : "crosshair";
       }
@@ -1089,7 +1199,7 @@ export function OrderFlowChart({
       e.preventDefault();
       const rect = canvas!.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const rightMargin = s.showDOM ? 160 : 75;
+      const rightMargin = s.showDOM && s.hasVolume ? 160 : 75;
       const isNearPriceScale = mouseX > rect.width - rightMargin;
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
 
@@ -1232,7 +1342,11 @@ export function OrderFlowChart({
         <div className="flex items-center gap-0.5 bg-[#080c16]/90 p-0.5 rounded border border-white/10 backdrop-blur-sm">
           <button
             onClick={() => setShowHeatmap((v) => !v)}
-            title="Traded volume at price, from bar data. NOT resting order-book liquidity - this feed has no depth."
+            title={
+              hasVolume
+                ? "Traded volume at price, from bar data. NOT resting order-book liquidity - this feed has no depth."
+                : "This feed publishes no volume, so the profile is built from TIME at price (every bar counts once). Not volume, and not order-book depth."
+            }
             style={{
               padding: "2px 6px",
               borderRadius: 2,
@@ -1249,45 +1363,58 @@ export function OrderFlowChart({
               color: showHeatmap ? "#38bdf8" : "rgba(255,255,255,0.4)",
             }}
           >
-            VOLUME PROFILE
+            {hasVolume ? "VOLUME PROFILE" : "TIME PROFILE"}
           </button>
           <button
-            onClick={() => setShowBubbles((v) => !v)}
+            onClick={() => hasVolume && setShowBubbles((v) => !v)}
+            disabled={!hasVolume}
+            title={
+              hasVolume
+                ? "Bars whose volume is at least 2x the trailing 30-bar median. Size is the multiple. NOT absorption and NOT delta - this feed has no bid/ask split."
+                : "Unavailable: this feed publishes no volume, so there is no relative volume to mark."
+            }
             style={{
               padding: "2px 6px",
               borderRadius: 2,
               fontSize: 9,
               fontFamily: "JetBrains Mono, monospace",
               fontWeight: 700,
-              cursor: "pointer",
-              border: showBubbles
+              cursor: hasVolume ? "pointer" : "not-allowed",
+              opacity: hasVolume ? 1 : 0.35,
+              border: showBubbles && hasVolume
                 ? "1px solid rgba(201,168,76,0.6)"
                 : "1px solid transparent",
-              background: showBubbles
+              background: showBubbles && hasVolume
                 ? "rgba(201,168,76,0.15)"
                 : "transparent",
-              color: showBubbles ? "#e5d5a0" : "rgba(255,255,255,0.4)",
+              color: showBubbles && hasVolume ? "#e5d5a0" : "rgba(255,255,255,0.4)",
             }}
           >
             BUBBLES
           </button>
           <button
-            onClick={() => setShowDOM((v) => !v)}
-            title="Modelled depth. This feed carries no order book - the ladder is derived from the volume profile, not received from an exchange."
+            onClick={() => hasVolume && setShowDOM((v) => !v)}
+            disabled={!hasVolume}
+            title={
+              hasVolume
+                ? "Modelled depth. This feed carries no order book - the ladder is derived from the volume profile, not received from an exchange."
+                : "Unavailable: the modelled ladder is derived from volume, and this feed publishes none."
+            }
             style={{
               padding: "2px 6px",
               borderRadius: 2,
               fontSize: 9,
               fontFamily: "JetBrains Mono, monospace",
               fontWeight: 700,
-              cursor: "pointer",
-              border: showDOM
+              cursor: hasVolume ? "pointer" : "not-allowed",
+              opacity: hasVolume ? 1 : 0.35,
+              border: showDOM && hasVolume
                 ? "1px solid rgba(16,185,129,0.6)"
                 : "1px solid transparent",
-              background: showDOM
+              background: showDOM && hasVolume
                 ? "rgba(16,185,129,0.15)"
                 : "transparent",
-              color: showDOM ? "#34d399" : "rgba(255,255,255,0.4)",
+              color: showDOM && hasVolume ? "#34d399" : "rgba(255,255,255,0.4)",
             }}
           >
             DEPTH (MODELLED)
