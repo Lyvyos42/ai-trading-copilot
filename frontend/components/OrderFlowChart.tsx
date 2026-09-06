@@ -35,6 +35,28 @@ interface VolumeBubble {
   isBull: boolean;
 }
 
+/**
+ * What the backend says about the feed that produced these candles.
+ *
+ * The chart used to infer all of this from the numbers, which cannot work:
+ * volume 0 and "this market publishes no volume" look identical in an array
+ * of candles, and "traded size" and "count of price updates" look identical
+ * too. The server knows which source answered, so it says.
+ */
+interface Provenance {
+  source: string;
+  venue: string;
+  is_realtime: boolean;
+  has_volume: boolean;
+  volume_kind: "traded" | "tick_count" | "none" | string;
+  license: string;
+  note: string;
+  quote_currency?: string | null;
+  resolved_symbol?: string | null;
+  last_bar_age_seconds?: number | null;
+  bar_count?: number | null;
+}
+
 interface SRLevels {
   support: number[];
   resistance: number[];
@@ -326,6 +348,7 @@ export function OrderFlowChart({
   // Whether the feed carries volume at all. Spot FX does not, and the
   // volume-derived layers must say so rather than draw invented structure.
   const [hasVolume, setHasVolume] = useState(true);
+  const [prov, setProv] = useState<Provenance | null>(null);
 
   useEffect(() => {
     setLocalInterval(externalInterval);
@@ -339,6 +362,7 @@ export function OrderFlowChart({
     heatmap: null as HeatmapData | null,
     bubbles: [] as VolumeBubble[],
     hasVolume: true,
+    volumeKind: "traded" as string,
     heatCanvas: null as HTMLCanvasElement | null,
     ticker: "",
     interval: "",
@@ -422,7 +446,19 @@ export function OrderFlowChart({
           const hm = buildHeatmap(candles);
           s.heatmap = hm;
           s.bubbles = computeVolumeBubbles(candles);
+          const p: Provenance | null = data.provenance ?? null;
+          setProv(p);
+          // The candles are authoritative for whether anything WILL render;
+          // the provenance is authoritative for what it means. They should
+          // agree, and a disagreement is worth seeing in the console rather
+          // than silently resolving one way.
           s.hasVolume = hm ? hm.hasVolume : false;
+          if (p && p.has_volume !== s.hasVolume) {
+            console.warn(
+              `[chart] ${ticker}: ${p.source} declares has_volume=${p.has_volume} ` +
+              `but the candles say ${s.hasVolume}. Using the candles.`);
+          }
+          s.volumeKind = p?.volume_kind ?? "traded";
           setHasVolume(s.hasVolume);
           s.ticker = ticker;
           s.interval = interval;
@@ -655,13 +691,15 @@ export function OrderFlowChart({
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
           ctx.font = "8px JetBrains Mono, monospace";
-          ctx.fillStyle = hm.hasVolume
+          ctx.fillStyle = hm.hasVolume && s.volumeKind === "traded"
             ? "rgba(56,189,248,0.55)"
             : "rgba(245,158,11,0.75)";
           ctx.fillText(
-            hm.hasVolume
-              ? "VOLUME AT PRICE - FROM BARS, NOT ORDER BOOK"
-              : "TIME AT PRICE - THIS FEED PUBLISHES NO VOLUME",
+            !hm.hasVolume
+              ? "TIME AT PRICE - THIS FEED PUBLISHES NO VOLUME"
+              : s.volumeKind === "tick_count"
+              ? "TICK COUNT AT PRICE - PRICE UPDATES, NOT SIZE TRADED"
+              : "VOLUME AT PRICE - FROM BARS, NOT ORDER BOOK",
             8, plotH - 4);
           ctx.restore();
         }
@@ -1439,6 +1477,64 @@ export function OrderFlowChart({
         >
           RESET
         </button>
+
+        {/* Feed provenance. The source that answered, and how old its newest
+            bar was when it arrived - measured on the response, not a claim
+            about a nominal delay. During market hours that age IS the delay. */}
+        {prov && (
+          <div
+            title={
+              `${prov.venue}` +
+              (prov.resolved_symbol ? ` · ${prov.resolved_symbol}` : "") +
+              (prov.quote_currency ? ` · quoted in ${prov.quote_currency}` : "") +
+              `
+${prov.note}` +
+              (prov.last_bar_age_seconds != null
+                ? `
+Newest bar was ${prov.last_bar_age_seconds}s old on arrival.`
+                : "")
+            }
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "2px 7px",
+              borderRadius: 3,
+              fontSize: 9,
+              fontFamily: "JetBrains Mono, monospace",
+              fontWeight: 700,
+              letterSpacing: 0.3,
+              cursor: "help",
+              border: prov.is_realtime
+                ? "1px solid rgba(16,185,129,0.45)"
+                : "1px solid rgba(245,158,11,0.4)",
+              background: prov.is_realtime
+                ? "rgba(16,185,129,0.10)"
+                : "rgba(245,158,11,0.08)",
+              color: prov.is_realtime ? "#34d399" : "#fbbf24",
+            }}
+          >
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: prov.is_realtime ? "#34d399" : "#fbbf24",
+              }}
+            />
+            {prov.source.toUpperCase()}
+            <span style={{ opacity: 0.75, fontWeight: 500 }}>
+              {prov.is_realtime ? "LIVE" : "DELAYED"}
+            </span>
+            <span style={{ opacity: 0.55, fontWeight: 500 }}>
+              {prov.volume_kind === "traded"
+                ? "REAL VOL"
+                : prov.volume_kind === "tick_count"
+                ? "TICK VOL"
+                : "NO VOL"}
+            </span>
+          </div>
+        )}
       </div>
 
       {loading && (

@@ -677,6 +677,59 @@ async def get_ohlcv(
         _ohlcv_cache[cache_key] = (result, _time.time())
         return result
 
+    # ── 1. Provider router ───────────────────────────────────────────────────
+    #
+    # Sources ordered by how close they sit to where the trades happen, each
+    # declaring what it is returning. See app/data/providers.py for what was
+    # measured and why this order.
+    #
+    # The important output besides the candles is `provenance`: whether the
+    # feed is real-time, whether it carries volume at all, and what kind of
+    # volume that is. The chart gates its volume profile, its bubbles and its
+    # modelled depth ladder on those flags, because a chart that cannot tell
+    # "no volume" from "zero volume" will draw a profile out of nothing - and
+    # it did, as a white rectangle, on every FX symbol.
+    try:
+        from app.data import providers as _prov
+        from app.data.market_data import (
+            resolve_ticker, resolve_asset_class, _SPOT_TO_FUTURES, _fetch_tv_ta_spot,
+        )
+
+        _ac = resolve_asset_class(ticker)
+        # _SPOT_TO_FUTURES is keyed WITHOUT the "=X" suffix, so XAUUSD=X has to
+        # be stripped before the lookup or spot gold silently misses the
+        # mapping and 404s against a ticker Yahoo delisted.
+        _futures = _SPOT_TO_FUTURES.get(ticker.upper().replace("=X", ""))
+        _yf_sym = _futures or resolve_ticker(ticker)
+
+        candles, prov = await _prov.fetch(ticker, interval, period, _ac, _yf_sym)
+
+        if candles:
+            # Metals: Yahoo delisted the spot =X tickers, so the bars come from
+            # the futures contract and are shifted onto spot. Only done when
+            # Yahoo actually answered - an exchange feed needs no correction.
+            if prov.source == "yahoo" and _futures:
+                spot = await _fetch_tv_ta_spot(ticker)
+                if spot and spot > 0:
+                    offset = spot - candles[-1]["close"]
+                    if abs(offset) < candles[-1]["close"] * 0.05:
+                        for c in candles:
+                            for k in ("open", "high", "low", "close"):
+                                c[k] = round(c[k] + offset, 6)
+
+            return _cache_and_return({
+                "ticker": ticker,
+                "candles": candles,
+                "provenance": prov.to_dict(),
+            })
+        import logging
+        logging.warning(f"provider router returned no candles for {ticker}")
+    except Exception as _router_err:
+        import logging
+        logging.warning(
+            f"provider router failed for {ticker}: "
+            f"{type(_router_err).__name__}: {_router_err}")
+
     # ── 1. CoinGecko (primary source for crypto) ──────────────────────────────
     if ticker in _COINGECKO_IDS:
         try:
@@ -707,7 +760,20 @@ async def get_ohlcv(
                         existing["close"] = c  # last update wins for close
 
                 candles = sorted(day_map.values(), key=lambda x: x["time"])
-                return _cache_and_return({"ticker": ticker, "candles": candles})
+                # CoinGecko's /ohlc carries no volume field at all, and its
+                # candle width changes with the day range without saying so.
+                # Only reached if both exchanges were unreachable.
+                return _cache_and_return({
+                    "ticker": ticker, "candles": candles,
+                    "provenance": {
+                        "source": "coingecko", "venue": "CoinGecko aggregate",
+                        "is_realtime": False, "has_volume": False,
+                        "volume_kind": "none", "license": "public_api",
+                        "bar_count": len(candles),
+                        "note": ("Aggregate, not a venue. Publishes no volume, "
+                                 "and its candle width varies with the range "
+                                 "requested. Fallback only."),
+                    }})
         except Exception:
             pass  # fall through to yfinance
 
@@ -769,7 +835,17 @@ async def get_ohlcv(
                 candles[-1]["high"] = round(max(candles[-1]["high"], spot), 4)
                 candles[-1]["low"] = round(min(candles[-1]["low"], spot), 4)
 
-        return _cache_and_return({"ticker": ticker, "candles": candles})
+        return _cache_and_return({
+            "ticker": ticker, "candles": candles,
+            "provenance": {
+                "source": "yahoo", "venue": "Yahoo composite",
+                "is_realtime": False,
+                "has_volume": any(c.get("volume", 0) for c in candles),
+                "volume_kind": ("traded" if any(c.get("volume", 0) for c in candles)
+                                else "none"),
+                "license": "consumer_endpoint", "bar_count": len(candles),
+                "note": "Delayed consumer feed (legacy path).",
+            }})
 
     except Exception as yf_err:
         import logging
@@ -844,7 +920,17 @@ async def get_ohlcv(
                         c["low"]   = round(c["low"] + offset, 4)
                         c["close"] = round(c["close"] + offset, 4)
 
-        return _cache_and_return({"ticker": ticker, "candles": candles})
+        return _cache_and_return({
+            "ticker": ticker, "candles": candles,
+            "provenance": {
+                "source": "yahoo", "venue": "Yahoo composite",
+                "is_realtime": False,
+                "has_volume": any(c.get("volume", 0) for c in candles),
+                "volume_kind": ("traded" if any(c.get("volume", 0) for c in candles)
+                                else "none"),
+                "license": "consumer_endpoint", "bar_count": len(candles),
+                "note": "Delayed consumer feed (legacy path).",
+            }})
 
     except Exception as rest_err:
         import logging
