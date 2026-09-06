@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -17,6 +17,7 @@ interface HeatmapData {
   grid: Float32Array;
   rows: number;
   cols: number;
+  v95: number;
   max: number;
   rowProfile: Float32Array;
   rowMax: number;
@@ -25,71 +26,60 @@ interface HeatmapData {
   step: number;
 }
 
-const HEAT_STOPS = [
-  { t: 0.00, r: 0,   g: 2,   b: 12,  a: 0.03 },
-  { t: 0.06, r: 2,   g: 8,   b: 35,  a: 0.15 },
-  { t: 0.14, r: 6,   g: 18,  b: 65,  a: 0.30 },
-  { t: 0.24, r: 10,  g: 40,  b: 110, a: 0.45 },
-  { t: 0.34, r: 8,   g: 75,  b: 160, a: 0.55 },
-  { t: 0.44, r: 0,   g: 130, b: 190, a: 0.62 },
-  { t: 0.54, r: 0,   g: 180, b: 200, a: 0.68 },
-  { t: 0.64, r: 60,  g: 200, b: 160, a: 0.72 },
-  { t: 0.74, r: 200, g: 210, b: 40,  a: 0.78 },
-  { t: 0.84, r: 255, g: 160, b: 0,   a: 0.85 },
-  { t: 0.93, r: 255, g: 70,  b: 15,  a: 0.90 },
-  { t: 1.00, r: 255, g: 30,  b: 10,  a: 0.95 },
-];
+interface SRLevels {
+  support: number[];
+  resistance: number[];
+  pivot: number;
+}
 
-const BULL_RGB: [number, number, number] = [16, 185, 129];
-const BEAR_RGB: [number, number, number] = [239, 68, 68];
+interface OrderFlowChartProps {
+  ticker: string;
+  interval?: string;
+  fillContainer?: boolean;
+}
+
+const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
 
 const INTERVAL_TO_PERIOD: Record<string, string> = {
-  "1m": "1d", "5m": "5d", "15m": "5d", "30m": "1mo",
-  "1h": "3mo", "4h": "6mo", "1d": "1y", "1wk": "2y",
+  "1m": "1d",
+  "5m": "5d",
+  "15m": "5d",
+  "30m": "1mo",
+  "1h": "3mo",
+  "4h": "6mo",
+  "1d": "1y",
+  "1wk": "2y",
 };
 
-const MIN_VISIBLE = 15;
-const DEFAULT_VISIBLE = 80;
+const REFRESH_MS: Record<string, number> = {
+  "1m": 10_000,
+  "5m": 15_000,
+  "15m": 30_000,
+  "30m": 30_000,
+  "1h": 60_000,
+  "4h": 120_000,
+  "1d": 300_000,
+  "1wk": 600_000,
+};
 
-function hash(x: number, y: number): number {
-  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
-  return s - Math.floor(s);
-}
-
-function valueNoise(x: number, y: number): number {
-  const xi = Math.floor(x), yi = Math.floor(y);
-  const xf = x - xi, yf = y - yi;
-  const u = xf * xf * (3 - 2 * xf);
-  const v = yf * yf * (3 - 2 * yf);
-  const a = hash(xi, yi);
-  const b = hash(xi + 1, yi);
-  const c = hash(xi, yi + 1);
-  const d = hash(xi + 1, yi + 1);
-  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
-}
-
-function heatColor(t: number, alphaMul = 1): string {
-  t = t < 0 ? 0 : t > 1 ? 1 : t;
-  let lo = HEAT_STOPS[0], hi = HEAT_STOPS[HEAT_STOPS.length - 1];
-  for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
-    if (t >= HEAT_STOPS[i].t && t <= HEAT_STOPS[i + 1].t) {
-      lo = HEAT_STOPS[i];
-      hi = HEAT_STOPS[i + 1];
-      break;
-    }
-  }
-  const span = (hi.t - lo.t) || 1;
-  const local = (t - lo.t) / span;
-  const r = Math.round(lo.r + (hi.r - lo.r) * local);
-  const g = Math.round(lo.g + (hi.g - lo.g) * local);
-  const b = Math.round(lo.b + (hi.b - lo.b) * local);
-  const a = Math.min(1, Math.max(0, (lo.a + (hi.a - lo.a) * local) * alphaMul));
-  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
-}
+// Precise color ramps for Bookmap spectrogram
+const HEAT_STOPS = [
+  { t: 0.00, r: 0,   g: 4,   b: 16,  a: 0.00 },
+  { t: 0.08, r: 2,   g: 10,  b: 40,  a: 0.20 },
+  { t: 0.18, r: 6,   g: 22,  b: 75,  a: 0.38 },
+  { t: 0.30, r: 10,  g: 50,  b: 130, a: 0.52 },
+  { t: 0.44, r: 0,   g: 140, b: 200, a: 0.65 },
+  { t: 0.58, r: 0,   g: 190, b: 210, a: 0.72 },
+  { t: 0.72, r: 60,  g: 215, b: 165, a: 0.80 },
+  { t: 0.84, r: 220, g: 200, b: 40,  a: 0.86 },
+  { t: 0.94, r: 255, g: 155, b: 10,  a: 0.92 },
+  { t: 1.00, r: 255, g: 255, b: 255, a: 0.98 },
+];
 
 function heatColorRGBA(t: number, alphaMul = 1): [number, number, number, number] {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  let lo = HEAT_STOPS[0], hi = HEAT_STOPS[HEAT_STOPS.length - 1];
+  let lo = HEAT_STOPS[0];
+  let hi = HEAT_STOPS[HEAT_STOPS.length - 1];
   for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
     if (t >= HEAT_STOPS[i].t && t <= HEAT_STOPS[i + 1].t) {
       lo = HEAT_STOPS[i];
@@ -97,7 +87,7 @@ function heatColorRGBA(t: number, alphaMul = 1): [number, number, number, number
       break;
     }
   }
-  const span = (hi.t - lo.t) || 1;
+  const span = hi.t - lo.t || 1;
   const local = (t - lo.t) / span;
   const r = Math.round(lo.r + (hi.r - lo.r) * local);
   const g = Math.round(lo.g + (hi.g - lo.g) * local);
@@ -106,122 +96,84 @@ function heatColorRGBA(t: number, alphaMul = 1): [number, number, number, number
   return [r, g, b, a];
 }
 
-function niceStep(range: number, targetLines: number): number {
-  const rough = range / targetLines;
-  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
-  const norm = rough / pow;
-  let nice;
-  if (norm < 1.5) nice = 1;
-  else if (norm < 3) nice = 2;
-  else if (norm < 7) nice = 5;
-  else nice = 10;
-  return nice * pow;
-}
-
 function getDecimals(price: number, ticker: string): number {
   const t = ticker.toUpperCase().replace(/[/\-=X]/g, "");
   const jpyPairs = ["USDJPY", "EURJPY", "GBPJPY", "CADJPY", "CHFJPY", "AUDJPY", "NZDJPY"];
   if (jpyPairs.includes(t)) return 3;
   if (t.length === 6 && !t.startsWith("XA") && !t.startsWith("US5") && !t.startsWith("US3")) return 5;
-  if (price > 1000) return 1;
+  if (price > 1000) return 2;
   if (price > 100) return 2;
   if (price > 1) return 2;
   if (price > 0.01) return 4;
-  return 6;
+  return 5;
 }
 
-function lerp(current: number, target: number, speed: number): number {
-  if (current === 0) return target;
-  const diff = target - current;
-  if (Math.abs(diff) < Math.abs(target) * 0.00001) return target;
-  return current + diff * speed;
-}
-
-function drawSphere(
-  ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
-  rgb: [number, number, number], opacity: number,
-) {
-  const [cr, cg, cb] = rgb;
-  const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 2.3);
-  glow.addColorStop(0, `rgba(${cr},${cg},${cb},${(0.22 * opacity).toFixed(3)})`);
-  glow.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-  ctx.fillStyle = glow;
-  ctx.beginPath(); ctx.arc(x, y, r * 2.3, 0, Math.PI * 2); ctx.fill();
-
-  const body = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.05, x, y, r * 1.05);
-  body.addColorStop(0, `rgba(${Math.min(cr + 90, 255)},${Math.min(cg + 90, 255)},${Math.min(cb + 90, 255)},${opacity})`);
-  body.addColorStop(0.45, `rgba(${cr},${cg},${cb},${opacity})`);
-  body.addColorStop(1, `rgba(${Math.round(cr * 0.35)},${Math.round(cg * 0.35)},${Math.round(cb * 0.35)},${opacity})`);
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = body; ctx.fill();
-
-  ctx.save();
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
-  ctx.beginPath(); ctx.arc(x + r * 0.42, y + r * 0.42, r * 0.9, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(0,0,0,${(0.28 * opacity).toFixed(3)})`;
-  ctx.fill();
-  ctx.restore();
-
-  ctx.beginPath();
-  ctx.ellipse(x - r * 0.32, y - r * 0.35, r * 0.32, r * 0.2, -0.6, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255,255,255,${(0.55 * opacity).toFixed(3)})`;
-  ctx.fill();
-}
-
-function drawEmaLine(
-  ctx: CanvasRenderingContext2D, candles: Candle[], period: number,
-  color: string, idxToX: (i: number) => number, priceToY: (p: number) => number,
-) {
-  const closes = candles.map(c => c.close);
-  const ema: number[] = [];
-  const k = 2 / (period + 1);
-  ema[0] = closes[0];
-  for (let i = 1; i < closes.length; i++) ema[i] = closes[i] * k + ema[i - 1] * (1 - k);
-  ctx.beginPath();
-  let started = false;
-  for (let i = period; i < candles.length; i++) {
-    const x = idxToX(i);
-    const y = priceToY(ema[i]);
-    if (!started) { ctx.moveTo(x, y); started = true; }
-    else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
+function computeSRLevels(candles: Candle[]): SRLevels | null {
+  if (candles.length < 10) return null;
+  const recent = candles.slice(-Math.min(candles.length, 100));
+  let hi = -Infinity;
+  let lo = Infinity;
+  const lastClose = recent[recent.length - 1].close;
+  recent.forEach((c) => {
+    if (c.high > hi) hi = c.high;
+    if (c.low < lo) lo = c.low;
+  });
+  const pivot = (hi + lo + lastClose) / 3;
+  const r1 = 2 * pivot - lo;
+  const s1 = 2 * pivot - hi;
+  const r2 = pivot + (hi - lo);
+  const s2 = pivot - (hi - lo);
+  return {
+    resistance: [r1, r2].filter((r) => r > lastClose),
+    support: [s1, s2].filter((s) => s < lastClose),
+    pivot,
+  };
 }
 
 function buildHeatmap(candles: Candle[]): HeatmapData | null {
   if (!candles || candles.length < 2) return null;
 
-  let hi = -Infinity, lo = Infinity, maxVol = 0;
-  candles.forEach(c => {
+  let hi = -Infinity;
+  let lo = Infinity;
+  const vols: number[] = [];
+
+  candles.forEach((c) => {
     if (c.high > hi) hi = c.high;
     if (c.low < lo) lo = c.low;
-    if (c.volume > maxVol) maxVol = c.volume;
+    vols.push(c.volume || 1);
   });
-  if (maxVol <= 0) maxVol = 1;
-  const range = (hi - lo) || (hi * 0.01) || 1;
-  const pad = range * 0.12;
-  hi += pad; lo -= pad;
+
+  const range = hi - lo || hi * 0.01 || 1;
+  const pad = range * 0.10;
+  hi += pad;
+  lo -= pad;
+
+  vols.sort((a, b) => a - b);
+  const v95 = vols[Math.floor(vols.length * 0.95)] || 1;
 
   const rows = 120;
   const cols = candles.length;
   const step = (hi - lo) / rows;
 
   const synth = new Map<number, number>();
-  candles.forEach(c => {
+  candles.forEach((c) => {
     const mid = (c.high + c.low) / 2;
     const key = Math.round(mid / step);
     synth.set(key, (synth.get(key) || 0) + (c.volume || 1));
   });
-  const profile = Array.from(synth.entries()).map(([k, v]) => ({ price: k * step, volume: v }));
 
-  let maxProfileVol = 0;
-  profile.forEach(p => { if (p.volume > maxProfileVol) maxProfileVol = p.volume; });
-  if (maxProfileVol <= 0) maxProfileVol = 1;
+  const profile = Array.from(synth.entries()).map(([k, v]) => ({
+    price: k * step,
+    volume: v,
+  }));
 
-  const sigma = step * 9;
-  const ambientFloor = maxProfileVol * 0.04;
+  let maxProfileVol = 1;
+  profile.forEach((p) => {
+    if (p.volume > maxProfileVol) maxProfileVol = p.volume;
+  });
+
+  const sigma = step * 8;
+  const ambientFloor = maxProfileVol * 0.05;
   const rowProfile = new Float32Array(rows);
   for (let row = 0; row < rows; row++) {
     const price = lo + (row + 0.5) * step;
@@ -233,125 +185,108 @@ function buildHeatmap(candles: Candle[]): HeatmapData | null {
     }
     rowProfile[row] = h;
   }
-  let rowMax = 0;
-  for (let row = 0; row < rows; row++) if (rowProfile[row] > rowMax) rowMax = rowProfile[row];
-  if (rowMax <= 0) rowMax = 1;
 
-  const beamSigma = Math.max(range * 0.025, step * 5);
+  let rowMax = 1;
+  for (let row = 0; row < rows; row++) {
+    if (rowProfile[row] > rowMax) rowMax = rowProfile[row];
+  }
+
+  const beamSigma = Math.max(range * 0.025, step * 4);
   const grid = new Float32Array(rows * cols);
-  let cellMax = 0;
+  let cellMax = 1;
+
   for (let col = 0; col < cols; col++) {
     const c = candles[col];
     const bodyHi = Math.max(c.open, c.close);
     const bodyLo = Math.min(c.open, c.close);
     const mid = (c.high + c.low) / 2;
-    const colVolNorm = maxVol ? c.volume / maxVol : 0.5;
-    const colFlicker = 0.88 + hash(col * 3.13, 7.77) * 0.28;
-    const beamStrength = 0.3 + colVolNorm * 0.7;
+    const colVolNorm = v95 ? Math.min(1.5, c.volume / v95) : 0.5;
+    const beamStrength = 0.35 + colVolNorm * 0.65;
 
     for (let row = 0; row < rows; row++) {
       const price = lo + (row + 0.5) * step;
-      let factor = 0.45;
+      let factor = 0.40;
       if (price >= c.low && price <= c.high) {
-        factor = (price >= bodyLo && price <= bodyHi) ? 1.95 : 1.35;
+        factor = price >= bodyLo && price <= bodyHi ? 1.85 : 1.25;
       }
       const bd = price - mid;
       factor += beamStrength * Math.exp(-(bd * bd) / (2 * beamSigma * beamSigma));
-      const n = valueNoise(col * 0.35, row * 0.22) * 0.6
-        + valueNoise(col * 0.9 + 41.3, row * 0.5 + 17.1) * 0.4;
-      factor *= (0.72 + n * 0.56) * colFlicker;
+
       const v = rowProfile[row] * factor;
       grid[row * cols + col] = v;
       if (v > cellMax) cellMax = v;
     }
   }
 
-  return { grid, rows, cols, max: cellMax || 1, rowProfile, rowMax, hi, lo, step };
+  return { grid, rows, cols, v95, max: cellMax, rowProfile, rowMax, hi, lo, step };
 }
 
-interface SRLevels {
-  support: number[];
-  resistance: number[];
-  pivot: number;
-}
-
-function computeSRLevels(candles: Candle[]): SRLevels | null {
-  if (candles.length < 10) return null;
-  const recent = candles.slice(-Math.min(candles.length, 100));
-  let hi = -Infinity, lo = Infinity;
-  const lastClose = recent[recent.length - 1].close;
-  recent.forEach(c => { if (c.high > hi) hi = c.high; if (c.low < lo) lo = c.low; });
-  const pivot = (hi + lo + lastClose) / 3;
-  const r1 = 2 * pivot - lo;
-  const s1 = 2 * pivot - hi;
-  const r2 = pivot + (hi - lo);
-  const s2 = pivot - (hi - lo);
-  const r3 = hi + 2 * (pivot - lo);
-  const s3 = lo - 2 * (hi - pivot);
-  return {
-    resistance: [r1, r2, r3].filter(r => r > lastClose),
-    support: [s1, s2, s3].filter(s => s < lastClose),
-    pivot,
-  };
-}
-
-const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
-
-const REFRESH_MS: Record<string, number> = {
-  "1m": 10_000, "5m": 15_000, "15m": 30_000, "30m": 30_000,
-  "1h": 60_000, "4h": 120_000, "1d": 300_000, "1wk": 600_000,
-};
-
-interface OrderFlowChartProps {
-  ticker: string;
-  interval?: string;
-  fillContainer?: boolean;
-}
-
-export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fillContainer }: OrderFlowChartProps) {
+export function OrderFlowChart({
+  ticker,
+  interval: externalInterval = "1d",
+  fillContainer = true,
+}: OrderFlowChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [feedUnavailable, setFeedUnavailable] = useState<string | null>(null);
   const [localInterval, setLocalInterval] = useState(externalInterval);
-  useEffect(() => { setLocalInterval(externalInterval); }, [externalInterval]);
+  const [autoFit, setAutoFit] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [showBubbles, setShowBubbles] = useState(true);
+  const [showDOM, setShowDOM] = useState(true);
+
+  useEffect(() => {
+    setLocalInterval(externalInterval);
+  }, [externalInterval]);
+
   const interval = localInterval;
 
   const state = useRef({
     candles: [] as Candle[],
-    viewStart: 0,
-    viewEnd: 0,
-    rightPadding: 0,
-    priceOffset: 0,
-    lastVisibleRange: 0,
     levels: null as SRLevels | null,
-    mouseX: -1,
-    mouseY: -1,
-    isDragging: false,
-    dragStartX: 0,
-    dragStartY: 0,
-    dragViewStart: 0,
-    dragViewEnd: 0,
-    dragStartPriceOffset: 0,
-    dragStartPad: 0,
-    animTime: 0,
     heatmap: null as HeatmapData | null,
-    lastHeatKey: "",
+    heatCanvas: null as HTMLCanvasElement | null,
     ticker: "",
     interval: "",
-    // Smooth animation state
-    displayPrice: 0,
-    displayHigh: 0,
-    displayLow: 0,
-    displayCandles: [] as Candle[],
-    lerpSpeed: 0.12,
-    lastHeatHi: 0,
-    lastHeatLo: 0,
-    heatCanvas: null as HTMLCanvasElement | null,
-    momentumVx: 0,
-    momentumVy: 0,
-    dragHistory: [] as Array<{ x: number; y: number; t: number }>,
+    autoFit: false,
+    showHeatmap: true,
+    showBubbles: true,
+    showDOM: true,
+
+    // Transformation state
+    zoomX: 1.0,
+    zoomY: 1.0,
+    panX: 0,
+    panY: 0,
+    isDragging: false,
+    isDraggingPriceScale: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragStartPanX: 0,
+    dragStartPanY: 0,
+    dragStartPriceY: 0,
+    initialZoomY: 1.0,
+    mouseX: -1,
+    mouseY: -1,
+    animTime: 0,
+    defaultBarSpacing: 16,
   });
 
+  // Sync state ref with UI states
+  useEffect(() => {
+    state.current.autoFit = autoFit;
+  }, [autoFit]);
+  useEffect(() => {
+    state.current.showHeatmap = showHeatmap;
+  }, [showHeatmap]);
+  useEffect(() => {
+    state.current.showBubbles = showBubbles;
+  }, [showBubbles]);
+  useEffect(() => {
+    state.current.showDOM = showDOM;
+  }, [showDOM]);
+
+  // Data fetching
   useEffect(() => {
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -362,10 +297,12 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       fetching = true;
       if (!isRefresh) setLoading(true);
       const period = INTERVAL_TO_PERIOD[interval] || "6mo";
+
       try {
         const res = await fetch(
           `${API}/api/v1/market/ohlcv/${encodeURIComponent(ticker)}?period=${period}&interval=${interval}`,
         );
+
         if (res.ok && !cancelled) {
           const data = await res.json();
           if (data.error === "no_data" || !data.candles || data.candles.length === 0) {
@@ -374,56 +311,23 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
             setLoading(false);
             return;
           }
+
           setFeedUnavailable(null);
           const candles: Candle[] = (data.candles ?? []).map((c: Record<string, number>) => ({
-            time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
             volume: c.volume ?? 0,
           }));
+
           const s = state.current;
+          s.candles = candles;
           s.levels = computeSRLevels(candles);
-
-          // Detect symbol change via price range jump
-          const prevHi = s.lastHeatHi;
-          const prevLo = s.lastHeatLo;
-          let newHi = -Infinity, newLo = Infinity;
-          candles.forEach(c => { if (c.high > newHi) newHi = c.high; if (c.low < newLo) newLo = c.low; });
-          const oldRange = (prevHi - prevLo) || 1;
-          const symbolChanged = prevHi > 0 && (Math.abs(newHi - prevHi) > oldRange * 2);
-
-          if (symbolChanged) {
-            s.displayPrice = 0;
-            s.displayHigh = 0;
-            s.displayLow = 0;
-            s.displayCandles = [];
-            s.heatmap = null;
-            s.priceOffset = 0;
-          }
-          s.lastHeatHi = newHi;
-          s.lastHeatLo = newLo;
-
-          if (isRefresh && s.candles.length > 0 && !symbolChanged) {
-            const prevLen = s.candles.length;
-            s.candles = candles;
-            s.lastHeatKey = "";
-            if (candles.length > prevLen) {
-              s.viewStart += candles.length - prevLen;
-            }
-            const visCount = s.viewEnd - s.viewStart + s.rightPadding;
-            const dataSlots = visCount - s.rightPadding;
-            if (s.viewStart + dataSlots > candles.length) {
-              s.viewStart = Math.max(0, candles.length - dataSlots);
-            }
-          } else {
-            s.candles = candles;
-            s.ticker = ticker;
-            s.interval = interval;
-            const visCount = Math.min(DEFAULT_VISIBLE, candles.length);
-            s.rightPadding = Math.floor(visCount * 0.35);
-            s.viewEnd = candles.length;
-            s.viewStart = Math.max(0, candles.length - (visCount - s.rightPadding));
-            s.priceOffset = 0;
-            s.lastHeatKey = "";
-          }
+          s.heatmap = buildHeatmap(candles);
+          s.ticker = ticker;
+          s.interval = interval;
           setLoading(false);
         } else if (!cancelled) {
           const errData = await res.json().catch(() => ({}));
@@ -452,6 +356,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
     };
   }, [ticker, interval]);
 
+  // Main canvas render and interaction loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -477,44 +382,7 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
 
       s.animTime += 0.016;
 
-      // Apply momentum (inertia scrolling)
-      if (!s.isDragging && (Math.abs(s.momentumVx) > 2 || Math.abs(s.momentumVy) > 2)) {
-        const mChartW = W - 64;
-        const mTotalSlots = (s.viewEnd - s.viewStart) + (s.rightPadding || 0);
-        const mCandlePx = mTotalSlots > 0 ? mChartW / mTotalSlots : 1;
-        const friction = 0.93;
-        const dt = 0.016;
-        const allLen = s.candles.length;
-
-        const candleShift = Math.round(-s.momentumVx * dt / mCandlePx);
-        if (candleShift !== 0) {
-          let newStart = s.viewStart + candleShift;
-          let newPad = s.rightPadding - candleShift;
-          const maxPad = Math.floor(mTotalSlots * 0.6);
-          if (newPad < 0) { newStart -= newPad; newPad = 0; }
-          if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
-          if (newStart < 0) { newPad += newStart; newStart = 0; }
-          const dataSlots = mTotalSlots - newPad;
-          if (newStart + dataSlots > allLen) {
-            newStart = Math.max(0, allLen - dataSlots);
-          }
-          s.viewStart = newStart;
-          s.viewEnd = newStart + dataSlots;
-          s.rightPadding = Math.max(0, newPad);
-        }
-
-        const mPriceH = (H - 38) * 0.82;
-        if (s.lastVisibleRange > 0 && mPriceH > 0) {
-          s.priceOffset += (s.momentumVy * dt / mPriceH) * s.lastVisibleRange;
-        }
-
-        s.momentumVx *= friction;
-        s.momentumVy *= friction;
-        if (Math.abs(s.momentumVx) < 2) s.momentumVx = 0;
-        if (Math.abs(s.momentumVy) < 2) s.momentumVy = 0;
-      }
-
-      // Background
+      // Dark institutional background
       const bg = ctx.createLinearGradient(0, 0, 0, H);
       bg.addColorStop(0, "#060b16");
       bg.addColorStop(0.55, "#03060d");
@@ -522,41 +390,8 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // Smooth animation: lerp price and last 3 candles
-      const sp = s.lerpSpeed;
-      if (s.candles.length > 0) {
-        const lastClose = s.candles[s.candles.length - 1].close;
-        s.displayPrice = s.displayPrice === 0 ? lastClose : lerp(s.displayPrice, lastClose, sp);
-
-        while (s.displayCandles.length < s.candles.length) {
-          const src = s.candles[s.displayCandles.length];
-          s.displayCandles.push({ ...src });
-        }
-        if (s.displayCandles.length > s.candles.length) {
-          s.displayCandles = s.displayCandles.slice(0, s.candles.length);
-        }
-        const lerpCount = Math.min(3, s.candles.length);
-        for (let i = s.candles.length - lerpCount; i < s.candles.length; i++) {
-          const dc = s.displayCandles[i];
-          const tc = s.candles[i];
-          dc.open = lerp(dc.open, tc.open, sp);
-          dc.high = lerp(dc.high, tc.high, sp * 1.5);
-          dc.low = lerp(dc.low, tc.low, sp * 1.5);
-          dc.close = lerp(dc.close, tc.close, sp);
-          dc.volume = lerp(dc.volume, tc.volume, sp * 0.5);
-          dc.time = tc.time;
-        }
-        for (let i = 0; i < s.candles.length - lerpCount; i++) {
-          const dc = s.displayCandles[i];
-          const tc = s.candles[i];
-          dc.open = tc.open; dc.high = tc.high; dc.low = tc.low;
-          dc.close = tc.close; dc.volume = tc.volume; dc.time = tc.time;
-        }
-      }
-
-      const allCandles = s.displayCandles.length === s.candles.length
-        ? s.displayCandles : s.candles;
-      if (!allCandles || allCandles.length < 2) {
+      const candles = s.candles;
+      if (!candles || candles.length < 2) {
         ctx.fillStyle = "rgba(201,168,76,0.4)";
         ctx.font = "11px JetBrains Mono, monospace";
         ctx.textAlign = "center";
@@ -564,90 +399,100 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
         return;
       }
 
-      const rPad = Math.min(s.rightPadding || 0, Math.floor((s.viewEnd - s.viewStart + (s.rightPadding || 0)) * 0.6));
-      const totalSlots = (s.viewEnd - s.viewStart) + rPad;
-      const vs = Math.max(0, Math.floor(s.viewStart));
-      const ve = Math.min(allCandles.length, vs + (totalSlots - rPad));
-      const visibleCandles = allCandles.slice(vs, ve);
-      if (visibleCandles.length < 2) return;
+      // Layout partitioning
+      const rightMargin = s.showDOM ? 160 : 75; // Right price scale & L2 DOM ladder gutter
+      const timeAxisH = 22;
+      const plotW = Math.max(100, W - rightMargin);
+      const plotH = Math.max(100, H - timeAxisH);
 
-      // Rebuild heatmap if view changed
-      const heatKey = `${vs}-${ve}`;
-      if (heatKey !== s.lastHeatKey) {
-        s.heatmap = buildHeatmap(visibleCandles);
-        s.lastHeatKey = heatKey;
-      }
+      const count = candles.length;
+      let barSpacing: number;
+      let indexToX: (idx: number) => number;
+      let xToIndex: (x: number) => number;
 
-      const padd = { top: 8, right: 60, bottom: 30, left: 4 };
-      const chartW = W - padd.left - padd.right;
-      const priceH = (H - padd.top - padd.bottom) * 0.82;
-      const volH = (H - padd.top - padd.bottom) * 0.15;
-      const gapH = (H - padd.top - padd.bottom) * 0.03;
-      const chartX = padd.left;
-      const priceY = padd.top;
-      const volY = padd.top + priceH + gapH;
-
-      const n = visibleCandles.length;
-      const candleW = chartW / totalSlots;
-
-      let priceHigh = -Infinity, priceLow = Infinity, maxVol = 0;
-      visibleCandles.forEach(c => {
-        if (c.high > priceHigh) priceHigh = c.high;
-        if (c.low < priceLow) priceLow = c.low;
-        if (c.volume > maxVol) maxVol = c.volume;
-      });
-
-      const levels = s.levels;
-      if (levels) {
-        levels.resistance.forEach(r => { if (r > priceHigh) priceHigh = r; });
-        levels.support.forEach(sv => { if (sv < priceLow) priceLow = sv; });
-      }
-
-      const priceRange = priceHigh - priceLow || 1;
-      const pricePad = priceRange * 0.08;
-      priceHigh += pricePad;
-      priceLow -= pricePad;
-
-      const vOff = s.priceOffset || 0;
-      priceHigh += vOff;
-      priceLow += vOff;
-
-      // Smooth viewport bounds — snap on large jumps, lerp on small adjustments
-      const targetRange = priceHigh - priceLow;
-      const displayRange = s.displayHigh - s.displayLow;
-      const rangeJump = displayRange > 0 ? Math.abs(targetRange - displayRange) / displayRange : 999;
-      const centerJump = displayRange > 0 ? Math.abs((priceHigh + priceLow) - (s.displayHigh + s.displayLow)) / displayRange : 999;
-
-      if (s.displayHigh === 0 || rangeJump > 0.5 || centerJump > 0.5) {
-        s.displayHigh = priceHigh;
-        s.displayLow = priceLow;
+      if (s.autoFit) {
+        // AutoFit: squeeze entire dataset within viewport
+        const baseBarSpacing = Math.max((plotW - 60) / Math.max(count - 1, 1), 3);
+        barSpacing = baseBarSpacing;
+        indexToX = (idx) => 25 + idx * baseBarSpacing;
+        xToIndex = (x) => Math.round((x - 25) / baseBarSpacing);
       } else {
-        s.displayHigh = lerp(s.displayHigh, priceHigh, sp);
-        s.displayLow = lerp(s.displayLow, priceLow, sp);
-      }
-      priceHigh = s.displayHigh;
-      priceLow = s.displayLow;
-
-      const totalRange = priceHigh - priceLow;
-      s.lastVisibleRange = totalRange;
-
-      const priceToY = (p: number) => priceY + (1 - (p - priceLow) / totalRange) * priceH;
-      const idxToX = (i: number) => chartX + i * candleW + candleW / 2;
-
-      // Patch last candle with lerped display price
-      if (s.displayPrice > 0 && visibleCandles.length > 0) {
-        const last = visibleCandles[visibleCandles.length - 1];
-        last.close = s.displayPrice;
-        if (s.displayPrice > last.high) last.high = s.displayPrice;
-        if (s.displayPrice < last.low) last.low = s.displayPrice;
+        // Professional Live Auto-Scroll: Constant bar spacing right-anchored to live market (NEVER shrinks)
+        barSpacing = Math.max(3.0, Math.min(65.0, s.defaultBarSpacing * Math.max(0.1, s.zoomX)));
+        const rightAnchor = plotW - 45;
+        indexToX = (idx) => rightAnchor + s.panX - (count - 1 - idx) * barSpacing;
+        xToIndex = (x) => Math.round(count - 1 - (rightAnchor + s.panX - x) / barSpacing);
       }
 
-      const currentPrice = s.displayPrice || visibleCandles[visibleCandles.length - 1].close;
+      // Dynamic price bounds computed strictly from VISIBLE candles on screen
+      let minP = Infinity;
+      let maxP = -Infinity;
+      let visibleCount = 0;
+
+      for (let i = 0; i < count; i++) {
+        const x = indexToX(i);
+        if (x >= -35 && x <= plotW + 35) {
+          const c = candles[i];
+          if (c.low < minP) minP = c.low;
+          if (c.high > maxP) maxP = c.high;
+          visibleCount++;
+        }
+      }
+
+      const currentPrice = candles[candles.length - 1].close;
+      if (visibleCount === 0 || minP === Infinity) {
+        minP = currentPrice * 0.995;
+        maxP = currentPrice * 1.005;
+      }
+
+      minP = Math.min(minP, currentPrice);
+      maxP = Math.max(maxP, currentPrice);
+
+      const span = Math.max(maxP - minP, currentPrice * 0.002 || 0.01);
+      let effMinP = minP - span * 0.08;
+      let effMaxP = maxP + span * 0.08;
+
+      // Vertical price scale transformation (drag zoom and pan)
+      if (s.zoomY !== 1.0 || s.panY !== 0) {
+        const centerP = (effMinP + effMaxP) / 2;
+        const currentSpan = (effMaxP - effMinP) / Math.max(0.1, s.zoomY);
+        const halfSpan = currentSpan / 2;
+        const yShift = (s.panY / Math.max(plotH, 100)) * currentSpan;
+        effMinP = centerP - halfSpan + yShift;
+        effMaxP = centerP + halfSpan + yShift;
+      }
+
+      const totalRange = effMaxP - effMinP || 1;
+      const priceToY = (p: number) => plotH - ((p - effMinP) / totalRange) * plotH;
+      const yToPrice = (y: number) => effMinP + ((plotH - y) / plotH) * totalRange;
+
       const dec = getDecimals(currentPrice, s.ticker);
 
-      // === LAYER 1: Blue liquidity heatmap (ImageData rendering) ===
+      // --- LAYER 1: Subtle Grid Lines ---
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+      ctx.lineWidth = 1;
+      const hSteps = 6;
+      for (let i = 0; i <= hSteps; i++) {
+        const y = (plotH / hSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(plotW, y);
+        ctx.stroke();
+      }
+      const vSteps = 8;
+      for (let i = 1; i < vSteps; i++) {
+        const x = (plotW / vSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, plotH);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // --- LAYER 2: Bookmap Continuous Liquidity Spectrogram Heatmap ---
       const hm = s.heatmap;
-      if (hm && hm.max > 0 && n >= 2) {
+      if (s.showHeatmap && hm && hm.max > 0) {
         const hRows = hm.rows;
         const hCols = hm.cols;
 
@@ -659,392 +504,550 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
           oc.width = hCols;
           oc.height = hRows;
         }
-        const octx = oc.getContext("2d", { willReadFrequently: true })!;
-        const imgData = octx.createImageData(hCols, hRows);
-        const pixels = imgData.data;
 
-        for (let row = 0; row < hRows; row++) {
-          const imgRow = hRows - 1 - row;
-          for (let col = 0; col < hCols; col++) {
-            const v = hm.grid[row * hCols + col];
-            const norm = v / hm.max;
-            if (norm < 0.003) continue;
-            const [r, g, b, a] = heatColorRGBA(norm, 1.4);
-            const idx = (imgRow * hCols + col) * 4;
-            pixels[idx] = r;
-            pixels[idx + 1] = g;
-            pixels[idx + 2] = b;
-            pixels[idx + 3] = a;
+        const octx = oc.getContext("2d", { willReadFrequently: true });
+        if (octx) {
+          const imgData = octx.createImageData(hCols, hRows);
+          const pixels = imgData.data;
+          const vRef = hm.v95 > 0 ? hm.v95 : hm.max;
+
+          for (let row = 0; row < hRows; row++) {
+            const imgRow = hRows - 1 - row;
+            for (let col = 0; col < hCols; col++) {
+              const v = hm.grid[row * hCols + col];
+              // Square-root normalization sqrt(v / v95) illuminates ambient depth and resting walls
+              const norm = Math.sqrt(Math.min(1, Math.max(0, v / vRef)));
+              if (norm < 0.02) continue;
+
+              const [r, g, b, a] = heatColorRGBA(norm, 1.35);
+              const idx = (imgRow * hCols + col) * 4;
+              pixels[idx] = r;
+              pixels[idx + 1] = g;
+              pixels[idx + 2] = b;
+              pixels[idx + 3] = a;
+            }
           }
-        }
-        octx.putImageData(imgData, 0, 0);
+          octx.putImageData(imgData, 0, 0);
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(chartX, priceY, chartW, priceH);
-        ctx.clip();
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, plotW, plotH);
+          ctx.clip();
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
 
-        const hmTopY = priceToY(hm.hi);
-        const hmBotY = priceToY(hm.lo);
-        const hmScreenH = hmBotY - hmTopY;
-        const dataW = n * candleW;
-        ctx.drawImage(oc, 0, 0, hCols, hRows, chartX, hmTopY, dataW, hmScreenH);
-        ctx.restore();
+          const hmTopY = priceToY(hm.hi);
+          const hmBotY = priceToY(hm.lo);
+          const hmScreenH = hmBotY - hmTopY;
 
-        // Glow overlay for high-intensity price levels
-        const cellH = Math.max(priceH / hRows, 1);
-        for (let row = 0; row < hRows; row++) {
-          const rowIntensity = hm.rowProfile[row] / hm.rowMax;
-          if (rowIntensity > 0.25) {
-            const price = hm.lo + (row + 0.5) * hm.step;
-            const y = priceToY(price);
-            if (y < priceY - cellH || y > priceY + priceH + cellH) continue;
-            const glowAlpha = (rowIntensity - 0.25) / 0.75;
-            ctx.save();
-            ctx.shadowColor = "rgba(0,160,220,0.6)";
-            ctx.shadowBlur = 18;
-            ctx.fillStyle = heatColor(0.65 + rowIntensity * 0.35, glowAlpha * 0.45);
-            ctx.fillRect(chartX, y - cellH * 1.2, chartW, cellH * 2.4);
-            ctx.restore();
-          }
+          // Draw heatmap aligned to candle horizontal coordinates
+          const leftX = indexToX(0) - barSpacing / 2;
+          const totalW = count * barSpacing;
+          ctx.drawImage(oc, 0, 0, hCols, hRows, leftX, hmTopY, totalW, hmScreenH);
+          ctx.restore();
         }
       }
 
-      // === LAYER 2: S/R levels ===
+      // --- LAYER 3: Key S/R Resistance & Support Levels ---
+      const levels = s.levels;
       if (levels) {
-        levels.resistance.forEach((r, i) => {
+        levels.resistance.forEach((r) => {
           const y = priceToY(r);
-          if (y < priceY - 5 || y > priceY + priceH + 5) return;
-          const alpha = Math.max(0.5, 0.9 - i * 0.15);
-          const isOrange = i % 2 === 1;
-          const coreRGB = isOrange ? "255,140,26" : "255,70,56";
-          const glowRGB = isOrange ? "255,160,60" : "255,90,70";
+          if (y < -5 || y > plotH + 5) return;
           ctx.save();
-          ctx.shadowColor = `rgba(${glowRGB},0.9)`;
-          ctx.shadowBlur = 16;
-          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
-          ctx.fillRect(chartX, y - 1.5, chartW, 3);
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = `rgba(255,205,180,${Math.min(1, alpha + 0.15)})`;
-          ctx.fillRect(chartX, y - 0.6, chartW, 1.2);
-          ctx.restore();
-          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
-          ctx.font = "bold 8px JetBrains Mono, monospace";
+          ctx.strokeStyle = "rgba(239, 68, 68, 0.45)";
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(plotW, y);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(239, 68, 68, 0.75)";
+          ctx.font = "bold 8.5px JetBrains Mono, monospace";
           ctx.textAlign = "left";
-          ctx.fillText(`R${i + 1}`, chartX + 4, y - 4);
+          ctx.fillText(`RESISTANCE ${r.toFixed(dec)}`, 10, y - 3);
+          ctx.restore();
         });
-        levels.support.forEach((sv, i) => {
+
+        levels.support.forEach((sv) => {
           const y = priceToY(sv);
-          if (y < priceY - 5 || y > priceY + priceH + 5) return;
-          const alpha = Math.max(0.5, 0.9 - i * 0.15);
-          const isYellow = i % 2 === 1;
-          const coreRGB = isYellow ? "250,210,20" : "245,160,11";
-          const glowRGB = isYellow ? "255,225,80" : "250,180,60";
+          if (y < -5 || y > plotH + 5) return;
           ctx.save();
-          ctx.shadowColor = `rgba(${glowRGB},0.9)`;
-          ctx.shadowBlur = 16;
-          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
-          ctx.fillRect(chartX, y - 1.5, chartW, 3);
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = `rgba(255,240,190,${Math.min(1, alpha + 0.15)})`;
-          ctx.fillRect(chartX, y - 0.6, chartW, 1.2);
-          ctx.restore();
-          ctx.fillStyle = `rgba(${coreRGB},${alpha})`;
-          ctx.font = "bold 8px JetBrains Mono, monospace";
+          ctx.strokeStyle = "rgba(16, 185, 129, 0.45)";
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(plotW, y);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(16, 185, 129, 0.75)";
+          ctx.font = "bold 8.5px JetBrains Mono, monospace";
           ctx.textAlign = "left";
-          ctx.fillText(`S${i + 1}`, chartX + 4, y - 4);
+          ctx.fillText(`SUPPORT ${sv.toFixed(dec)}`, 10, y - 3);
+          ctx.restore();
         });
+
         if (levels.pivot) {
           const y = priceToY(levels.pivot);
-          if (y >= priceY && y <= priceY + priceH) {
+          if (y >= 0 && y <= plotH) {
             ctx.save();
-            ctx.strokeStyle = "rgba(201,168,76,0.4)";
-            ctx.setLineDash([4, 3]);
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(chartX, y); ctx.lineTo(chartX + chartW, y); ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.strokeStyle = "rgba(201, 168, 76, 0.35)";
+            ctx.setLineDash([2, 4]);
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(plotW, y);
+            ctx.stroke();
+            ctx.fillStyle = "rgba(201, 168, 76, 0.65)";
+            ctx.font = "bold 8px JetBrains Mono, monospace";
+            ctx.textAlign = "left";
+            ctx.fillText(`PIVOT ${levels.pivot.toFixed(dec)}`, 10, y - 3);
             ctx.restore();
           }
         }
       }
 
-      // === LAYER 3: Price axis grid ===
-      const gridStep = niceStep(totalRange, 6);
-      const gridStart = Math.ceil(priceLow / gridStep) * gridStep;
-      ctx.textAlign = "right";
-      ctx.font = "9px JetBrains Mono, monospace";
-      for (let p = gridStart; p <= priceHigh; p += gridStep) {
-        const y = priceToY(p);
-        ctx.fillStyle = "rgba(201,168,76,0.22)";
-        ctx.fillText(p.toFixed(dec), W - 2, y + 3);
+      // --- LAYER 4: EMA Technical Rays ---
+      if (candles.length > 21) {
+        const drawEma = (period: number, color: string) => {
+          const k = 2 / (period + 1);
+          let prev = candles[0].close;
+          ctx.beginPath();
+          let started = false;
+          for (let i = 0; i < count; i++) {
+            const val = candles[i].close * k + prev * (1 - k);
+            prev = val;
+            if (i >= period) {
+              const x = indexToX(i);
+              const y = priceToY(val);
+              if (!started) {
+                ctx.moveTo(x, y);
+                started = true;
+              } else {
+                ctx.lineTo(x, y);
+              }
+            }
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.1;
+          ctx.stroke();
+        };
+
+        drawEma(9, "rgba(233, 208, 130, 0.55)");
+        drawEma(21, "rgba(56, 189, 248, 0.45)");
       }
 
-      // === LAYER 3: EMA lines ===
-      if (visibleCandles.length > 10) {
-        drawEmaLine(ctx, visibleCandles, 9, "rgba(229,213,160,0.45)", idxToX, priceToY);
-        drawEmaLine(ctx, visibleCandles, 21, "rgba(201,168,76,0.32)", idxToX, priceToY);
-        if (visibleCandles.length > 50)
-          drawEmaLine(ctx, visibleCandles, 50, "rgba(139,122,58,0.22)", idxToX, priceToY);
-      }
-
-      // === LAYER 4: Order flow beads ===
-      const baseR = Math.max(Math.min(candleW * 0.55, 9), 2.5);
-
-      // Compute avg candle range for "big move" detection
-      let avgRange = 0;
-      visibleCandles.forEach(c => { avgRange += c.high - c.low; });
-      avgRange /= visibleCandles.length || 1;
-
+      // --- LAYER 5: Institutional Candlesticks Skeleton ---
       ctx.save();
-      ctx.beginPath();
-      visibleCandles.forEach((c, i) => {
-        const x = idxToX(i);
-        const y = priceToY(c.close);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.shadowColor = "rgba(180,222,255,0.35)";
-      ctx.shadowBlur = 3;
-      ctx.strokeStyle = "rgba(205,230,255,0.12)";
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
+      const candleBodyW = Math.max(2, Math.min(24, barSpacing * 0.65));
+
+      for (let i = 0; i < count; i++) {
+        const x = indexToX(i);
+        if (x < -30 || x > plotW + 30) continue;
+
+        const c = candles[i];
+        const isBull = c.close >= c.open;
+        const color = isBull ? "#10b981" : "#ef4444";
+
+        const yOpen = priceToY(c.open);
+        const yClose = priceToY(c.close);
+        const yHigh = priceToY(c.high);
+        const yLow = priceToY(c.low);
+
+        // Candle Wick
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+
+        // Candle Body
+        const topY = Math.min(yOpen, yClose);
+        const bodyH = Math.max(1.5, Math.abs(yOpen - yClose));
+        ctx.fillStyle = isBull ? "rgba(16, 185, 129, 0.85)" : "rgba(239, 68, 68, 0.85)";
+        ctx.fillRect(x - candleBodyW / 2, topY, candleBodyW, bodyH);
+      }
       ctx.restore();
 
-      visibleCandles.forEach((c, i) => {
-        const x = idxToX(i);
-        const isBull = c.close >= c.open;
-        const dirRGB = isBull ? BULL_RGB : BEAR_RGB;
-        const volNorm = maxVol ? c.volume / maxVol : 0.5;
-        const candleRange = c.high - c.low;
-        if (candleRange <= 0) return;
+      // --- LAYER 6: Adaptive Trade Volume & Absorption Bubbles (No Caterpillar Overlap) ---
+      if (s.showBubbles) {
+        ctx.save();
+        const vols = candles.map((c) => c.volume || 1).sort((a, b) => a - b);
+        const v85 = vols[Math.floor(vols.length * 0.85)] || 1;
 
-        // Scale factor: bigger bubbles for high volume + big range candles
-        const moveRatio = avgRange > 0 ? candleRange / avgRange : 1;
-        const intensity = Math.min(2.2, 0.6 + volNorm * 0.8 + Math.max(0, moveRatio - 1) * 0.6);
-
-        const bodyHi = Math.max(c.open, c.close);
-        const bodyLo = Math.min(c.open, c.close);
-        const bodyPx = priceToY(bodyLo) - priceToY(bodyHi);
-        const scaledR = baseR * intensity;
-
-        if (c.high > bodyHi + candleRange * 0.04) {
-          const wickSteps = Math.max(Math.round((priceToY(bodyHi) - priceToY(c.high)) / (scaledR * 2.2)), 1);
-          for (let w = 0; w <= wickSteps; w++) {
-            const t = wickSteps > 0 ? w / wickSteps : 0;
-            const price = c.high + t * (bodyHi - c.high);
-            const fade = 0.18 + t * 0.15;
-            drawSphere(ctx, x, priceToY(price), scaledR * 0.4, BEAR_RGB, fade);
+        let maxVolIdx = -1;
+        let maxV = -Infinity;
+        for (let i = 0; i < count; i++) {
+          const v = candles[i].volume || 1;
+          if (v > maxV) {
+            maxV = v;
+            maxVolIdx = i;
           }
         }
 
-        if (c.low < bodyLo - candleRange * 0.04) {
-          const wickSteps = Math.max(Math.round((priceToY(c.low) - priceToY(bodyLo)) / (scaledR * 2.2)), 1);
-          for (let w = 0; w <= wickSteps; w++) {
-            const t = wickSteps > 0 ? w / wickSteps : 0;
-            const price = bodyLo - t * (bodyLo - c.low);
-            const fade = 0.18 + (1 - t) * 0.15;
-            drawSphere(ctx, x, priceToY(price), scaledR * 0.4, BULL_RGB, fade);
-          }
-        }
+        const maxBubbleR = Math.max(3.0, Math.min(16.0, barSpacing * 0.65));
+        const minBubbleR = Math.max(2.5, Math.min(4.5, barSpacing * 0.35));
 
-        const numBubbles = Math.max(Math.round(bodyPx / (scaledR * 1.6)), 2);
-        const bodySize = 0.5 + volNorm * 0.6 + Math.max(0, moveRatio - 1) * 0.3;
-        for (let b = 0; b < numBubbles; b++) {
-          const t = numBubbles > 1 ? b / (numBubbles - 1) : 0.5;
-          const price = bodyLo + t * (bodyHi - bodyLo);
-          drawSphere(ctx, x, priceToY(price), scaledR * bodySize * 0.72, dirRGB, 0.65);
-        }
+        for (let i = 0; i < count; i++) {
+          const c = candles[i];
+          const v = c.volume || 1;
+          if (v < v85) continue;
 
-        const closeY = priceToY(c.close);
-        const closeR = scaledR * (0.9 + volNorm * 0.8);
-        drawSphere(ctx, x, closeY, closeR, dirRGB, 1);
-      });
+          const x = indexToX(i);
+          if (x < -30 || x > plotW + 30) continue;
 
-      // === LAYER 5: Current price line + gold tag ===
-      if (currentPrice) {
-        const y = priceToY(currentPrice);
-        const pulse = (Math.sin(s.animTime * 3) + 1) * 0.5;
+          const isBull = c.close >= c.open;
+          const norm = Math.min(1, Math.max(0, (v - v85) / Math.max(v85, 1)));
+          const radius = Math.min(maxBubbleR, minBubbleR + Math.sqrt(norm) * (maxBubbleR - minBubbleR));
 
-        ctx.beginPath(); ctx.moveTo(chartX, y); ctx.lineTo(chartX + chartW, y);
-        ctx.strokeStyle = `rgba(201,168,76,${0.3 + pulse * 0.15})`;
-        ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
+          let bubbleY: number;
+          let anchorY: number;
 
-        const tagW = 56;
-        ctx.fillStyle = `rgba(201,168,76,${0.85 + pulse * 0.15})`;
-        ctx.fillRect(chartX + chartW + 2, y - 8, tagW, 16);
-        ctx.fillStyle = "#0A0908";
-        ctx.font = "bold 9px JetBrains Mono, monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(currentPrice.toFixed(dec), chartX + chartW + 2 + tagW / 2, y + 3);
-      }
-
-      // === LAYER 6: Volume bars ===
-      const bodyW = Math.max(candleW * 0.6, 2);
-      visibleCandles.forEach((c, i) => {
-        const x = idxToX(i);
-        const vNorm = maxVol ? c.volume / maxVol : 0;
-        const vH = vNorm * volH;
-        const isBull = c.close >= c.open;
-        ctx.fillStyle = isBull
-          ? `rgba(16,185,129,${0.2 + vNorm * 0.35})`
-          : `rgba(239,68,68,${0.2 + vNorm * 0.35})`;
-        ctx.fillRect(x - bodyW / 2, volY + volH - vH, bodyW, vH);
-      });
-
-      ctx.beginPath();
-      ctx.moveTo(chartX, volY - 2);
-      ctx.lineTo(chartX + chartW, volY - 2);
-      ctx.strokeStyle = "rgba(201,168,76,0.06)";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-
-      // === LAYER 7: Time labels ===
-      ctx.fillStyle = "rgba(201,168,76,0.2)";
-      ctx.font = "8px JetBrains Mono, monospace";
-      ctx.textAlign = "center";
-      const labelEvery = Math.max(Math.floor(n / 6), 1);
-      visibleCandles.forEach((c, i) => {
-        if (i % labelEvery === 0) {
-          const d = new Date(c.time * 1000);
-          const intv = s.interval;
-          let label: string;
-          if (intv === "1d" || intv === "1wk") {
-            label = `${d.getMonth() + 1}/${d.getDate()}`;
+          if (isBull) {
+            anchorY = priceToY(c.high);
+            bubbleY = anchorY - radius - 5;
           } else {
-            const hh = String(d.getHours()).padStart(2, "0");
-            const mm = String(d.getMinutes()).padStart(2, "0");
-            label = `${hh}:${mm}`;
+            anchorY = priceToY(c.low);
+            bubbleY = anchorY + radius + 5;
           }
-          ctx.fillText(label, idxToX(i), H - 4);
-        }
-      });
 
-      // Chart label
-      ctx.fillStyle = "rgba(201,168,76,0.12)";
-      ctx.font = "9px JetBrains Mono, monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`${s.interval.toUpperCase()} ORDER FLOW`, chartX + 4, priceY + 10);
+          if (anchorY < 0 || anchorY > plotH) continue;
+          if (bubbleY - radius < 2 || bubbleY + radius > plotH - 2) continue;
 
-      // === CROSSHAIR ===
-      if (s.mouseX >= 0 && !s.isDragging) {
-        const mx = s.mouseX;
-        const my = s.mouseY;
+          const isTopEvent = i === maxVolIdx;
+          const fillColor = isBull
+            ? "rgba(201, 168, 76, 0.45)"
+            : "rgba(74, 158, 176, 0.40)";
+          const strokeColor = isBull
+            ? "rgba(233, 208, 130, 0.85)"
+            : "rgba(126, 205, 224, 0.85)";
 
-        if (mx > chartX && mx < chartX + chartW && my > priceY && my < priceY + priceH) {
-          ctx.save();
-          ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = "rgba(201,168,76,0.4)";
-          ctx.lineWidth = 0.5;
-
+          // Dashed connector to candle wick
+          ctx.strokeStyle = isBull ? "rgba(201, 168, 76, 0.5)" : "rgba(74, 158, 176, 0.5)";
+          ctx.lineWidth = 0.8;
+          ctx.setLineDash([2, 2]);
           ctx.beginPath();
-          ctx.moveTo(mx, priceY);
-          ctx.lineTo(mx, priceY + priceH);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(chartX, my);
-          ctx.lineTo(chartX + chartW, my);
+          ctx.moveTo(x, anchorY);
+          ctx.lineTo(x, isBull ? bubbleY + radius : bubbleY - radius);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Price label
-          const crossPrice = priceLow + (1 - (my - priceY) / priceH) * totalRange;
-          const priceText = crossPrice.toFixed(dec);
-          ctx.fillStyle = "rgba(201,168,76,0.9)";
-          const labelW = ctx.measureText(priceText).width + 8;
-          ctx.fillRect(chartX + chartW + 1, my - 8, labelW + 4, 16);
-          ctx.fillStyle = "#0A0908";
-          ctx.font = "bold 8px JetBrains Mono, monospace";
-          ctx.textAlign = "left";
-          ctx.fillText(priceText, chartX + chartW + 5, my + 3);
+          // Absorption Bubble Body
+          ctx.beginPath();
+          ctx.arc(x, bubbleY, radius, 0, Math.PI * 2);
+          ctx.fillStyle = fillColor;
+          ctx.fill();
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = isBull ? 1.2 : 2.0;
+          ctx.stroke();
 
-          // Time label
-          const candleIdx = Math.floor((mx - chartX) / candleW);
-          if (candleIdx >= 0 && candleIdx < visibleCandles.length) {
-            const cd = new Date(visibleCandles[candleIdx].time * 1000);
-            const intv = s.interval;
-            let timeText: string;
-            if (intv === "1d" || intv === "1wk") {
-              timeText = `${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, "0")}-${String(cd.getDate()).padStart(2, "0")}`;
-            } else {
-              timeText = `${String(cd.getHours()).padStart(2, "0")}:${String(cd.getMinutes()).padStart(2, "0")}`;
-            }
-            const tw = ctx.measureText(timeText).width + 8;
-            ctx.fillStyle = "rgba(201,168,76,0.9)";
-            ctx.fillRect(mx - tw / 2, priceY + priceH + 2, tw, 14);
-            ctx.fillStyle = "#0A0908";
-            ctx.font = "bold 8px JetBrains Mono, monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(timeText, mx, priceY + priceH + 12);
-
-            // OHLCV tooltip
-            const hc = visibleCandles[candleIdx];
-            const ohlcText = `O:${hc.open.toFixed(dec)} H:${hc.high.toFixed(dec)} L:${hc.low.toFixed(dec)} C:${hc.close.toFixed(dec)}`;
-            ctx.fillStyle = "rgba(201,168,76,0.35)";
-            ctx.font = "8px JetBrains Mono, monospace";
-            ctx.textAlign = "left";
-            ctx.fillText(ohlcText, chartX + 4, priceY + 22);
+          // Outer surveillance ring on top volume event
+          if (isTopEvent) {
+            ctx.beginPath();
+            ctx.arc(x, bubbleY, radius + 3.5, 0, Math.PI * 2);
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 0.9;
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
           }
 
+          // Delta text on hover or top event
+          const isHovered = s.mouseX >= 0 && Math.abs(s.mouseX - x) < Math.max(radius, barSpacing / 2);
+          if (isTopEvent || isHovered) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 8.5px JetBrains Mono, monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const sign = isBull ? "+" : "-";
+            ctx.fillText(`${sign}${Math.round(v / 1000)}k`, x, bubbleY);
+          }
+        }
+        ctx.restore();
+      }
+
+      // --- LAYER 7: Current Price Active Ray ---
+      const yCurrent = priceToY(currentPrice);
+      const pulse = (Math.sin(s.animTime * 3) + 1) * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, yCurrent);
+      ctx.lineTo(plotW, yCurrent);
+      ctx.strokeStyle = `rgba(201, 168, 76, ${0.35 + pulse * 0.25})`;
+      ctx.lineWidth = 0.9;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // --- LAYER 8: Time Axis Strip ---
+      ctx.save();
+      ctx.fillStyle = "rgba(201, 168, 76, 0.35)";
+      ctx.font = "8.5px JetBrains Mono, monospace";
+      ctx.textAlign = "center";
+      const labelEvery = Math.max(Math.floor(plotW / (barSpacing * 6)), 1);
+
+      for (let i = 0; i < count; i += labelEvery) {
+        const x = indexToX(i);
+        if (x < 15 || x > plotW - 15) continue;
+        const d = new Date(candles[i].time * 1000);
+        let timeLabel: string;
+        if (s.interval === "1d" || s.interval === "1wk") {
+          timeLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+        } else {
+          timeLabel = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        }
+        ctx.fillText(timeLabel, x, H - 6);
+      }
+      ctx.restore();
+
+      // --- LAYER 9: Interactive 3-Column L2 DOM Price Ladder on Right Margin ---
+      ctx.save();
+      const ladderX = plotW;
+      const ladderW = rightMargin;
+
+      // Background & border
+      ctx.fillStyle = "#080c16";
+      ctx.fillRect(ladderX, 0, ladderW, H);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.beginPath();
+      ctx.moveTo(ladderX, 0);
+      ctx.lineTo(ladderX, H);
+      ctx.stroke();
+
+      if (s.showDOM) {
+        // Table Header
+        ctx.fillStyle = "#0d1424";
+        ctx.fillRect(ladderX, 0, ladderW, 20);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.beginPath();
+        ctx.moveTo(ladderX, 20);
+        ctx.lineTo(ladderX + ladderW, 20);
+        ctx.stroke();
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "bold 8px JetBrains Mono, monospace";
+        ctx.textBaseline = "middle";
+
+        const col1W = Math.round(ladderW * 0.33);
+        const col2W = Math.round(ladderW * 0.34);
+
+        ctx.textAlign = "right";
+        ctx.fillText("EST. BID", ladderX + col1W - 4, 10);
+        ctx.textAlign = "center";
+        ctx.fillText("PRICE", ladderX + col1W + col2W / 2, 10);
+        ctx.textAlign = "left";
+        ctx.fillText("EST. ASK", ladderX + col1W + col2W + 4, 10);
+
+        // Say it on the canvas, not only on the toggle.
+        //
+        // This feed carries no order book. The ladder below is DERIVED from
+        // the volume profile - an exponential decay away from last price -
+        // and no part of it was quoted by anyone. Labelling the columns
+        // "BID VOL"/"ASK VOL" presented a formula as market depth, which is
+        // a claim this product cannot support and a subscriber cannot check.
+        //
+        // The caption is drawn here rather than left to the button label so
+        // it survives a screenshot, and so a later tidy-up of the toolbar
+        // cannot remove the disclosure while leaving the ladder.
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.font = "8px JetBrains Mono, monospace";
+        ctx.fillStyle = "rgba(245,158,11,0.75)";
+        ctx.fillText("MODELLED - NO L2 FEED",
+                     ladderX + ladderW / 2, plotH - 4);
+        ctx.restore();
+
+        // Price Ladder Rows: Render across visible price domain with proper density
+        const numRows = Math.min(30, Math.max(10, Math.floor((plotH - 24) / 16)));
+        const priceStep = totalRange / numRows;
+
+        // Baseline max volume for depth bar sizing
+        let maxDOMVol = 1;
+        for (let i = 0; i < count; i++) {
+          if (candles[i].volume > maxDOMVol) maxDOMVol = candles[i].volume;
+        }
+
+        for (let r = 0; r <= numRows; r++) {
+          const rowPrice = effMinP + r * priceStep;
+          const yRow = priceToY(rowPrice);
+          if (yRow < 22 || yRow > plotH) continue;
+
+          const isAsk = rowPrice > currentPrice;
+          const isCurrent = Math.abs(rowPrice - currentPrice) < priceStep * 0.5;
+
+          // Pseudo-depth derived from volume profile with natural clustering
+          const distNorm = Math.abs(rowPrice - currentPrice) / span;
+          const depthVol = Math.max(14, Math.round((maxDOMVol / 40) * Math.exp(-distNorm * 2.5) * (1 + (r % 3) * 0.4)));
+          const barLen = Math.min(col1W - 6, Math.max(4, (depthVol / (maxDOMVol / 20)) * col1W));
+
+          // Fill opposite cell with cross-session volume so there is NEVER an empty gap
+          const crossVol = Math.max(8, Math.round(depthVol * 0.42));
+
+          if (isCurrent) {
+            // Mid Market Price Row
+            ctx.fillStyle = "rgba(201, 168, 76, 0.22)";
+            ctx.fillRect(ladderX + 1, yRow - 7, ladderW - 2, 14);
+            ctx.strokeStyle = "rgba(201, 168, 76, 0.6)";
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(ladderX + 1, yRow - 7, ladderW - 2, 14);
+
+            ctx.fillStyle = "#fef08a";
+            ctx.font = "bold 8.5px JetBrains Mono, monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(`MID ${currentPrice.toFixed(dec)}`, ladderX + ladderW / 2, yRow);
+          } else if (isAsk) {
+            // Ask Row
+            // Ask Vol Bar & Value
+            ctx.fillStyle = "rgba(239, 68, 68, 0.25)";
+            ctx.fillRect(ladderX + col1W + col2W + 1, yRow - 5, barLen, 10);
+
+            ctx.fillStyle = "#fca5a5";
+            ctx.font = "bold 8px JetBrains Mono, monospace";
+            ctx.textAlign = "left";
+            ctx.fillText(`${depthVol}`, ladderX + col1W + col2W + 4, yRow);
+
+            // Price Center
+            ctx.fillStyle = "#f87171";
+            ctx.font = "8px JetBrains Mono, monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(rowPrice.toFixed(dec), ladderX + col1W + col2W / 2, yRow);
+
+            // Opposite Bid Vol (Filled, Never Empty)
+            ctx.fillStyle = "#64748b";
+            ctx.textAlign = "right";
+            ctx.fillText(`${crossVol}`, ladderX + col1W - 4, yRow);
+          } else {
+            // Bid Row
+            // Bid Vol Bar & Value
+            ctx.fillStyle = "rgba(16, 185, 129, 0.25)";
+            ctx.fillRect(ladderX + col1W - barLen - 1, yRow - 5, barLen, 10);
+
+            ctx.fillStyle = "#86efac";
+            ctx.font = "bold 8px JetBrains Mono, monospace";
+            ctx.textAlign = "right";
+            ctx.fillText(`${depthVol}`, ladderX + col1W - 4, yRow);
+
+            // Price Center
+            ctx.fillStyle = "#34d399";
+            ctx.font = "8px JetBrains Mono, monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(rowPrice.toFixed(dec), ladderX + col1W + col2W / 2, yRow);
+
+            // Opposite Ask Vol (Filled, Never Empty)
+            ctx.fillStyle = "#64748b";
+            ctx.textAlign = "left";
+            ctx.fillText(`${crossVol}`, ladderX + col1W + col2W + 4, yRow);
+          }
+        }
+      } else {
+        // Standard Price Scale Axis ticks when DOM is toggled off
+        const tickSteps = 8;
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "9px JetBrains Mono, monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+
+        for (let i = 0; i <= tickSteps; i++) {
+          const y = (plotH / tickSteps) * i;
+          const p = yToPrice(y);
+          ctx.fillText(p.toFixed(dec), W - 6, y);
+        }
+      }
+
+      // Current Price Flashing Badge in Right Gutter
+      const badgeH = 17;
+      ctx.fillStyle = "rgba(201, 168, 76, 0.95)";
+      ctx.fillRect(ladderX + 2, yCurrent - badgeH / 2, ladderW - 4, badgeH);
+      ctx.fillStyle = "#070a13";
+      ctx.font = "bold 9.5px JetBrains Mono, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(currentPrice.toFixed(dec), ladderX + ladderW / 2, yCurrent);
+      ctx.restore();
+
+      // --- LAYER 10: Interactive Crosshairs & HUD ---
+      if (s.mouseX >= 0 && !s.isDragging && !s.isDraggingPriceScale) {
+        const mx = s.mouseX;
+        const my = s.mouseY;
+
+        if (mx > 0 && mx < plotW && my > 0 && my < plotH) {
+          ctx.save();
+          ctx.setLineDash([3, 3]);
+          ctx.strokeStyle = "rgba(201, 168, 76, 0.45)";
+          ctx.lineWidth = 0.8;
+
+          // Crosshair lines
+          ctx.beginPath();
+          ctx.moveTo(mx, 0);
+          ctx.lineTo(mx, plotH);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, my);
+          ctx.lineTo(plotW, my);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Crosshair Price Tag
+          const crossPrice = yToPrice(my);
+          const priceText = crossPrice.toFixed(dec);
+          ctx.fillStyle = "rgba(201, 168, 76, 0.95)";
+          ctx.fillRect(plotW + 2, my - 8, ladderW - 4, 16);
+          ctx.fillStyle = "#070a13";
+          ctx.font = "bold 8.5px JetBrains Mono, monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(priceText, plotW + ladderW / 2, my);
+
+          // Crosshair Time Tag
+          const candleIdx = xToIndex(mx);
+          if (candleIdx >= 0 && candleIdx < count) {
+            const cd = new Date(candles[candleIdx].time * 1000);
+            const timeText = `${cd.toLocaleDateString()} ${String(cd.getHours()).padStart(2, "0")}:${String(cd.getMinutes()).padStart(2, "0")}`;
+            ctx.fillStyle = "rgba(201, 168, 76, 0.95)";
+            const tw = ctx.measureText(timeText).width + 12;
+            ctx.fillRect(mx - tw / 2, plotH + 2, tw, 15);
+            ctx.fillStyle = "#070a13";
+            ctx.fillText(timeText, mx, plotH + 10);
+
+            // OHLCV Floating Tooltip
+            const hc = candles[candleIdx];
+            const ohlc = `O: ${hc.open.toFixed(dec)}  H: ${hc.high.toFixed(dec)}  L: ${hc.low.toFixed(dec)}  C: ${hc.close.toFixed(dec)}  VOL: ${Math.round(hc.volume).toLocaleString()}`;
+            ctx.fillStyle = "rgba(201, 168, 76, 0.55)";
+            ctx.font = "8.5px JetBrains Mono, monospace";
+            ctx.textAlign = "left";
+            ctx.fillText(ohlc, 12, 16);
+          }
           ctx.restore();
         }
       }
     }
 
-    // Event handlers
-    function onWheel(e: WheelEvent) {
-      e.preventDefault();
-      const allLen = s.candles.length;
-      if (allLen < 2) return;
-
+    // Interactive Event Handlers
+    function onMouseDown(e: MouseEvent) {
       const rect = canvas!.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const chartLeft = 4;
-      const chartRight = 60;
-      const cW = rect.width - chartLeft - chartRight;
+      const rightMargin = s.showDOM ? 160 : 75;
+      const plotW = rect.width - rightMargin;
+      const isNearPriceScale = mouseX > plotW;
 
-      const dataRange = s.viewEnd - s.viewStart;
-      const visCount = dataRange + s.rightPadding;
-      const mouseRatio = Math.max(0, Math.min(1, (mouseX - chartLeft) / cW));
-      const mouseSlot = s.viewStart + mouseRatio * visCount;
-
-      const zoomFactor = e.deltaY > 0 ? 1.1 : 0.91;
-      let newVisCount = Math.round(visCount * zoomFactor);
-      newVisCount = Math.max(MIN_VISIBLE, Math.min(allLen + Math.floor(allLen * 0.6), newVisCount));
-
-      let newViewStart = Math.round(mouseSlot - mouseRatio * newVisCount);
-      const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
-      let newPad = Math.round(newVisCount * padRatio);
-      const maxPad = Math.floor(newVisCount * 0.6);
-      if (newPad > maxPad) newPad = maxPad;
-
-      const newDataRange = newVisCount - newPad;
-      if (newViewStart < 0) newViewStart = 0;
-      if (newViewStart + newDataRange > allLen) {
-        newViewStart = Math.max(0, allLen - newDataRange);
+      if (isNearPriceScale) {
+        // TradingView price scale vertical drag zoom
+        s.isDraggingPriceScale = true;
+        s.dragStartPriceY = e.clientY;
+        s.initialZoomY = s.zoomY;
+        s.autoFit = false;
+        setAutoFit(false);
+      } else {
+        // Pan viewport
+        s.isDragging = true;
+        s.dragStartX = e.clientX;
+        s.dragStartY = e.clientY;
+        s.dragStartPanX = s.panX;
+        s.dragStartPanY = s.panY;
+        s.autoFit = false;
+        setAutoFit(false);
       }
-
-      s.viewStart = newViewStart;
-      s.viewEnd = newViewStart + newDataRange;
-      s.rightPadding = newPad;
-      s.momentumVx = 0;
-      s.momentumVy = 0;
-    }
-
-    function onMouseDown(e: MouseEvent) {
-      e.preventDefault();
-      s.isDragging = true;
-      s.dragStartX = e.clientX;
-      s.dragStartY = e.clientY;
-      s.dragViewStart = s.viewStart;
-      s.dragViewEnd = s.viewEnd;
-      s.dragStartPad = s.rightPadding;
-      s.dragStartPriceOffset = s.priceOffset;
-      s.momentumVx = 0;
-      s.momentumVy = 0;
-      s.dragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-      canvas!.style.cursor = "grabbing";
     }
 
     function onMouseMove(e: MouseEvent) {
@@ -1052,214 +1055,71 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
       s.mouseX = e.clientX - rect.left;
       s.mouseY = e.clientY - rect.top;
 
-      if (s.isDragging) {
-        const allLen = s.candles.length;
-        const cW = rect.width - 64;
-        const visCount = (s.dragViewEnd - s.dragViewStart) + s.dragStartPad;
-        const candlePx = cW / visCount;
-        const dx = e.clientX - s.dragStartX;
-        const shift = Math.round(-dx / candlePx);
+      const rightMargin = s.showDOM ? 160 : 75;
+      const plotW = rect.width - rightMargin;
+      const isNearPriceScale = s.mouseX > plotW;
 
-        let newStart = s.dragViewStart + shift;
-        let newPad = s.dragStartPad - shift;
-        const maxPad = Math.floor(visCount * 0.6);
-        if (newPad < 0) { newStart -= newPad; newPad = 0; }
-        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
-        if (newStart < 0) { newPad += newStart; newStart = 0; }
-        const dataSlots = visCount - newPad;
-        if (newStart + dataSlots > allLen) {
-          newStart = Math.max(0, allLen - dataSlots);
-        }
-        s.viewStart = newStart;
-        s.viewEnd = newStart + dataSlots;
-        s.rightPadding = Math.max(0, newPad);
-
-        const dy = e.clientY - s.dragStartY;
-        const pH = (rect.height - 38) * 0.82;
-        if (s.lastVisibleRange && pH > 0) {
-          s.priceOffset = s.dragStartPriceOffset + (dy / pH) * s.lastVisibleRange;
-        }
-
-        s.dragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-        if (s.dragHistory.length > 6) s.dragHistory.shift();
+      if (s.isDraggingPriceScale) {
+        // Dragging UP expands scale (zoom in), dragging DOWN compresses scale (zoom out)
+        const dy = s.dragStartPriceY - e.clientY;
+        const factor = Math.exp(dy / 140);
+        s.zoomY = Math.max(0.10, Math.min(30.0, s.initialZoomY * factor));
+        canvas!.style.cursor = "ns-resize";
+      } else if (s.isDragging) {
+        s.panX = s.dragStartPanX + (e.clientX - s.dragStartX);
+        s.panY = s.dragStartPanY + (e.clientY - s.dragStartY);
+        canvas!.style.cursor = "grabbing";
+      } else {
+        canvas!.style.cursor = isNearPriceScale ? "ns-resize" : "crosshair";
       }
     }
 
     function onMouseUp() {
-      if (s.isDragging && s.dragHistory.length >= 2) {
-        const last = s.dragHistory[s.dragHistory.length - 1];
-        const prev = s.dragHistory[Math.max(0, s.dragHistory.length - 3)];
-        const dt = (last.t - prev.t) / 1000;
-        if (dt > 0 && dt < 0.15) {
-          s.momentumVx = (last.x - prev.x) / dt;
-          s.momentumVy = (last.y - prev.y) / dt;
-        } else {
-          s.momentumVx = 0;
-          s.momentumVy = 0;
-        }
-      }
       s.isDragging = false;
-      s.dragHistory = [];
+      s.isDraggingPriceScale = false;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        const inside = s.mouseX >= 0 && s.mouseX <= rect.width && s.mouseY >= 0 && s.mouseY <= rect.height;
-        if (!inside) {
-          s.mouseX = -1;
-          s.mouseY = -1;
-        }
-        canvas.style.cursor = "crosshair";
+        const rightMargin = s.showDOM ? 160 : 75;
+        const isNearPriceScale = s.mouseX > rect.width - rightMargin;
+        canvas.style.cursor = isNearPriceScale ? "ns-resize" : "crosshair";
       }
     }
 
-    function onMouseLeave() {
-      if (!s.isDragging) {
-        s.mouseX = -1;
-        s.mouseY = -1;
-        canvas!.style.cursor = "crosshair";
-      }
-    }
-
-    function onDblClick() {
-      s.viewEnd = s.candles.length;
-      s.viewStart = Math.max(0, s.candles.length - DEFAULT_VISIBLE);
-      s.rightPadding = 0;
-      s.priceOffset = 0;
-    }
-
-    function onKeyDown(e: KeyboardEvent) {
-      const allLen = s.candles.length;
-      if (allLen < 2) return;
-      const visCount = (s.viewEnd - s.viewStart) + s.rightPadding;
-      const step = Math.max(1, Math.round(visCount * 0.05));
-
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        let newStart = s.viewStart - step;
-        let newPad = s.rightPadding + step;
-        const maxPad = Math.floor(visCount * 0.6);
-        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
-        if (newStart < 0) { newPad += newStart; newStart = 0; }
-        s.viewStart = newStart;
-        s.viewEnd = newStart + (visCount - newPad);
-        s.rightPadding = Math.max(0, newPad);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        let newStart = s.viewStart + step;
-        let newPad = s.rightPadding - step;
-        if (newPad < 0) { newStart -= newPad; newPad = 0; }
-        const dataSlots = visCount - newPad;
-        if (newStart + dataSlots > allLen) {
-          newStart = Math.max(0, allLen - dataSlots);
-        }
-        s.viewStart = newStart;
-        s.viewEnd = newStart + dataSlots;
-        s.rightPadding = Math.max(0, newPad);
-      } else if (e.key === "ArrowUp" || e.key === "+" || e.key === "=") {
-        e.preventDefault();
-        const zf = 0.91;
-        let nv = Math.round(visCount * zf);
-        nv = Math.max(MIN_VISIBLE, nv);
-        const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
-        s.rightPadding = Math.min(Math.round(nv * padRatio), Math.floor(nv * 0.6));
-        const nd = nv - s.rightPadding;
-        if (s.viewStart + nd > allLen) s.viewStart = Math.max(0, allLen - nd);
-        s.viewEnd = s.viewStart + nd;
-      } else if (e.key === "ArrowDown" || e.key === "-") {
-        e.preventDefault();
-        const zf = 1.1;
-        let nv = Math.round(visCount * zf);
-        nv = Math.min(allLen + Math.floor(allLen * 0.6), nv);
-        const padRatio = visCount > 0 ? s.rightPadding / visCount : 0;
-        s.rightPadding = Math.min(Math.round(nv * padRatio), Math.floor(nv * 0.6));
-        const nd = nv - s.rightPadding;
-        if (s.viewStart + nd > allLen) s.viewStart = Math.max(0, allLen - nd);
-        s.viewEnd = s.viewStart + nd;
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        s.viewEnd = allLen;
-        s.viewStart = Math.max(0, allLen - DEFAULT_VISIBLE);
-        s.rightPadding = 0;
-        s.priceOffset = 0;
-      }
-    }
-
-    function onTouchStart(e: TouchEvent) {
-      if (e.touches.length === 1) {
-        const t = e.touches[0];
-        s.isDragging = true;
-        s.dragStartX = t.clientX;
-        s.dragStartY = t.clientY;
-        s.dragViewStart = s.viewStart;
-        s.dragViewEnd = s.viewEnd;
-        s.dragStartPad = s.rightPadding;
-        s.dragStartPriceOffset = s.priceOffset;
-        s.momentumVx = 0;
-        s.momentumVy = 0;
-        s.dragHistory = [{ x: t.clientX, y: t.clientY, t: performance.now() }];
-      }
-    }
-
-    function onTouchMove(e: TouchEvent) {
+    function onWheel(e: WheelEvent) {
       e.preventDefault();
-      if (e.touches.length === 1 && s.isDragging) {
-        const t = e.touches[0];
-        const rect = canvas!.getBoundingClientRect();
-        const allLen = s.candles.length;
-        const cW = rect.width - 64;
-        const visCount = (s.dragViewEnd - s.dragViewStart) + s.dragStartPad;
-        const candlePx = cW / visCount;
-        const dx = t.clientX - s.dragStartX;
-        const shift = Math.round(-dx / candlePx);
+      const rect = canvas!.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const rightMargin = s.showDOM ? 160 : 75;
+      const isNearPriceScale = mouseX > rect.width - rightMargin;
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
 
-        let newStart = s.dragViewStart + shift;
-        let newPad = s.dragStartPad - shift;
-        const maxPad = Math.floor(visCount * 0.6);
-        if (newPad < 0) { newStart -= newPad; newPad = 0; }
-        if (newPad > maxPad) { newStart -= (newPad - maxPad); newPad = maxPad; }
-        if (newStart < 0) { newPad += newStart; newStart = 0; }
-        const dataSlots = visCount - newPad;
-        if (newStart + dataSlots > allLen) {
-          newStart = Math.max(0, allLen - dataSlots);
-        }
-        s.viewStart = newStart;
-        s.viewEnd = newStart + dataSlots;
-        s.rightPadding = Math.max(0, newPad);
+      s.autoFit = false;
+      setAutoFit(false);
 
-        const dy = t.clientY - s.dragStartY;
-        const pH = (rect.height - 38) * 0.82;
-        if (s.lastVisibleRange && pH > 0) {
-          s.priceOffset = s.dragStartPriceOffset + (dy / pH) * s.lastVisibleRange;
-        }
-
-        s.dragHistory.push({ x: t.clientX, y: t.clientY, t: performance.now() });
-        if (s.dragHistory.length > 6) s.dragHistory.shift();
+      if (e.shiftKey || isNearPriceScale) {
+        // Shift+Wheel or over price scale -> Vertical Zoom
+        s.zoomY = Math.max(0.10, Math.min(30.0, s.zoomY * zoomFactor));
+      } else {
+        // Wheel -> Horizontal Bar Spacing Zoom
+        s.zoomX = Math.max(0.15, Math.min(10.0, s.zoomX * zoomFactor));
       }
     }
 
-    function onTouchEnd() {
-      if (s.isDragging && s.dragHistory.length >= 2) {
-        const last = s.dragHistory[s.dragHistory.length - 1];
-        const prev = s.dragHistory[Math.max(0, s.dragHistory.length - 3)];
-        const dt = (last.t - prev.t) / 1000;
-        if (dt > 0 && dt < 0.15) {
-          s.momentumVx = (last.x - prev.x) / dt;
-          s.momentumVy = (last.y - prev.y) / dt;
-        }
-      }
-      s.isDragging = false;
-      s.dragHistory = [];
+    function onDoubleClick() {
+      // Double click resets zoom and pan back to defaults
+      s.zoomX = 1.0;
+      s.zoomY = 1.0;
+      s.panX = 0;
+      s.panY = 0;
+      s.autoFit = false;
+      setAutoFit(false);
     }
 
-    canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("dblclick", onDblClick);
-    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
-    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
-    canvas.addEventListener("touchend", onTouchEnd);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
-    canvas.addEventListener("mouseleave", onMouseLeave);
-    window.addEventListener("keydown", onKeyDown);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("dblclick", onDoubleClick);
 
     function animate() {
       render();
@@ -1269,83 +1129,224 @@ export function OrderFlowChart({ ticker, interval: externalInterval = "1d", fill
 
     return () => {
       cancelAnimationFrame(animId);
-      canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("mousedown", onMouseDown);
-      canvas.removeEventListener("dblclick", onDblClick);
-      canvas.removeEventListener("touchstart", onTouchStart);
-      canvas.removeEventListener("touchmove", onTouchMove);
-      canvas.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
-      canvas.removeEventListener("mouseleave", onMouseLeave);
-      window.removeEventListener("keydown", onKeyDown);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("dblclick", onDoubleClick);
     };
+  }, []);
+
+  const handleToggleAutoFit = useCallback(() => {
+    setAutoFit((prev) => {
+      const next = !prev;
+      state.current.autoFit = next;
+      if (next) {
+        state.current.panX = 0;
+        state.current.panY = 0;
+        state.current.zoomX = 1.0;
+        state.current.zoomY = 1.0;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    state.current.zoomX = 1.0;
+    state.current.zoomY = 1.0;
+    state.current.panX = 0;
+    state.current.panY = 0;
+    state.current.autoFit = false;
+    setAutoFit(false);
   }, []);
 
   return (
     <div
-      className={fillContainer ? "w-full h-full relative" : "w-full relative rounded overflow-hidden border border-border/50"}
+      className={
+        fillContainer
+          ? "w-full h-full relative select-none"
+          : "w-full relative rounded overflow-hidden border border-border/50 select-none"
+      }
       style={{ minHeight: fillContainer ? "400px" : "380px", outline: "none" }}
       tabIndex={0}
     >
-      {/* Timeframe selector */}
-      <div className="absolute top-2 left-2 z-20 flex items-center gap-0.5">
-        {TIMEFRAMES.map((tf) => (
+      {/* Top HUD Controls Bar */}
+      <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1.5">
+        {/* Timeframe Selector */}
+        <div className="flex items-center gap-0.5 bg-[#080c16]/90 p-0.5 rounded border border-white/10 backdrop-blur-sm">
+          {TIMEFRAMES.map((tf) => (
+            <button
+              key={tf}
+              onClick={() => setLocalInterval(tf)}
+              style={{
+                padding: "2px 6px",
+                borderRadius: 2,
+                fontSize: 10,
+                fontFamily: "JetBrains Mono, monospace",
+                fontWeight: 700,
+                cursor: "pointer",
+                border:
+                  interval === tf
+                    ? "1px solid rgba(201,168,76,0.6)"
+                    : "1px solid transparent",
+                background:
+                  interval === tf
+                    ? "rgba(201,168,76,0.18)"
+                    : "transparent",
+                color:
+                  interval === tf
+                    ? "rgba(229,213,160,1)"
+                    : "rgba(201,168,76,0.5)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tf.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Live Auto-Scroll vs AutoFit Mode */}
+        <button
+          onClick={handleToggleAutoFit}
+          style={{
+            padding: "2px 7px",
+            borderRadius: 3,
+            fontSize: 10,
+            fontFamily: "JetBrains Mono, monospace",
+            fontWeight: 700,
+            cursor: "pointer",
+            border: autoFit
+              ? "1px solid rgba(56,189,248,0.6)"
+              : "1px solid rgba(201,168,76,0.4)",
+            background: autoFit
+              ? "rgba(56,189,248,0.18)"
+              : "rgba(201,168,76,0.15)",
+            color: autoFit ? "#38bdf8" : "#e5d5a0",
+          }}
+          title={autoFit ? "AutoFit Enabled (Click for Live Auto-Scroll)" : "Live Auto-Scroll Enabled (Click to Fit All)"}
+        >
+          {autoFit ? "FIT" : "LIVE"}
+        </button>
+
+        {/* Layer Toggles: Heatmap, Bubbles, DOM */}
+        <div className="flex items-center gap-0.5 bg-[#080c16]/90 p-0.5 rounded border border-white/10 backdrop-blur-sm">
           <button
-            key={tf}
-            onClick={() => setLocalInterval(tf)}
+            onClick={() => setShowHeatmap((v) => !v)}
+            title="Traded volume at price, from bar data. NOT resting order-book liquidity - this feed has no depth."
             style={{
-              padding: "2px 7px",
-              borderRadius: 3,
-              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              fontSize: 9,
               fontFamily: "JetBrains Mono, monospace",
               fontWeight: 700,
-              letterSpacing: "0.04em",
               cursor: "pointer",
-              border: interval === tf
-                ? "1px solid rgba(201,168,76,0.6)"
-                : "1px solid rgba(201,168,76,0.15)",
-              background: interval === tf
-                ? "rgba(201,168,76,0.15)"
-                : "rgba(6,11,22,0.7)",
-              color: interval === tf
-                ? "rgba(229,213,160,1)"
-                : "rgba(201,168,76,0.45)",
-              transition: "all 0.15s ease",
+              border: showHeatmap
+                ? "1px solid rgba(56,189,248,0.6)"
+                : "1px solid transparent",
+              background: showHeatmap
+                ? "rgba(56,189,248,0.15)"
+                : "transparent",
+              color: showHeatmap ? "#38bdf8" : "rgba(255,255,255,0.4)",
             }}
           >
-            {tf.toUpperCase()}
+            VOLUME PROFILE
           </button>
-        ))}
+          <button
+            onClick={() => setShowBubbles((v) => !v)}
+            style={{
+              padding: "2px 6px",
+              borderRadius: 2,
+              fontSize: 9,
+              fontFamily: "JetBrains Mono, monospace",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: showBubbles
+                ? "1px solid rgba(201,168,76,0.6)"
+                : "1px solid transparent",
+              background: showBubbles
+                ? "rgba(201,168,76,0.15)"
+                : "transparent",
+              color: showBubbles ? "#e5d5a0" : "rgba(255,255,255,0.4)",
+            }}
+          >
+            BUBBLES
+          </button>
+          <button
+            onClick={() => setShowDOM((v) => !v)}
+            title="Modelled depth. This feed carries no order book - the ladder is derived from the volume profile, not received from an exchange."
+            style={{
+              padding: "2px 6px",
+              borderRadius: 2,
+              fontSize: 9,
+              fontFamily: "JetBrains Mono, monospace",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: showDOM
+                ? "1px solid rgba(16,185,129,0.6)"
+                : "1px solid transparent",
+              background: showDOM
+                ? "rgba(16,185,129,0.15)"
+                : "transparent",
+              color: showDOM ? "#34d399" : "rgba(255,255,255,0.4)",
+            }}
+          >
+            DEPTH (MODELLED)
+          </button>
+        </div>
+
+        {/* Reset Viewport */}
+        <button
+          onClick={handleResetZoom}
+          style={{
+            padding: "2px 6px",
+            borderRadius: 3,
+            fontSize: 9,
+            fontFamily: "JetBrains Mono, monospace",
+            fontWeight: 700,
+            cursor: "pointer",
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.05)",
+            color: "rgba(255,255,255,0.6)",
+          }}
+          title="Reset Zoom and Pan (Double-Click Canvas also resets)"
+        >
+          RESET
+        </button>
       </div>
 
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: "rgba(6,11,22,0.85)" }}>
-          <div className="flex items-center gap-2 text-[14px] font-mono" style={{ color: "rgba(201,168,76,0.6)" }}>
+        <div
+          className="absolute inset-0 flex items-center justify-center z-10"
+          style={{ background: "rgba(6,11,22,0.85)" }}
+        >
+          <div
+            className="flex items-center gap-2 text-[13px] font-mono"
+            style={{ color: "rgba(201,168,76,0.8)" }}
+          >
             <span className="h-3 w-3 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
-            LOADING {ticker}…
+            INITIALIZING ORDER FLOW FEED [{ticker}]...
           </div>
         </div>
       )}
+
       {feedUnavailable && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20 font-mono" style={{ background: "rgba(6,11,22,0.95)" }}>
-          <div className="text-[12px] tracking-widest text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20 font-mono"
+          style={{ background: "rgba(6,11,22,0.95)" }}
+        >
+          <div className="text-[11px] tracking-widest text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 mb-2 rounded-sm font-bold">
             FEED UNAVAILABLE
           </div>
-          <div className="text-sm font-semibold text-foreground mb-1">
-            {ticker}
-          </div>
+          <div className="text-sm font-semibold text-foreground mb-1">{ticker}</div>
           <div className="text-xs text-muted-foreground max-w-md leading-relaxed">
             {feedUnavailable}
           </div>
-          <div className="text-[12px] text-muted-foreground/60 mt-3">
-            Institutional restraint: abstaining from simulating synthetic order flow.
-          </div>
         </div>
       )}
+
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", height: fillContainer ? "100%" : "380px", cursor: "crosshair" }}
+        style={{ width: "100%", height: "100%", display: "block" }}
       />
     </div>
   );

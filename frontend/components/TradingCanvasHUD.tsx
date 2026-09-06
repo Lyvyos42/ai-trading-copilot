@@ -43,6 +43,9 @@ interface TradingCanvasHUDProps {
   /** "chart" | "split" | "flow" - the toggle cycles through all three, so the
    *  label has to say which one the next press gives you. */
   canvasMode?: "chart" | "split" | "flow";
+  /** "tv" | "radar" - switches between standard TradingView widget and the proprietary Microstructure Radar & L2 DOM chart */
+  chartType?: "tv" | "radar";
+  onChartTypeChange?: (type: "tv" | "radar") => void;
 }
 
 const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -69,6 +72,8 @@ export function TradingCanvasHUD({
   analyzing = false,
   onWatchlistChange,
   canvasMode = "chart",
+  chartType = "radar",
+  onChartTypeChange,
 }: TradingCanvasHUDProps) {
   const [copied, setCopied] = useState(false);
   const [pinnedTabs, setPinnedTabs] = useState<string[]>(() => {
@@ -268,8 +273,37 @@ export function TradingCanvasHUD({
           </div>
         </div>
 
-        {/* Right: Timeframe Interval Pills & 3D Order Flow Toggle */}
+        {/* Right: Chart Engine Selector, Timeframe Interval Pills & 3D Order Flow Toggle */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {onChartTypeChange && (
+            <div className="flex items-center gap-0.5 bg-surface-2 p-0.5 rounded border border-border/40">
+              <button
+                onClick={() => onChartTypeChange("tv")}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[12px] font-mono font-bold transition-colors",
+                  chartType === "tv"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="TradingView Technical Chart"
+              >
+                TV CHART
+              </button>
+              <button
+                onClick={() => onChartTypeChange("radar")}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[12px] font-mono font-bold transition-colors",
+                  chartType === "radar"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Microstructure Radar & L2 DOM Ladder"
+              >
+                RADAR DOM
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-0.5 bg-surface-2 p-0.5 rounded border border-border/40">
             {INTERVALS.map((inv) => (
               <button

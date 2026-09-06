@@ -6,6 +6,7 @@ import { PreMarketBriefing } from "@/components/PreMarketBriefing";
 import { SignalRadar } from "@/components/SignalRadar";
 import { TradingCanvasHUD } from "@/components/TradingCanvasHUD";
 import { TradingViewChart } from "@/components/TradingViewChart";
+import { OrderFlowChart } from "@/components/OrderFlowChart";
 import { AgentConsensusHUD } from "@/components/AgentConsensusHUD";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { useRequireAuth } from "@/lib/useAuth";
@@ -126,6 +127,7 @@ export default function DashboardPage() {
   // chart, so order flow and price could never be read together.
   const [canvasMode, setCanvasMode] = useState<"chart" | "split" | "flow">("chart");
   const show3D = canvasMode === "flow";
+  const [chartType, setChartType] = useState<"tv" | "radar">("radar");
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -455,6 +457,8 @@ export default function DashboardPage() {
             onIntervalChange={setChartInterval}
             show3D={show3D}
             canvasMode={canvasMode}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
             onToggle3D={() =>
               setCanvasMode((m) => (m === "chart" ? "split" : m === "split" ? "flow" : "chart"))
             }
@@ -477,11 +481,19 @@ export default function DashboardPage() {
                 "relative w-full min-h-0",
                 canvasMode === "split" ? "h-[58%] border-b border-border/40" : "flex-1"
               )}>
-                <TradingViewChart
-                  ticker={activeTicker}
-                  interval={chartInterval}
-                  fillContainer={true}
-                />
+                {chartType === "radar" ? (
+                  <OrderFlowChart
+                    ticker={activeTicker}
+                    interval={chartInterval}
+                    fillContainer={true}
+                  />
+                ) : (
+                  <TradingViewChart
+                    ticker={activeTicker}
+                    interval={chartInterval}
+                    fillContainer={true}
+                  />
+                )}
               </div>
             )}
 
