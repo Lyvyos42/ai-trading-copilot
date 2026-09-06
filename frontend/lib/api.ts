@@ -339,6 +339,47 @@ export async function scanNow(
 }
 
 
+export interface ScanJob {
+  state: "idle" | "running" | "done" | "error" | "cancelled";
+  started_at?: number | null;
+  finished_at?: number | null;
+  symbols: string[];
+  symbols_scanned?: number;
+  profile?: string;
+  signals_generated: number;
+  signals: ScanResult[];
+  error: string | null;
+}
+
+/**
+ * Start a scan on the server and return straight away.
+ *
+ * scanNow() awaits the whole scan inside the request, so it only works while
+ * the user stays on the page that started it - navigate away and the promise
+ * resolves into an unmounted component, the button never leaves its scanning
+ * state, and the work may be cancelled with the disconnect. This hands the
+ * job to the server and polls it instead, so the scan is not tied to the page.
+ */
+export async function scanAsync(
+  symbols?: string[],
+  replaceActive = true,
+  profile = "balanced"
+): Promise<ScanJob> {
+  return apiFetch("/api/v1/scanner/scan-async", {
+    method: "POST",
+    body: JSON.stringify({
+      symbols: symbols || [],
+      replace_active: replaceActive,
+      profile,
+    }),
+  });
+}
+
+export async function getScanStatus(): Promise<ScanJob> {
+  return apiFetch("/api/v1/scanner/scan-status");
+}
+
+
 export async function executePosition(signalId: string, quantity = 1): Promise<{ id: string }> {
   return apiFetch("/api/v1/portfolio/execute", {
     method: "POST",

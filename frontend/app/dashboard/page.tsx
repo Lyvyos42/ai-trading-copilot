@@ -15,7 +15,9 @@ import {
   listSignals,
   getAgentStatus,
   wakeBackend,
-  scanNow,
+  scanAsync,
+  getScanStatus,
+  type ScanResult,
   setActiveProfile as saveActiveProfile,
   type Signal,
   type AgentStatus,
@@ -267,44 +269,102 @@ export default function DashboardPage() {
     });
   }
 
+  // Absorb a finished scan's signals into the list on screen.
+  const absorbScanResults = useCallback((incoming: ScanResult[]) => {
+    if (!incoming || incoming.length === 0) return;
+    setSignals((prev) => {
+      const map = new Map(prev.map((sg) => [sg.ticker, sg]));
+      for (const sg of incoming) {
+        const converted: Signal = {
+          signal_id: sg.signal_id,
+          ticker: sg.ticker,
+          direction: sg.direction,
+          confidence_score: sg.confidence_score,
+          entry_price: sg.entry_price,
+          stop_loss: sg.stop_loss,
+          status: "ACTIVE",
+          timeframe: PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
+          asset_class: inferAssetClass(sg.ticker),
+          agent_votes: {},
+          reasoning_chain: sg.summary ? [sg.summary] : [],
+          strategy_sources: ["Confluence Screener"],
+          timestamp: sg.timestamp || new Date().toISOString(),
+          expiry_time: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        };
+        map.set(sg.ticker, converted);
+      }
+      return Array.from(map.values());
+    });
+  }, [activeProfile]);
+
   // Trigger Scanner
+  //
+  // The scan runs on the server and this polls it. It used to be a single
+  // awaited request: leaving the dashboard unmounted the component while that
+  // request was still open, so the result arrived nowhere, the button never
+  // came out of its scanning state, and the work could be cancelled along with
+  // the connection. Now the page can be left and come back to a scan that
+  // carried on without it.
   async function handleScanNow() {
     setScanning(true);
     setAnalysisError(null);
     try {
-      const res = await scanNow(watchlist, true, activeProfile);
-      if (res.signals && res.signals.length > 0) {
-        setSignals((prev) => {
-          const map = new Map(prev.map((s) => [s.ticker, s]));
-          for (const s of res.signals) {
-            const converted: Signal = {
-              signal_id: s.signal_id,
-              ticker: s.ticker,
-              direction: s.direction,
-              confidence_score: s.confidence_score,
-              entry_price: s.entry_price,
-              stop_loss: s.stop_loss,
-              status: "ACTIVE",
-              timeframe: PROFILE_TIMEFRAMES[activeProfile]?.timeframe || "1D",
-              asset_class: inferAssetClass(s.ticker),
-              agent_votes: {},
-              reasoning_chain: s.summary ? [s.summary] : [],
-              strategy_sources: ["Confluence Screener"],
-              timestamp: s.timestamp || new Date().toISOString(),
-              expiry_time: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-            };
-            map.set(s.ticker, converted);
-          }
-          return Array.from(map.values());
-        });
+      const job = await scanAsync(watchlist, true, activeProfile);
+      if (job.state === "done") {
+        absorbScanResults(job.signals);
+        setScanning(false);
+      } else if (job.state === "error") {
+        setAnalysisError(job.error || "Scan failed");
+        setScanning(false);
       }
+      // "running" is left to the poller below.
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Scan failed";
-      setAnalysisError(msg);
-    } finally {
+      setAnalysisError(e instanceof Error ? e.message : "Scan failed");
       setScanning(false);
     }
   }
+
+  // Poll the server's scan job.
+  //
+  // This runs on mount too, not only after the button is pressed, so returning
+  // to the dashboard mid-scan shows the scan that is actually in progress
+  // rather than an idle button. It stops as soon as the job is not running.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async (isFirst = false) => {
+      try {
+        const job = await getScanStatus();
+        if (cancelled) return;
+
+        if (job.state === "running") {
+          setScanning(true);
+          timer = setTimeout(() => poll(), 2000);
+          return;
+        }
+        // Only adopt a finished job's signals if we were tracking it - on the
+        // very first poll that means a scan this page did not start, which is
+        // exactly the case worth picking up.
+        if (job.state === "done") {
+          absorbScanResults(job.signals);
+        } else if (job.state === "error" && !isFirst) {
+          setAnalysisError(job.error || "Scan failed");
+        }
+        setScanning(false);
+      } catch {
+        // A failing status endpoint should not pin the button on forever.
+        if (!cancelled) setScanning(false);
+      }
+    };
+
+    poll(true);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoggedIn, absorbScanResults]);
 
   // Generate on-demand signal for ticker
   async function handleGenerate(t?: string) {

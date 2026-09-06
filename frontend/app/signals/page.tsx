@@ -223,9 +223,15 @@ export default function SignalsPage() {
     const wins = signals.filter((s) => s.status === "WIN").length;
     const losses = signals.filter((s) => s.status === "LOSS").length;
     const active = signals.filter((s) => s.status === "ACTIVE").length;
+    // Price crossed both the target and the invalidation inside one bar, so
+    // which came first is not recorded anywhere and the outcome was not
+    // observed. Counted separately and kept out of the win rate rather than
+    // being called a loss - a coin flip reported as a measurement is worse
+    // than an honest gap.
+    const ambiguous = signals.filter((s) => s.status === "AMBIGUOUS").length;
     const resolved = wins + losses;
     const winRate = resolved > 0 ? (wins / resolved) * 100 : null;
-    return { total: signals.length, wins, losses, active, resolved, winRate };
+    return { total: signals.length, wins, losses, active, ambiguous, resolved, winRate };
   }, [signals]);
 
   if (authLoading || !isLoggedIn) {
@@ -813,7 +819,7 @@ export default function SignalsPage() {
             )}
             {signals.length > 0 && stats.resolved > 0 && (
               <div className="px-3 py-1.5 border-b border-border/40 text-[12px] font-mono text-muted-foreground/80 flex items-center justify-between bg-muted/10">
-                <span>{stats.wins}W / {stats.losses}L from {stats.resolved} hand-resolved outcome{stats.resolved === 1 ? "" : "s"} ({stats.active} pending)</span>
+                <span>{stats.wins}W / {stats.losses}L from {stats.resolved} resolved outcome{stats.resolved === 1 ? "" : "s"} ({stats.active} pending{stats.ambiguous > 0 ? `, ${stats.ambiguous} unscored` : ""})</span>
                 <span className="text-[11px] text-muted-foreground border border-border px-1 rounded">{stats.winRate !== null ? `${stats.winRate.toFixed(1)}% WR` : ""}</span>
               </div>
             )}
@@ -848,7 +854,8 @@ export default function SignalsPage() {
                   const pct = isBull
                     ? (sig.bullish_pct ?? sig.confidence_score ?? 50)
                     : (sig.bearish_pct ?? (100 - (sig.confidence_score ?? 50)));
-                  const isResolved = sig.status === "WIN" || sig.status === "LOSS";
+                  const isResolved = sig.status === "WIN" || sig.status === "LOSS"
+                                  || sig.status === "AMBIGUOUS";
                   return (
                     <div
                       key={sig.signal_id || `${sig.ticker}-${sig.timestamp || idx}`}
@@ -892,10 +899,15 @@ export default function SignalsPage() {
                               fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
                               background: sig.status === "WIN" ? "hsl(var(--bull) / 0.1)" : "hsl(var(--bear) / 0.1)",
                               border: `1px solid ${sig.status === "WIN" ? "hsl(var(--bull) / 0.3)" : "hsl(var(--bear) / 0.3)"}`,
-                              color: sig.status === "WIN" ? "hsl(var(--bull))" : "hsl(var(--bear))",
+                              color: sig.status === "WIN" ? "hsl(var(--bull))"
+                                   : sig.status === "AMBIGUOUS" ? "hsl(var(--muted-foreground))"
+                                   : "hsl(var(--bear))",
                             }}
+                            title={sig.status === "AMBIGUOUS"
+                              ? "Price touched both the research target and the invalidation level inside the same bar. Which came first is not recorded, so this is not scored either way and is excluded from the win rate."
+                              : undefined}
                           >
-                            {sig.status}
+                            {sig.status === "AMBIGUOUS" ? "UNSCORED" : sig.status}
                           </span>
                         ) : (
                           <div className="flex gap-1">

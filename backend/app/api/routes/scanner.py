@@ -237,6 +237,136 @@ async def scan_now(
 
 
 
+
+
+# ── Background scan jobs ─────────────────────────────────────────────────────
+#
+# /scan-now awaits the whole scan inside the request. That works only while the
+# user stays on the page that started it: navigating away unmounts the caller,
+# the promise resolves into a dead component, and the button is left with no
+# way back to a finished state. The scan itself may also be cancelled when the
+# client disconnects, so a scan the user started and walked away from could
+# simply not happen.
+#
+# The work does not belong to the request. It is started here, tracked per
+# user, and polled - so navigation is irrelevant to it, any page can show that
+# a scan is running, and the results are in the database when the user returns
+# whether or not anyone was watching.
+#
+# In-process and deliberately so: this is a progress indicator, not a queue.
+# It does not survive a restart, and after a restart the status reads "idle",
+# which is the truthful answer from a process that is not running a scan. If
+# this ever needs to survive deploys or span workers it wants a real job store,
+# not a bigger dict.
+import asyncio as _asyncio
+import time as _time
+
+_scan_jobs: dict[str, dict] = {}
+_SCAN_JOB_TTL = 900  # keep a finished job readable for 15 minutes
+
+
+def _scan_job_public(job: dict) -> dict:
+    """The job as the client sees it, without the asyncio.Task handle."""
+    return {k: v for k, v in job.items() if k != "task"}
+
+
+async def _run_scan_job(user_id: str, symbols: list[str], replace_active: bool,
+                        profile: str) -> None:
+    from app.services.auto_scanner import run_auto_scan_for_user
+
+    job = _scan_jobs.get(user_id)
+    try:
+        results = await run_auto_scan_for_user(
+            user_id, symbols, replace_active=replace_active, profile=profile
+        )
+        if job is not None:
+            job.update({
+                "state": "done",
+                "finished_at": _time.time(),
+                "signals_generated": len(results),
+                "signals": results,
+            })
+    except _asyncio.CancelledError:
+        if job is not None:
+            job.update({"state": "cancelled", "finished_at": _time.time()})
+        raise
+    except Exception as exc:
+        # A failed scan has to be visible. Swallowing it here would leave the
+        # UI spinning on a job that is never going to finish.
+        if job is not None:
+            job.update({
+                "state": "error",
+                "finished_at": _time.time(),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+
+
+@router.post("/scan-async")
+async def scan_async(
+    body: ScanNowIn,
+    db:   AsyncSession = Depends(get_db),
+    user: dict         = Depends(get_current_user),
+):
+    """Start a scan in the background and return immediately.
+
+    Poll /scan-status for progress. Starting a scan while one is already
+    running for this user returns the running job rather than starting a
+    second one - a double click should not double the work, and two concurrent
+    scans over the same watchlist would race each other writing signals.
+    """
+    user_id, max_symbols = await _get_user_id_and_max_symbols(user, db)
+
+    existing = _scan_jobs.get(user_id)
+    if existing and existing.get("state") == "running":
+        return _scan_job_public(existing)
+
+    symbols = [s.upper().strip() for s in body.symbols if s.strip()][:max_symbols]
+    if not symbols:
+        symbols = ["BTC-USD", "EURUSD=X", "GBPUSD=X", "XAUUSD"]
+
+    job = {
+        "state": "running",
+        "started_at": _time.time(),
+        "finished_at": None,
+        "symbols": symbols,
+        "symbols_scanned": len(symbols),
+        "profile": body.profile,
+        "signals_generated": 0,
+        "signals": [],
+        "error": None,
+    }
+    _scan_jobs[user_id] = job
+    job["task"] = _asyncio.create_task(
+        _run_scan_job(user_id, symbols, body.replace_active, body.profile)
+    )
+
+    # Drop jobs nobody is going to ask about again.
+    cutoff = _time.time() - _SCAN_JOB_TTL
+    for uid in [u for u, j in _scan_jobs.items()
+                if j.get("finished_at") and j["finished_at"] < cutoff]:
+        _scan_jobs.pop(uid, None)
+
+    return _scan_job_public(job)
+
+
+@router.get("/scan-status")
+async def scan_status(
+    db:   AsyncSession = Depends(get_db),
+    user: dict         = Depends(get_current_user),
+):
+    """Current or most recent background scan for this user.
+
+    "idle" means no scan has been started in this process - which is also what
+    a restarted server reports, correctly, because it is not running one.
+    """
+    user_id, _ = await _get_user_id_and_max_symbols(user, db)
+    job = _scan_jobs.get(user_id)
+    if not job:
+        return {"state": "idle", "symbols": [], "signals": [],
+                "signals_generated": 0, "error": None}
+    return _scan_job_public(job)
+
+
 def _alert_to_dict(a: MarketAlert) -> dict:
     return {
         "id":          a.id,
