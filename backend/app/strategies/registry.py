@@ -249,7 +249,25 @@ REGISTRY: dict[str, Registration] = {
                "momentum. Promotion needs more INSTRUMENTS, not more "
                "parameters - the published result is cross-sectional over 58 "
                "futures because no single market supplies enough independent "
-               "trends."),
+               "trends. CANDIDATE 20 RAN THAT TEST AND IT FAILED. Identical "
+               "LB480 band logic across ten macro instruments, 2,135 trades "
+               "2009-2026, pools to -0.016R at naive t -0.41 and Welch +0.03; "
+               "1 of 5 gates, and the one it passes (retention +2.16) is "
+               "meaningless on a negative mean. Effective breadth was measured "
+               "first: N_eff 3.75 against a nominal 10, top eigenvalue 45% of "
+               "variance, mean |rho| 0.39 - and for a trend follower the sign "
+               "does not help, since long EURUSD and short USDCHF at -0.66 is "
+               "one bet twice. If the gold effect were general the pooled t "
+               "would have been ~+2.83; it is -0.41. Four of ten are positive "
+               "(gold, silver, AUD, NZD) but xauusd-xagusd correlate +0.78 and "
+               "audusd-nzdusd +0.83, so that is two coupled pairs, not four "
+               "successes, and selecting them is hindsight. Concentration did "
+               "not improve with breadth either: in every grouping the top 5% "
+               "of trades exceeds the entire profit and the other 95% is "
+               "negative, because the losing tail scales with trade count just "
+               "as the winning tail does. The commodity/risk-asset split is "
+               "recorded as a hypothesis for a future pre-registration on an "
+               "untested universe, not as a finding."),
     ),
 
     "turn_of_month": Registration(

@@ -86,13 +86,88 @@ trade count. Half the filed grid is not testing time-series momentum at all.
 A usable version would need either a threshold on the momentum magnitude at
 entry or a hysteresis band around the sign flip.
 
+CANDIDATE 20 - THE CROSS-SECTIONAL PORTFOLIO. THE GOLD RESULT DOES NOT GENERALISE.
+
+Identical LB480 trailing-band logic, no per-market tuning, across ten macro
+instruments, 2009-2026, 2,135 trades.
+
+    sym         n    net R      t   win%     long    short  control  Welch
+    xauusd    200   +0.310  +1.46   31%   +0.194   +0.431   +0.057  +1.18
+    xagusd    201   +0.212  +1.36   33%   +0.262   +0.144   +0.005  +1.29
+    audusd    206   +0.281  +1.50   35%   +0.102   +0.512   -0.049  +1.74
+    nzdusd    217   +0.070  +0.62   35%   +0.117   +0.024   -0.045  +0.99
+    usdjpy    206   -0.104  -1.13   29%   -0.029   -0.176   +0.013  -1.23
+    usdchf    213   -0.110  -1.39   31%   -0.124   -0.091   -0.019  -1.10
+    usdcad    215   -0.115  -1.47   33%   -0.018   -0.226   -0.019  -1.18
+    gbpusd    209   -0.136  -1.94   35%   -0.150   -0.124   -0.029  -1.47
+    eurjpy    244   -0.224  -2.95   26%   -0.118   -0.324   -0.031  -2.44
+    eurusd    224   -0.265  -3.54   29%   -0.413   -0.102   -0.045  -2.83
+
+    POOLED    2135  -0.016R   naive t -0.41   month-clustered t +0.53
+              control -0.017R   Welch +0.03   long -0.020R  short -0.012R
+
+    G1 OOS clustered t -0.39 (n=427) vs 2.96          FAIL
+    G1b retention +2.16                               passes, but on a
+                                                      negative mean it means
+                                                      nothing
+    G2 2021-2026 clustered t -0.12 (-0.042R)          FAIL
+    G3 symmetry: long -0.020R, short -0.012R          FAIL
+    G4 Welch +0.03, net -0.016R                       FAIL
+
+BREADTH DID NOT BUY POWER BECAUSE THERE WAS NO GENERAL EFFECT TO AMPLIFY
+
+Effective breadth was measured before the run, not assumed. Six of the ten are
+USD pairs and two more are USD-denominated metals; the top eigenvalue of the
+daily-return correlation matrix explains 45% of variance, the first two explain
+63%, mean absolute pairwise correlation is 0.39, and the eigenvalue-based N_eff
+is 3.75. For a trend follower the SIGN of a correlation does not help - long
+EURUSD and short USDCHF at rho -0.66 is one bet expressed twice.
+
+    gold alone                                     t +1.46
+    predicted pooled if the effect were general    t +2.83  (sqrt of N_eff)
+    actual pooled                                  t -0.41
+
+Four of ten are positive - gold, silver, AUD, NZD - and they are not four
+independent successes: xauusd-xagusd correlate +0.78 and audusd-nzdusd +0.83.
+Two coupled pairs. Six markets are negative, EURUSD at t -3.54 and EURJPY at
+-2.95. Pooling only the four that worked gives +0.216R at t +2.54, but
+selecting them is hindsight and that figure is not a gate result. With ten
+markets and no true effect, four positive is unremarkable.
+
+DIVERSIFICATION DID NOT DILUTE THE CONCENTRATION EITHER
+
+    grouping        n     median     skew   sum of top 5%   sum of the rest
+    gold alone    200    -0.401R    +6.11         +107.8R            -45.7R
+    the four      824    -0.416R    +6.11         +339.7R           -161.9R
+    all ten      2135    -0.466R    +6.79         +587.3R           -621.3R
+
+In every grouping the top 5% of trades carries more than the entire profit and
+the remaining 95% is negative. Breadth did not help, because the losing tail
+scales with the trade count exactly as the winning tail does. The payoff shape
+is intrinsic to a trailing-band trend rule, not an artefact of one market.
+
+TWO OF MY OWN METRICS BROKE AND ARE CORRECTED HERE
+"Top 5% share of profit" and "trades to reach 100% of profit" both divide by
+total profit. Pooled profit is negative (-34.0R), so the first returned -1726%
+and the second returned 0 of 2135. Those were the metric failing, not findings.
+The scale-free version is the table above.
+
+ONE PATTERN WORTH PRE-REGISTERING RATHER THAN CLAIMING
+The four positives - gold, silver, AUD, NZD - are all commodity and risk-linked
+assets, and the six negatives are all developed-market funding currencies. That
+is a coherent economic grouping rather than a random split, and it is exactly
+the kind of post-hoc pattern this programme has repeatedly refuted. It is
+recorded as a hypothesis for a future pre-registration on instruments not used
+here, not as a finding.
+
 VERDICT: gated. Underpowered on XAUUSD, refuted on the validation instrument.
 The gold band cells are the only place in this programme where a strategy has
 beaten the beta charge with its short leg, and that is worth keeping. What it
 cannot do is clear an out-of-sample bar on forty trades whose outcome is
-decided by ten of them. The honest next step is more INSTRUMENTS - the
-published result is cross-sectional over 58 futures precisely because no single
-market supplies enough independent trends - not more parameters on these two.
+decided by ten of them. Candidate 20 tested the obvious next step - more instruments - and it failed:
+ten markets pooled to a NEGATIVE expectancy. What remains is a gold-and-silver
+plus AUD-and-NZD result that no longer has an untested universe to be confirmed
+on.
 """
 from __future__ import annotations
 
