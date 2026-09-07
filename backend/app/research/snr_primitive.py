@@ -174,4 +174,99 @@ scissors the programme-level power screen describes, reached from a completely
 different direction - not through strategies, but through the raw inputs the
 strategies were built from.
 
+================================================================================
+ROUND 3 - THE FULL BATTERY: 8 PRIMITIVES x 12 SYMBOLS
+================================================================================
+
+Expanding the symbol set changed the answer twice, which is the point of doing
+it. Symbols: EURUSD GBPUSD AUDUSD NZDUSD USDCAD USDCHF USDJPY EURJPY EURGBP
+XAUUSD XAGUSD WTI, H1, ~99k bars each.
+
+THE MATRIX - t of (real minus its own control), 10-bar horizon
+
+    primitive        +ve/12   pooled t        n
+    prior_week_hl      8/12      +0.67    11,029
+    asian_range        6/11      +0.52    68,665
+    round_number       6/12      +0.16    95,201
+    prior_day_hl       5/12      -1.09    84,561
+    order_block        3/12      -1.14    17,356
+    equal_highs        3/12      -1.94     9,037
+    fractal_pivot      5/12      -2.46   105,710
+
+Under the null, 8/12 has p = 0.194. Nothing here is distinguishable from chance,
+and three primitives are significantly NEGATIVE pooled.
+
+ACROSS ALL 95 CELLS
+    mean t -0.203, median -0.178, sd 1.216
+    cells |t| > 2: 10 of 95 against ~4 expected - and 9 of the 10 are NEGATIVE
+
+The consistent negative tilt is the finding: price is marginally MORE likely to
+continue through a level than through a matched control price. Every folklore
+claim points the other way.
+
+A REIMPLEMENTATION FAULT, CAUGHT BY THE EXPANSION
+
+The battery's FVG used the gap MIDPOINT as a level and returned 6/12, pooled
+-0.27, which appeared to kill the earlier 3/3 result. That was my error: the
+pre-registered construction measures ZONE ENTRY - price entering anywhere in the
+gap band - which is what SMC actually claims. The battery was not faithful to
+the primitive it was re-testing.
+
+FAIR VALUE GAP, CORRECT CONSTRUCTION, ALL 12 SYMBOLS
+
+    symbol       n    real t   held%   fake t   diff t
+    eurusd    9269    +0.27   49.8%    -0.83    +0.78
+    gbpusd    9099    +0.84   50.6%    -0.54    +0.97
+    audusd    9947    +1.13   49.9%    -1.00    +1.50
+    nzdusd    9798    +1.26   50.7%    +0.62    +0.41
+    usdcad    9357    -0.11   49.5%    -0.62    +0.37
+    usdchf    8967    +1.03   50.7%    +0.67    +0.21
+    usdjpy    9421    +1.33   51.2%    +0.63    +0.41
+    eurjpy    9260    -0.15   50.6%    -1.07    +0.69
+    eurgbp    8031    +1.40   50.1%    -1.80    +2.26
+    xauusd    9544    +1.54   50.9%    +1.24    +0.14
+    xagusd    8952    +2.93   50.9%    +1.54    +0.78
+    wti       5363    +0.84   49.6%    +1.03    -0.15
+
+    POSITIVE ON 11 OF 12    pooled diff-t +2.42
+    binomial P(>= 11/12 | null) = 0.003
+
+That is the strongest cross-sectional result in this programme. It is not a
+single-instrument curiosity, it is not a pooling artefact, and it survives a
+displaced-zone control on every instrument but one.
+
+AND IT IS SMALLER THAN THE SPREAD ON ALL TWELVE
+
+    symbol    edge ATR   edge px    toll px   edge/toll
+    eurgbp     +0.0952   0.00009    0.00010      0.93x
+    gbpusd     +0.0407   0.00008    0.00012      0.63x
+    audusd     +0.0491   0.00006    0.00011      0.59x
+    eurusd     +0.0327   0.00005    0.00010      0.48x
+    eurjpy     +0.0255   0.00519    0.01304      0.40x
+    usdcad     +0.0151   0.00002    0.00010      0.22x
+    usdjpy     +0.0159   0.00237    0.01147      0.21x
+    xagusd     +0.0308   0.00315    0.02060      0.15x
+    nzdusd     +0.0136   0.00002    0.00014      0.12x
+    xauusd     +0.0053   0.02009    0.21000      0.10x
+    usdchf     +0.0086   0.00001    0.00012      0.09x
+    wti        -0.0070  -0.00096    0.01300     -0.07x
+
+    mean 0.32x    best 0.93x (EURGBP)    symbols above 1.0x: 0 of 12
+
+VERDICT
+The fair value gap is REAL and it is UNTRADEABLE at retail cost. Eleven of
+twelve instruments agree at p = 0.003, and not one of them produces an effect
+larger than its own round-trip friction. EURGBP comes closest at 0.93x - the
+tightest spread relative to ATR in the set - and still loses.
+
+This is the clearest single statement of the scissors the programme has
+produced. It is not "there is no edge". It is "there is an edge, measured on
+110,000 observations across twelve instruments, and it is worth about a third
+of what it costs to collect". At institutional execution the same effect would
+clear; at a retail CFD spread it cannot.
+
+Every other primitive tested - fractal pivots, touch counts, level flips, round
+numbers, prior-day and prior-week extremes, Asian session extremes, order
+blocks, equal highs - shows nothing, and several are mildly anti-predictive.
+
 """
