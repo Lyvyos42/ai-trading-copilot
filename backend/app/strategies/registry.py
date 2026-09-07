@@ -31,6 +31,7 @@ from typing import Optional
 
 from app.strategies.base import BaseStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
+from app.strategies.fomc_drift import FOMCDriftStrategy
 from app.strategies.ibs import IBSMeanReversionStrategy
 from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
@@ -206,6 +207,26 @@ REGISTRY: dict[str, Registration] = {
                "it was computed over a window too short to contain the decay. "
                "Separately the CFD cost wall stands: sp500 pays 0.70R in the "
                "cash session against a gross edge of +0.021R."),
+    ),
+
+    "fomc_drift": Registration(
+        strategy=FOMCDriftStrategy,
+        deployment=Deployment.GATED,
+        instruments=("SPY", "IWM", "QQQ"),
+        consensus_weight=0.0,
+        basis=("Study BLOCKED, not concluded. The event file drops every "
+               "projection-month meeting from 2021 - 8% of rows fall in "
+               "Mar/Jun/Sep/Dec against a true 50% - which removes exactly the "
+               "high-information events and lands on the 2018-2026 window the "
+               "modern-third gate tests. Separately, SPY exists here only as "
+               "daily bars and cannot resolve a 14:00 boundary, so neither "
+               "pre-registered window is computable on the primary universe. "
+               "On what does run - IWM M30 2011-2019, 69 events - W1 gives "
+               "t +0.33 and W2 t -0.76, indistinguishable from the same hours "
+               "on an ordinary day. The SPY overnight leg, a subset the spec "
+               "did not ask for, gives Welch +1.84 over 216 events, "
+               "concentrated in 2002-2010. Nothing clears any gate and nothing "
+               "is refuted."),
     ),
 
     "pead_time_sue": Registration(
