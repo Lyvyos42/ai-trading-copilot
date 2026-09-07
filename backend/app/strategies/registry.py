@@ -31,6 +31,7 @@ from typing import Optional
 
 from app.strategies.artemis_squeeze import ArtemisSqueezeStrategy
 from app.strategies.base import BaseStrategy
+from app.strategies.consensus_9 import Consensus9Strategy
 from app.strategies.crt import CRTStrategy
 from app.strategies.decasteljau import DecasteljauStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
@@ -270,6 +271,46 @@ REGISTRY: dict[str, Registration] = {
                "drift being larger under uncertainty. 99 events, 29 of them in "
                "the regime that carries it. Needs an intraday SPY series back "
                "to 1993."),
+    ),
+
+    "consensus_9": Registration(
+        strategy=Consensus9Strategy,
+        deployment=Deployment.GATED,
+        instruments=("EURUSD", "GBPUSD"),
+        consensus_weight=0.0,
+        basis=("Refuted on FX M15. 34,000 trades over EURUSD primary and "
+               "GBPUSD validation, 99,000 bars each 2022-2026. All 16 testable "
+               "cells negative, to t -6.94, longs and shorts negative in every "
+               "one; best is -0.135R. GROSS is also negative in all eight "
+               "checked (-0.032 to -0.068R), so the filed +2.00 prior is not a "
+               "cost story - it was the best of 16 cells against a 2.96 bar "
+               "and does not reproduce at full depth with the engine's own "
+               "value-area levels. Inverting does not rescue it either: "
+               "+0.067R gross against a 0.111R toll is -0.044R. Welch against "
+               "a bias-matched control is negative in EVERY cell, to -2.41 - "
+               "the reverse of the shadow artefact, it loses to a random entry "
+               "with matched geometry. THE CONVICTION SCORE RUNS BACKWARDS: "
+               "raising min_conviction 0.55 -> 0.62 is worse in 7 of 8 cells, "
+               "the second engine to show this after decasteljau (quality>=70 "
+               "at -0.167R vs >=60 at -0.009R). That matters more than either "
+               "verdict, because a confidence score that inverts is worse than "
+               "none - it is used to size. Half the filed grid was never "
+               "testable: min_votes=3 gives 30-47 signals against 6,200, "
+               "because correlation, macro and sentiment vote NEUTRAL on every "
+               "bar and 3 concordant votes cannot come from an effective "
+               "roster of 4. Those three agents read LIVE news and calendar "
+               "state, never the bar timestamp, returning identical votes on "
+               "2022 and 2026 bars - symbol= and symbol=None disagree on 0 of "
+               "3,200 decisions across both pairs and all four threshold "
+               "combos, at 10x the compute. A backtest validity problem, not a "
+               "live defect: live those agents read current news for the "
+               "current bar. But any historical figure for this engine is a "
+               "four-specialist figure, not a nine-agent one. HARNESS TRAP: "
+               "the frame must be lowercase ohlcv WITH a 'Date' column; a "
+               "DatetimeIndex makes the technical agent vote SHORT at 0.90 "
+               "confidence on a NaN RSI while three specialists abstain on a "
+               "swallowed ValueError - prior scans should be checked for which "
+               "frame they passed."),
     ),
 
     "crt": Registration(
