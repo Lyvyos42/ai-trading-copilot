@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Optional
 
 from app.strategies.base import BaseStrategy
+from app.strategies.crt import CRTStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
 from app.strategies.fomc_drift import FOMCDriftStrategy
 from app.strategies.ibs import IBSMeanReversionStrategy
@@ -230,6 +231,25 @@ REGISTRY: dict[str, Registration] = {
                "drift being larger under uncertainty. 99 events, 29 of them in "
                "the regime that carries it. Needs an intraday SPY series back "
                "to 1993."),
+    ),
+
+    "crt": Registration(
+        strategy=CRTStrategy,
+        deployment=Deployment.GATED,
+        instruments=("XAUUSD", "XAGUSD"),
+        consensus_weight=0.0,
+        basis=("Refuted against its own bias-matched control. 7557 trades "
+               "across two specifications (4H->M15 over 4.2 years, 1H->M5 over "
+               "17 months) and two metals. XAUUSD Spec B nets +0.021R at t 0.43 "
+               "against a control of -0.024R - Welch +0.92. The validation "
+               "symbol fails outright, t -3.83 and -4.75. Modern-third t is "
+               "0.38 against a required 2.00 and shorts are negative, so "
+               "directional symmetry fails too. The control did clear it of the "
+               "beta charge: long share is 46-49% on every run, so gold's +141% "
+               "drift is not flowing into the signal and the near-zero result is "
+               "real. Structurally this is the Donchian failure trade at a "
+               "different anchor, now refused on six instruments across three "
+               "asset classes."),
     ),
 
     "pead_time_sue": Registration(
