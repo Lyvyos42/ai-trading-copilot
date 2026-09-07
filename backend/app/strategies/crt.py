@@ -76,6 +76,46 @@ Also worth recording: maximum drawdown is -53.6% at 1% risk per trade, with a
 19-trade losing streak, and the Monte Carlo p99 is -83.2%. Even had the
 expectancy been positive, that path is not tradeable at this risk fraction.
 
+CONFIRMED UNDER THE 4-POINT MICROSTRUCTURE PROTOCOL AND THE FULL GRID
+
+Re-run with the spread in the FILLS rather than deducted as a cost - long
+entries lifting the ask, short entries hitting the bid, short stops paying a
+full spread, straddle bars scored as stops - across the whole parameter grid:
+min_sweep_atr in [0.10, 0.25] x killzones in [on, off] x two specifications x
+two metals. Sixteen cells:
+
+    spec symbol   sweep     KZ      n    net R      t    ctrl R   Welch
+    A    xauusd    0.10   True   1448   -0.016   -0.33   -0.031   +0.30
+    A    xauusd    0.10  False   4530   +0.003   +0.09   -0.024   +0.89
+    A    xauusd    0.25   True   1152   -0.045   -0.88   -0.030   -0.29
+    A    xauusd    0.25  False   3615   -0.044   -1.52   -0.015   -1.00
+    A    xagusd    0.10   True   1592   -0.210   -5.50   -0.218   +0.22
+    A    xagusd    0.10  False   5296   -0.234  -11.40   -0.261   +1.27
+    A    xagusd    0.25   True   1212   -0.230   -5.67   -0.182   -1.17
+    A    xagusd    0.25  False   4123   -0.204   -9.02   -0.233   +1.24
+    B    xauusd    0.10   True   1717   -0.024   -0.54   -0.042   +0.41
+    B    xauusd    0.10  False   4189   -0.007   -0.21   -0.039   +1.05
+    B    xauusd    0.25   True   1408   +0.016   +0.36   -0.026   +0.93
+    B    xauusd    0.25  False   3391   +0.006   +0.19   -0.048   +1.65
+    B    xagusd    0.10   True   1531   -0.131   -3.18   -0.077   -1.28
+    B    xagusd    0.10  False   3877   -0.177   -6.51   -0.120   -2.03
+    B    xagusd    0.25   True   1236   -0.094   -2.12   -0.089   -0.11
+    B    xagusd    0.25  False   3113   -0.106   -3.60   -0.110   +0.14
+
+ZERO of sixteen clear the control at Welch >= 2.00. The best is +1.65. Only
+three cells have positive net expectancy at all, and the largest is +0.016R.
+Silver is negative in all eight of its cells, reaching t -11.40.
+
+ONE CONVENTION ARTEFACT, MEASURED RATHER THAN ASSUMED
+The protocol handicaps shorts: their stops pay a full spread while long stops
+pay none, and neither side is charged on the target. On XAUUSD that is 0.017
+to 0.020R, against an observed long-short gap of 0.038 to 0.125R. So the
+convention explains between a third and a half of the asymmetry and the rest
+is real. Re-running with symmetric half-spread stops turns one cell's shorts
+positive - Spec B, sweep 0.25, killzones off, long +0.028R and short +0.005R -
+and that cell still returns t +0.50 against the control's Welch of 1.65. It
+passes symmetry and fails everything else.
+
 VERDICT: refuted. Two specifications, two instruments, 7557 trades, and the
 mechanism does not distinguish itself from a random entry with the same
 geometry. Together with the equity work this is the same trade shape refused on

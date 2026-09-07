@@ -249,7 +249,12 @@ REGISTRY: dict[str, Registration] = {
                "drift is not flowing into the signal and the near-zero result is "
                "real. Structurally this is the Donchian failure trade at a "
                "different anchor, now refused on six instruments across three "
-               "asset classes."),
+               "asset classes. Re-run under the 4-point microstructure protocol "
+               "with the spread in the fills and the full 16-cell grid "
+               "(sweep 0.10/0.25 x killzones on/off x two specs x two metals): "
+               "zero cells clear the control at Welch 2.00, the best is +1.65, "
+               "only three have positive expectancy at all and the largest is "
+               "+0.016R. Silver is negative in all eight of its cells."),
     ),
 
     "pead_time_sue": Registration(
