@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Optional
 
 from app.strategies.base import BaseStrategy
+from app.strategies.donchian_fail import DonchianFailureStrategy
 from app.strategies.ibs import IBSMeanReversionStrategy
 from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
@@ -186,6 +187,27 @@ REGISTRY: dict[str, Registration] = {
                "and retention 0.54 against a 2.96 / 0.70 hurdle. Lakonishok & "
                "Smidt published in 1988; the decay is the ordinary fate of a "
                "documented anomaly."),
+    ),
+
+    "donchian_fail": Registration(
+        strategy=DonchianFailureStrategy,
+        deployment=Deployment.GATED,
+        instruments=("SPY",),
+        consensus_weight=0.0,
+        basis=("The closest of the refused candidates. SPY nets +0.354R at "
+               "t 2.40 over 184 trades with out-of-sample Sharpe retention "
+               "0.99 - the OOS Sharpe IS the in-sample one, which is what a "
+               "real edge looks like. It fails on sample size: 37 holdout "
+               "trades cannot reach t 2.96, and the compulsory intraday cohort "
+               "reaches 1.83 against a required 2.0. Shorts are positive "
+               "(+0.270R) but at t 1.26 against longs at 2.34, so part of it "
+               "is equity drift. sp500 and nasdaq fail outright: sp500's cost "
+               "is 0.70R inside the cash session and 1.03R outside against a "
+               "GROSS edge of +0.021R, because a 0.25-ATR stop on M30 bars "
+               "gives a 6.28-point risk unit against a 2.0-point spread. That "
+               "is a general limit on half-hour mean reversion in these CFDs, "
+               "not a fact about Donchian. Settle it with a deeper SPY export "
+               "or another penny-spread ETF with a real tape."),
     ),
 
     "pead_time_sue": Registration(
