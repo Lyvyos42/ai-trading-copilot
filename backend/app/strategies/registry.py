@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Optional
 
 from app.strategies.base import BaseStrategy
+from app.strategies.ibs import IBSMeanReversionStrategy
 from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
 )
@@ -56,6 +57,10 @@ class Registration:
     # The measurement behind the state. Shown in the API response so a reader
     # can see why a strategy is or is not counting.
     basis: str = ""
+    # Strategies that make the SAME trade. Two entries naming each other must
+    # never both be LIVE: the consensus would count one edge twice and report
+    # a conviction it has not earned. Enforced by check_exclusions().
+    excludes: tuple[str, ...] = ()
     params: dict = field(default_factory=dict)
 
     def applies_to(self, symbol: str) -> bool:
@@ -116,6 +121,22 @@ REGISTRY: dict[str, Registration] = {
                "claim. Its weight reflects that."),
     ),
 
+    "ibs_mean_reversion": Registration(
+        strategy=IBSMeanReversionStrategy,
+        deployment=Deployment.GATED,
+        consensus_weight=0.0,
+        excludes=("overnight_drift",),
+        basis=("Discriminates, but it is the same trade. With the regime "
+               "filter applied to both groups, sp500 sessions closing below "
+               "IBS 0.2 return +17.8bp overnight against +0.6bp for the rest - "
+               "Welch t 3.01 over 833 observations. The intraday leg separates "
+               "at t 0.18, so the whole effect is overnight, which is what "
+               "overnight_drift already trades. Standalone OOS t is 1.82-2.18 "
+               "against 3.08 on only 154-218 qualifying sessions. Deployed as "
+               "the ibs_max parameter of OvernightDriftStrategy, not as a "
+               "second voter."),
+    ),
+
     "pead_time_sue": Registration(
         strategy=PEADTimeScreener,
         deployment=Deployment.GATED,
@@ -125,6 +146,32 @@ REGISTRY: dict[str, Registration] = {
                "Promotion requires the key AND a study, in that order."),
     ),
 }
+
+
+def check_exclusions() -> list[str]:
+    """Pairs that would double-count one edge if both went live.
+
+    Called at import so a registry edit that puts two voters on the same trade
+    fails immediately, rather than quietly inflating consensus confidence on
+    exactly the setups where both fire - which is the worst place for it,
+    because those are the ones that reach the user.
+    """
+    problems = []
+    for name, reg in REGISTRY.items():
+        if reg.deployment is not Deployment.LIVE:
+            continue
+        for other in reg.excludes:
+            o = REGISTRY.get(other)
+            if o is not None and o.deployment is Deployment.LIVE:
+                problems.append(
+                    f"{name} and {other} are both LIVE but make the same "
+                    f"trade; the consensus would count it twice")
+    return problems
+
+
+_conflicts = check_exclusions()
+if _conflicts:
+    raise RuntimeError("strategy registry: " + "; ".join(_conflicts))
 
 
 def live(symbol: str) -> list[tuple[str, Registration]]:

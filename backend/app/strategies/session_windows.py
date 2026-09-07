@@ -35,8 +35,31 @@ FLATTEN_BY = dtime(15, 50)
 HALF_DAY_CLOSE = dtime(13, 0)
 
 
-def to_et(ts_epoch: int) -> datetime:
-    return datetime.fromtimestamp(ts_epoch, tz=timezone.utc).astimezone(EXCHANGE_TZ)
+def to_et(ts_epoch) -> datetime:
+    """Epoch seconds, or anything datetime-like, to exchange-local time.
+
+    BarSeries.time is documented as epoch seconds, but a caller building one
+    from a Parquet frame hands over pandas.Timestamp objects without noticing -
+    the column looks numeric and the constructor takes any sequence. That
+    raised TypeError deep inside datetime.fromtimestamp, several frames from
+    the mistake. Coercing here is cheaper than the traceback, and a Timestamp
+    already carries its own instant, so there is nothing to guess.
+
+    Naive datetimes are assumed UTC. That assumption is stated rather than
+    silently applied because it is wrong for a naive broker timestamp, and the
+    right fix for those is ief-style localisation at the loader - see
+    app/research/mt5_data.py - not a guess here.
+    """
+    if isinstance(ts_epoch, datetime):
+        dt = ts_epoch
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(EXCHANGE_TZ)
+    if hasattr(ts_epoch, "to_pydatetime"):        # pandas.Timestamp
+        return to_et(ts_epoch.to_pydatetime())
+    if hasattr(ts_epoch, "timestamp") and callable(ts_epoch.timestamp):
+        return datetime.fromtimestamp(ts_epoch.timestamp(), tz=timezone.utc).astimezone(EXCHANGE_TZ)
+    return datetime.fromtimestamp(float(ts_epoch), tz=timezone.utc).astimezone(EXCHANGE_TZ)
 
 
 def et_epoch(day: date, t: dtime) -> int:
