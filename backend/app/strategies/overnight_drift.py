@@ -108,7 +108,7 @@ class OvernightDriftStrategy(BaseStrategy):
     def __init__(self, sma_period: int = 200, rsi_period: int = 14,
                  rsi_floor: float = 45.0, require_regime: bool = True,
                  ibs_max: Optional[float] = None,
-                 fomc_counter_regime: bool = True,
+                 fomc_counter_regime: bool = False,
                  prop: Optional[PropConstraint] = None):
         super().__init__(sma_period=sma_period, rsi_period=rsi_period,
                          rsi_floor=rsi_floor, require_regime=require_regime,
@@ -129,6 +129,24 @@ class OvernightDriftStrategy(BaseStrategy):
         self.ibs_max = ibs_max
         # Counter-regime companion: hold overnight on the eve of scheduled FOMC
         # announcements even when price is below the 200-day average or RSI <= 45.
+        #
+        # DEFAULTS TO OFF. Replicated independently and the direction holds, but
+        # the out-of-sample pass rests on 16 trades:
+        #
+        #   in-sample     63 trades  1994-2019   +17.7bp   t +1.39
+        #   out-of-sample 16 trades  2020-2026   +54.8bp   t +3.45
+        #
+        # The best three of those sixteen supply 54% of the out-of-sample total,
+        # and eight of them fall in 2022 alone - the hiking cycle. Retention is
+        # 4.92, which by this project's own reading of the Donchian result is
+        # not robustness but a holdout window too short and too homogeneous to
+        # contain anything else. The bulk of the evidence, 63 in-sample trades
+        # across 25 years, gives t 1.39.
+        #
+        # It is mechanistically coherent - policy uncertainty was extreme in
+        # 2020 and 2022, which is when Lucca & Moench say the drift is largest -
+        # and that is a reason to keep testing it, not to enable it by default
+        # in a strategy carrying 0.6 of the consensus weight.
         # Validated on SPY 1993-2026 across 62 bear meetings:
         # +30.2 bp net, win rate 66.1%, PF 2.79, OOS t = +3.52, retention 4.64.
         # In the modern era (2016-2026): +51.7 bp, t = +3.15, Welch = +3.05.
