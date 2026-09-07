@@ -14,79 +14,86 @@ PRE-REGISTERED - PREREG_2026-09-07_fomc_drift.md
     gates: OOS |t| >= 2.96, retention >= 0.70, most-recent-third |t| >= 2.0,
            non-overnight leg standing alone at |t| >= 2.0
 
-STATUS: THE STUDY IS BLOCKED, NOT CONCLUDED. Two things stop it, one of them
-mine.
+RESULT, on the repaired schedule: FAILS TWO OF THREE GATES, AND THE WAY IT
+FAILS IS THE MOST INTERESTING FINDING IN THE PROGRAMME.
 
-BLOCKER 1 - THE EVENT FILE IS SYSTEMATICALLY INCOMPLETE AFTER 2020
+Both earlier blockers are resolved. The event file now carries eight scheduled
+meetings a year across all 33 years with a 46.9% projection-month share, and
+IWM M30 resolves both windows exactly. The two unscheduled 2020 cuts are
+excluded: an emergency action has no anticipation window, which is the whole
+mechanism, and neither had a 14:00 or 14:15 release.
 
-fomc_dates.csv carries a clean eight meetings a year from 1993 to 2019, and
-then four to seven a year from 2020. The missing ones are not random:
+    IWM 2011-2026, 99 events with all required bars present
+      W1  14:00 t-1 -> release    +18.9bp   win 52.5%   t +1.88   Welch +1.43
+      W2  10:00 t   -> release     +4.1bp   win 46.5%   t +0.58   Welch +0.66
 
-    era          rows falling in a projection month (Mar/Jun/Sep/Dec)
-    1993-2020    102 of 223    46%     (the true share is about 50%)
-    2021-2026      2 of  25     8%
+    sp500 2022-2026, 34 events - independent cross-check
+      W1  +20.6bp   win 64.7%   t +1.86   Welch +1.55
+      W2   +1.2bp   win 41.2%   t +0.30   Welch -0.07
 
-March and June are absent entirely from 2021 onward. Those are the meetings
-that carry the Summary of Economic Projections and the press conference - the
-highest-information events of the cycle, and precisely where a
-pre-announcement drift should be largest. What survives in the file is the
-low-information subset.
+W1 reproduces at nearly the same magnitude on a second instrument and a
+different sample. W2, the intraday subset, is nothing on both - which is the
+correct outcome, since the intraday window is not the paper's claim.
 
-That is the worst possible bias for this particular question, and it lands
-exactly on the 2018-2026 window the modern-third gate was written to test. The
-gate cannot be evaluated until the file is completed.
+GATE 1, MODERN THIRD - PASSED, AND IT IS THE ONLY CANDIDATE TO DO SO
 
-BLOCKER 2 - DAILY BARS CANNOT RESOLVE A 14:00 BOUNDARY, WHICH I SHOULD HAVE
-SAID WHEN I PROPOSED THE SPECIFICATION
+    2011-2014   n=23    -8.0bp   t -0.37   Welch -0.60
+    2015-2017   n=18    +3.9bp   t +0.29   Welch +0.03
+    2018-2026   n=58   +34.2bp   t +2.46   Welch +2.12
 
-The spec names SPY 1993-2026 as a primary universe on 248 events. SPY is
-available here only as daily bars, and a daily bar cannot see 14:00. Neither
-W1 nor W2 is computable on it. What IS computable is the OVERNIGHT LEG of W1 -
-close on t-1 to open on t - which is a strict subset that ends well before the
-announcement and is therefore clean, just partial.
+The modern era is the STRONGEST, not the weakest. Every other candidate here
+ran the other way - turn-of-the-month went 2.96 to 0.51, Donchian went 3.69 to
+-0.68. This one has no decay to find. Lucca & Moench published in 2015 and the
+effect is larger after 2018 than before it.
 
-IWM M30 resolves both windows exactly, and covers 2011 onward, which leaves 69
-usable W1 events in the complete portion of the event file.
+GATE 2, OVERLAP - FAILED, AND THIS IS WHERE IT GETS USEFUL
 
-WHAT THE RUNNABLE PORTION SHOWS
+    14:00 t-1 -> cash close t-1      -6.2bp   t -1.21
+    overnight, cash close -> 09:30  +21.1bp   t +3.22   Welch +2.45
+    09:30 t -> release               +4.8bp   t +0.69
+    non-overnight portion (A + C)    -2.2bp   t -0.26   <- required >= 2.00
 
-IWM M30, 2011-2019, windows resolved exactly:
+The whole of W1 is its overnight leg. The two intraday portions contribute
+nothing and the earlier one is negative. So "pre-FOMC drift", measured here, is
+an overnight hold - which overnight_drift already makes every night.
 
-    window                       n   mean     t     null    Welch
-    W1  14:00 t-1 -> 14:00 t    69  +3.5bp  +0.33  +3.3bp   +0.02
-    W2  10:00 t   -> 14:00 t    54  -5.8bp  -0.76  +0.0bp   -0.74
+Except it does not make THIS one. Splitting the FOMC overnight leg by regime:
 
-Nothing. The exactly-specified windows are indistinguishable from an ordinary
-day at the same hours, and the pure-intraday subset is negative.
+    above the 200-day average   n=85   +9.5bp  vs +4.6bp control   Welch +0.85
+    BELOW the 200-day average   n=29  +42.5bp  vs +2.9bp control   Welch +2.32
 
-SPY daily, 1993-2019, overnight leg only, 216 events:
+The effect lives BELOW the 200-day average, in the conditions overnight_drift's
+regime gate exists to refuse. Inside that gate, an FOMC night is worth +5.8bp
+against +4.1bp for an ordinary one - Welch +0.36, nothing.
 
-    +10.7bp against a +3.1bp control      t +2.63    Welch +1.84
+That is consistent with the mechanism rather than a coincidence: Lucca & Moench
+report the drift is larger when uncertainty is high, and a market under its
+200-day average is the definition of the uncertain regime. The two strategies
+want OPPOSITE regimes. They do not overlap; they are disjoint, which is the
+reverse of what the overlap gate was written to detect.
 
-and by era:
+GATE 3, PRE-REGISTERED SPLIT - FAILED on significance, PASSED on retention
 
-    1993-2001   n=72   +2.3bp   t +0.62   Welch -0.62
-    2002-2010   n=72  +17.6bp   t +1.77   Welch +1.75
-    2011-2019   n=72   +9.4bp   t +1.60   Welch +1.24
+    in-sample Sharpe 0.48 -> out-of-sample 0.84
+    out-of-sample t 1.32 against 2.96      retention 1.75
 
-    80/20 split: in-sample t 2.07 -> out-of-sample t 1.95, retention 1.87
+VERDICT: gated as a standalone strategy - two of three gates failed.
 
-Nothing clears 2.96 on any measure. The overnight leg is concentrated in
-2002-2010 and weaker on either side of it, which is the decay shape again -
-though on 72 events per era none of these differences is itself significant.
+What it is NOT is refuted. Every measurement points the same way and none of
+them reaches the bar: W1 reproduces across two instruments at +19 and +21bp,
+the modern third clears its own gate at t 2.46, and the mechanism's own
+prediction - stronger under uncertainty - is visible at Welch +2.32. What
+defeats it is 99 events, of which 29 sit in the regime that carries the
+effect. Eight events a year cannot be hurried.
 
-READ THIS CAREFULLY BEFORE CONCLUDING ANYTHING
-
-The one leg that shows anything is the leg the specification did NOT ask for,
-measured on the instrument that could not run the specification. The two
-windows that were pre-registered, on the instrument that can resolve them,
-show nothing at all - on 69 events, which is too few to be evidence of absence
-either.
-
-This is not a refutation and it is not a result. It is a study whose primary
-universe was unrunnable and whose modern era is unavailable. Completing the
-event file and adding an intraday SPY series would make it answerable; until
-then the honest status is blocked.
+The interesting deployment is not a strategy of its own. It is a COUNTER-REGIME
+companion to overnight_drift: hold the night before a scheduled announcement
+specifically when price is below its 200-day average, which is precisely when
+overnight_drift is flat. On 29 observations that is a hypothesis, not a
+position. A deeper intraday series - SPY M30 back to 1993 would give about 248
+events and perhaps 70 in the low regime - is what would settle it, and unlike
+the decayed candidates there is a reason to expect the answer to still be
+there when the data arrives.
 """
 from __future__ import annotations
 
@@ -166,12 +173,14 @@ class FOMCDriftStrategy(BaseStrategy):
         if self.require_validation:
             return SignalResult.abstain(
                 self.name, bars.symbol,
-                "FOMC_STUDY_BLOCKED: the event file is missing every "
-                "projection-month meeting from 2021 (8% of rows fall in "
-                "Mar/Jun/Sep/Dec against a true 50%), so the modern-third gate "
-                "cannot run; and SPY exists here only as daily bars, which "
-                "cannot resolve a 14:00 boundary. On the runnable portion - IWM "
-                "M30 2011-2019, 69 events - W1 returns t +0.33 and W2 t -0.76.")
+                "FOMC_DRIFT_UNDERPOWERED: W1 reproduces on two instruments "
+                "(+18.9bp t 1.88 on IWM, +20.6bp t 1.86 on sp500) and the "
+                "modern third clears its own gate at t 2.46 - the only "
+                "candidate here with no decay. But the whole effect is the "
+                "overnight leg (t 3.22) and it lives BELOW the 200-day average "
+                "(Welch 2.32, n=29), so the non-overnight gate fails at t -0.26 "
+                "and out-of-sample t is 1.32 against 2.96. Underpowered, not "
+                "refuted.")
 
         if not self._table:
             return SignalResult.abstain(

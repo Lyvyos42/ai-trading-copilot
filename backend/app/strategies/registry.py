@@ -214,19 +214,22 @@ REGISTRY: dict[str, Registration] = {
         deployment=Deployment.GATED,
         instruments=("SPY", "IWM", "QQQ"),
         consensus_weight=0.0,
-        basis=("Study BLOCKED, not concluded. The event file drops every "
-               "projection-month meeting from 2021 - 8% of rows fall in "
-               "Mar/Jun/Sep/Dec against a true 50% - which removes exactly the "
-               "high-information events and lands on the 2018-2026 window the "
-               "modern-third gate tests. Separately, SPY exists here only as "
-               "daily bars and cannot resolve a 14:00 boundary, so neither "
-               "pre-registered window is computable on the primary universe. "
-               "On what does run - IWM M30 2011-2019, 69 events - W1 gives "
-               "t +0.33 and W2 t -0.76, indistinguishable from the same hours "
-               "on an ordinary day. The SPY overnight leg, a subset the spec "
-               "did not ask for, gives Welch +1.84 over 216 events, "
-               "concentrated in 2002-2010. Nothing clears any gate and nothing "
-               "is refuted."),
+        basis=("Underpowered, not refuted - and the only candidate in this "
+               "programme with NO decay. W1 reproduces across two instruments "
+               "(+18.9bp t 1.88 on 99 IWM events, +20.6bp t 1.86 on 34 sp500) "
+               "and the modern third is the STRONGEST era: 2018-2026 gives "
+               "t +2.46 against -0.37 for 2011-2014, clearing the anti-decay "
+               "gate that every other candidate failed. It fails the other two "
+               "gates: the entire effect is the overnight leg (t 3.22), so the "
+               "non-overnight portion returns t -0.26 against a required 2.00, "
+               "and out-of-sample t is 1.32 against 2.96. The overlap gate "
+               "fails in an informative direction - the effect concentrates "
+               "BELOW the 200-day average (Welch 2.32, n=29) where "
+               "overnight_drift is deliberately flat, so the two are disjoint "
+               "rather than duplicative, matching Lucca and Moench on the "
+               "drift being larger under uncertainty. 99 events, 29 of them in "
+               "the regime that carries it. Needs an intraday SPY series back "
+               "to 1993."),
     ),
 
     "pead_time_sue": Registration(
