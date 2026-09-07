@@ -97,6 +97,10 @@ class OvernightDriftStrategy(BaseStrategy):
     # will abstain there anyway.
     requires = (DataNeed.OHLC, DataNeed.OVERNIGHT_GAP)
     validated_on = ("SPY", "QQQ", "ES=F", "NQ=F")
+    # Daily bars, and only daily. The 200-period average and the 14-period RSI
+    # are a 200-DAY trend and a 14-DAY oscillator; on 30-minute bars the same
+    # code reads a fortnight and calls it a regime.
+    intervals = ("1d", "1day", "D1", "daily")
 
     def __init__(self, sma_period: int = 200, rsi_period: int = 14,
                  rsi_floor: float = 45.0, require_regime: bool = True,

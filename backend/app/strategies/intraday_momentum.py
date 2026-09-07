@@ -81,6 +81,7 @@ class IntradayMomentumStrategy(BaseStrategy):
     name = "intraday_momentum"
     requires = (DataNeed.OHLC, DataNeed.SESSION_TIMES)
     validated_on = ()   # deliberately empty - see the module docstring
+    intervals = ("30m", "M30")
 
     def __init__(self, require_gap_alignment: bool = False,
                  require_validation: bool = True,
@@ -237,6 +238,7 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
     name = "opening_range_breakout"
     requires = (DataNeed.OHLC, DataNeed.SESSION_TIMES)
     validated_on = ()
+    intervals = ("5m", "15m", "30m", "M5", "M15", "M30")
 
     def __init__(self, require_gap_alignment: bool = False,
                  min_range_bp: float = 5.0,
@@ -267,11 +269,13 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
         day = last_complete_session(bars.time)
         if day is None:
             return SignalResult.abstain(self.name, bars.symbol, "no bars")
-        if is_half_day(bars.time, day):
-            return SignalResult.abstain(
-                self.name, bars.symbol,
-                "HALF_SESSION: no time to hold to a 15:50 flatten")
 
+        # No half-day gate here, deliberately. It asks whether the session
+        # reached 15:30, which is false for every session still in progress -
+        # so gating on it made the strategy abstain all morning and only speak
+        # after the window it trades in had closed. This one acts from 10:00
+        # onward; the flatten is a time exit the execution layer applies, and
+        # an early close simply arrives before it.
         opening = window_indices(bars.time, day, RTH_OPEN, OPENING_RANGE_END)
         if not opening:
             return SignalResult.abstain(

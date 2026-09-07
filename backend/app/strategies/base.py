@@ -128,6 +128,16 @@ class BaseStrategy:
     # on cash equity indices has not been measured on EURUSD, and running it
     # there is a new hypothesis, not a deployment.
     validated_on: tuple[str, ...] = ()
+    # Bar intervals this strategy is defined on. Empty means it does not care.
+    #
+    # It cares more often than it looks. A "200-period" regime filter means 200
+    # DAYS on daily bars and about fifteen sessions on 30-minute bars, and
+    # nothing in the numbers distinguishes the two - the filter still returns a
+    # value, the strategy still emits a signal, and the signal is answering a
+    # different question than the one its docstring describes. Caught exactly
+    # that way: overnight drift ran on M30 bars and reported a regime read on a
+    # fortnight of data.
+    intervals: tuple[str, ...] = ()
 
     def __init__(self, **params):
         self.params = params
@@ -139,6 +149,13 @@ class BaseStrategy:
         return self._evaluate(bars)
 
     def _check_requirements(self, bars: BarSeries) -> Optional[SignalResult]:
+        if self.intervals and bars.interval not in self.intervals:
+            return SignalResult.abstain(
+                self.name, bars.symbol,
+                f"WRONG_INTERVAL: {self.name} is defined on "
+                f"{'/'.join(self.intervals)} bars and was given "
+                f"{bars.interval!r}. Its lookbacks would count the wrong unit.")
+
         if len(bars) < self.min_bars():
             return SignalResult.abstain(
                 self.name, bars.symbol,
