@@ -45,6 +45,7 @@ from app.strategies.nr7 import NR7BreakoutStrategy
 from app.strategies.orb_london import LondonORBStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
+from app.strategies.tsmom import TSMomentumStrategy
 from app.strategies.turn_of_month import TurnOfMonthStrategy
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
 from app.strategies.vpa_smc import VPASMCStrategy
@@ -214,6 +215,41 @@ REGISTRY: dict[str, Registration] = {
                "not the explanation. Volatility clustering is real; the "
                "DIRECTION of the expansion being predictable from the opening "
                "range is the claim that failed."),
+    ),
+
+    "tsmom": Registration(
+        strategy=TSMomentumStrategy,
+        deployment=Deployment.GATED,
+        instruments=("XAUUSD", "USDJPY"),
+        consensus_weight=0.0,
+        basis=("Underpowered on gold, refuted on the validation instrument. 12 "
+               "cells over XAUUSD and USDJPY H1, 16-17 years. No cell passes; "
+               "best is 2 of 5. XAUUSD at lookback 480 with the trailing-band "
+               "exit nets +0.310R on n=200 and PASSES directional symmetry "
+               "with its SHORT leg ahead of its long (+0.431R vs +0.194R) "
+               "across a +322% gold market - the cleanest beta acquittal in "
+               "the programme, since a trend follower on a tripling asset "
+               "would normally be pure long beta. Retention +2.07 and a "
+               "stationary block bootstrap gives P(mean<=0)=0.042, short of "
+               "the 12-cell Bonferroni bar of 0.004. It fails OOS (t +1.05 on "
+               "40 trades vs 2.96), modern third (t +1.12) and control (Welch "
+               "+1.43). CONCENTRATION IS THE REAL LIMIT: median trade -0.401R, "
+               "skew +6.11, and the top 5% of trades carry 174% of the profit "
+               "- remove the best ten of two hundred and it is negative. That "
+               "is the accepted shape of a trend payoff rather than a defect, "
+               "but it means the effective sample is nearer ten than two "
+               "hundred and no choice of statistic repairs it. USDJPY fails "
+               "outright: its largest cell (+0.748R) is long +1.825R against "
+               "short -0.329R on a pair that went 84 to 154, with OOS t -3.27 "
+               "and retention -4.90 - a carry position with a momentum label, "
+               "caught by the symmetry gate. SPEC DEFECT: the filed momentum-"
+               "flip exit holds a median of 3-5 bars against the band exit's "
+               "208-285, because entry fires at the zero crossing where the "
+               "sign is unstable; half the grid was not testing time-series "
+               "momentum. Promotion needs more INSTRUMENTS, not more "
+               "parameters - the published result is cross-sectional over 58 "
+               "futures because no single market supplies enough independent "
+               "trends."),
     ),
 
     "turn_of_month": Registration(
