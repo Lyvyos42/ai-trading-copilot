@@ -29,8 +29,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-from app.strategies.base import BaseStrategy
 from app.strategies.artemis_squeeze import ArtemisSqueezeStrategy
+from app.strategies.base import BaseStrategy
 from app.strategies.crt import CRTStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
 from app.strategies.fomc_drift import FOMCDriftStrategy
@@ -39,6 +39,7 @@ from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
 )
 from app.strategies.nr7 import NR7BreakoutStrategy
+from app.strategies.orb_london import LondonORBStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
 from app.strategies.turn_of_month import TurnOfMonthStrategy
@@ -285,6 +286,39 @@ REGISTRY: dict[str, Registration] = {
                "pinch 6 against 2,316 reported by the collaborating scan, so "
                "the Keltner parameters under test differ and this verdict does "
                "not transfer to that construction."),
+    ),
+
+    "orb_london_0830": Registration(
+        strategy=LondonORBStrategy,
+        deployment=Deployment.GATED,
+        instruments=("GBPUSD", "EURUSD"),
+        consensus_weight=0.0,
+        basis=("Refuted. 3,782 trades on GBPUSD M15 primary and EURUSD M15 "
+               "validation, 1,033 sessions 2022-2026, at two target "
+               "geometries. Zero of four cells pass the gates. The decisive "
+               "measurement is gross versus net: with zero spread and zero "
+               "commission on the same entries, expectancy is statistically "
+               "nil in all four cells (best t 1.40), so there is no edge for "
+               "the uniform 0.05-0.07R toll to consume and no execution "
+               "improvement reaches a positive number. The filed measured-move "
+               "target is a specification defect - risk is 1.32x the range "
+               "height because the fill follows a close beyond the near edge "
+               "while the stop sits at the far one, making a 1.0x-height "
+               "target only 0.52R from entry, which needs a 66% win rate to "
+               "break even and gets exactly 66%. All four cells land within "
+               "three points of their arithmetic breakeven win rate. The one "
+               "non-negative cell (GBPUSD 1:1.5, +0.002R) clears the control "
+               "at Welch 2.10 only because the control loses -0.080R, the "
+               "third time in this programme that gate has been satisfied by a "
+               "strategy earning nothing. EURUSD is negative in both "
+               "geometries to t -3.14. JPY controls could not be run at "
+               "specification: no M15 export exists and an H1 bar cannot "
+               "resolve an 08:30-08:45 range; at the 08:00 H1 anchor - a "
+               "different hypothesis - all four cells are negative over 16 "
+               "years and 9,665 trades. Also recorded: 56.4% of EURUSD "
+               "entry-window bars quote spread=0, an export artefact floored "
+               "at the non-zero median, without which the cost model would "
+               "let half the sample trade free."),
     ),
 
     "pead_time_sue": Registration(
