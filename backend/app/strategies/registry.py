@@ -49,6 +49,7 @@ from app.strategies.tsmom import TSMomentumStrategy
 from app.strategies.turn_of_month import TurnOfMonthStrategy
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
 from app.strategies.vpa_smc import VPASMCStrategy
+from app.strategies.wmr_month_end import WMRMonthEndStrategy
 from app.strategies.vwap_bands import InstitutionalVWAPStrategy
 
 
@@ -184,6 +185,40 @@ REGISTRY: dict[str, Registration] = {
                "the engine's O(history) continuation loop O(600); validated at "
                "119/119 signal agreement against a 1500-bar window on both "
                "pairs."),
+    ),
+
+    "wmr_month_end": Registration(
+        strategy=WMRMonthEndStrategy,
+        deployment=Deployment.OBSERVER,
+        instruments=("GBPUSD",),
+        consensus_weight=0.0,
+        basis=(
+            "Mechanism established, execution not. London 16:00 WMR month-end equ"
+            "ity-rebalancing flow (Melvin and Prins 2015), GBPUSD H1 primary / EU"
+            "RUSD validation, 2010-2026, 167 strict month-ends. Independently rep"
+            "licated: fix-hour beta +192.6 (t +3.31, r +0.249), pre-fix +51.1, po"
+            "st-fix INVERTS to -71.1 (t -1.84), ambient non-month-end placebo +52"
+            ".4 on n=3,970. The surge-and-invert across the fix is the strongest "
+            "single piece of evidence in the programme - the shape a non-discreti"
+            "onary flow exhausting at a benchmark should make. EURUSD is flat (t "
+            "-0.41), consistent with Euro-area funds using the ECB 14:15 CET fix."
+            " FIRST candidate filed with an a priori power calculation (sigma 15."
+            "5 pips, N=192 detects r >= 0.120). LIMITS: carried by about 10 month"
+            "s - dropping the 10 largest |SPY| takes t from +3.31 to +1.10, one o"
+            "f the five most extreme months has the WRONG sign, and Spearman is +"
+            "0.173 (t +2.26) against Pearson +0.249. The sign strategy nets +2.98"
+            " pips at t +1.17 against a pre-registered 1.65, Era 1 is NEGATIVE (-"
+            "1.13), and the 1.30-pip toll is about 40% of the effect. Promotion c"
+            "ontract is outlier-proof by design: positive MEDIAN net AND positive"
+            " Spearman over 24 forward month-ends, logged in macro_state_audit.js"
+            "onl. PORTFOLIO: combined equal-risk with meanrev EURUSD H4 and tsmom"
+            " XAUUSD H1 the three are effectively uncorrelated (mean |rho| 0.053,"
+            " every pair within one SE of zero) and reach t +2.76 at annualised S"
+            "harpe 0.69 over 191 months - the first figure here to clear anything"
+            ". In-sample, and it inherits the selection of all three components. "
+            "At the risk level where max drawdown fits a 10% prop limit the portf"
+            "olio returns about 3% a year, and its longest drawdown is 63 months."
+        ),
     ),
 
     "vp_auction": Registration(
