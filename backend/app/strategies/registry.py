@@ -36,6 +36,7 @@ from app.strategies.intraday_momentum import (
 )
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
+from app.strategies.vp_auction import VolumeProfileAuctionStrategy
 from app.strategies.vwap_bands import InstitutionalVWAPStrategy
 
 
@@ -135,6 +136,21 @@ REGISTRY: dict[str, Registration] = {
                "against 3.08 on only 154-218 qualifying sessions. Deployed as "
                "the ibs_max parameter of OvernightDriftStrategy, not as a "
                "second voter."),
+    ),
+
+    "vp_auction": Registration(
+        strategy=VolumeProfileAuctionStrategy,
+        deployment=Deployment.GATED,
+        instruments=("SPY", "QQQ"),
+        consensus_weight=0.0,
+        basis=("Rules not supported. The 80% rule measures 60.0% on 493 SPY "
+               "sessions, stable across acceptance variants, against a 54.6% "
+               "base rate for a random entry inside the value area - "
+               "two-proportion z 0.94 where 3.08 was needed. Traded: rejection "
+               "-0.023R (t -0.25), acceptance -0.038R at two confirmation bars "
+               "and degrading as confirmation is added. The value area "
+               "construct is retained for reference levels; it is the auction "
+               "rules that failed."),
     ),
 
     "pead_time_sue": Registration(
