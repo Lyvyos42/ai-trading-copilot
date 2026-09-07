@@ -32,6 +32,7 @@ from typing import Optional
 from app.strategies.artemis_squeeze import ArtemisSqueezeStrategy
 from app.strategies.base import BaseStrategy
 from app.strategies.crt import CRTStrategy
+from app.strategies.decasteljau import DecasteljauStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
 from app.strategies.fomc_drift import FOMCDriftStrategy
 from app.strategies.ibs import IBSMeanReversionStrategy
@@ -194,6 +195,41 @@ REGISTRY: dict[str, Registration] = {
                "and retention 0.54 against a 2.96 / 0.70 hurdle. Lakonishok & "
                "Smidt published in 1988; the decay is the ordinary fate of a "
                "documented anomaly."),
+    ),
+
+    "decasteljau": Registration(
+        strategy=DecasteljauStrategy,
+        deployment=Deployment.GATED,
+        instruments=("USDJPY", "EURJPY"),
+        consensus_weight=0.0,
+        basis=("Refuted on JPY H1. 12,796 trades over USDJPY primary and "
+               "EURJPY validation, 99,000 H1 bars each 2010-2026, two modes "
+               "and both pip conventions. Zero of five gates on all eight "
+               "cells; best is +0.020R at t 0.57. Corrected, the realised win "
+               "rate sits 0.2-1.7 points from arithmetic breakeven in every "
+               "cell - fair odds, no edge - reproducing and explaining the "
+               "engine's own recorded -0.009R at quality 60. FOUND AND FIXED A "
+               "LIVE DEFECT: _calc_sl_tp hardcoded pip_size=0.0001 for all "
+               "non-gold symbols, so max_sl_pips_fx=60 became a 0.006 cap on a "
+               "pair with ATR ~0.15; the cap crushed every stop and the "
+               "atr*0.3 floor restored it, pinning every JPY stop at 0.30*ATR "
+               "with rr 3.33 regardless of mode, swing structure or "
+               "sl_mult_override. USDJPY was live in the watchlist. Cost "
+               "measured at -0.247R per trade (-1,967R over 7,977 trades) "
+               "because that geometry needs a 23.1% win rate and gets 16-21%, "
+               "stopping out on the ENTRY BAR in the median case - 79-84% "
+               "stopped at a median hold of 1 bar, against 62-64% and 19-22 "
+               "bars corrected. Patched in the live engine 2026-09-07. Fourth "
+               "instance of the control-gate shadow artefact and the clearest: "
+               "every broken cell posts a POSITIVE Welch (+0.58 to +1.63) "
+               "while netting -0.198 to -0.312R, because the matched control "
+               "is destroyed by the same 4-pip stop; Welch alone would have "
+               "preferred the broken configuration, and the amended gate "
+               "rejects all eight. Carry is not leaking in - long and short "
+               "agree within a tenth of an R across a sample where USDJPY ran "
+               "+83.5%. DOES NOT refute the M5 configuration the engine was "
+               "written for: every lookback denominates in bars and means "
+               "something different on H1. That remains unmeasured."),
     ),
 
     "donchian_fail": Registration(
