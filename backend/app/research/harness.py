@@ -66,6 +66,27 @@ class Metrics:
                 for k, v in asdict(self).items()}
 
 
+def r_multiples_to_returns(r_multiples: Sequence[float],
+                           risk_fraction: float = 0.01) -> list[float]:
+    """Convert R-multiples into fractional account returns.
+
+    R-multiples are ADDITIVE - a -1R trade loses one unit of risk - while every
+    metric in this module compounds, because it takes fractional returns. Feed
+    R-multiples in directly and `1 + (-1.0)` is zero: the equity curve hits the
+    floor on the first full stop-out and every drawdown reads -100%. That is
+    not a large drawdown, it is a unit error, and it looks alarming rather than
+    wrong, which is worse.
+
+    Multiplying by the fraction of the account risked per trade makes them
+    returns. It also forces the caller to state what they were risking, which
+    is the number that decides whether a +0.50R expectancy is a business or a
+    rounding error.
+    """
+    if not 0.0 < risk_fraction < 1.0:
+        raise ValueError("risk_fraction must be a fraction of the account")
+    return [r * risk_fraction for r in r_multiples]
+
+
 def equity_curve(returns: Sequence[float]) -> list[float]:
     eq = [1.0]
     for r in returns:

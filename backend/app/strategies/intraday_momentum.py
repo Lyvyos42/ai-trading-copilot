@@ -14,37 +14,52 @@ OPENING RANGE BREAKOUT
     flattened on time. Gao et al. is NOT evidence for this. It is a common
     intraday pattern with a large practitioner literature and no comparable
     peer-reviewed support, and attaching the paper's citation to it would
-    misrepresent both.
+    misrepresent both. It is, however, the one of the two that measures well -
+    see OpeningRangeBreakoutStrategy.
 
 WHAT THE INTRADAY MOMENTUM EFFECT LOOKS LIKE NOW
 
-Measured on 2 years of Yahoo 1h bars, where the 15:30 bar IS the final half
-hour, 497 sessions each:
+First measured on a 1h proxy, then settled on TRUE 30-minute windows from
+4+ years of MT5 M30 exports - the exact 09:30-10:00 and 15:30-16:00 bars the
+paper is about. Correlation between the two:
 
-    SPY   corr(first hour, last half hour) = +0.089   t = +1.98
-          trading its sign: n=494  win 48.8%  mean +0.2bp  t = +0.20  total +0.98%
-    QQQ   corr = +0.077   t = +1.73
-          trading its sign: n=496  win 47.8%  mean +1.0bp  t = +0.78  total +4.75%
+    sp500   1058 sessions  2022-04 .. 2026-09   corr -0.0404   t -1.31
+    nasdaq  1025 sessions  2022-02 .. 2026-09   corr -0.0267   t -0.85
+    us30    1060 sessions  2022-04 .. 2026-09   corr -0.0531   t -1.73
+    spy      486 sessions  2024-09 .. 2026-09   corr +0.0520   t +1.15
 
-The correlation is positive - the paper's direction - and marginal. The
-TRADEABLE version has no edge at all: t of 0.20 and 0.78, win rates under
-50%, and those are gross of the spread paid in the closing half hour, which
-for a half-hour hold is most of the expected move.
+The sign has FLIPPED on all three series with a thousand sessions behind
+them. Not weakened - reversed. Only SPY, on the shortest sample, is still
+positive, and it is not significant either.
 
-The two results are consistent: a positive correlation with a near-zero sign
-trade means the relationship lives in MAGNITUDE, not direction. Large first
-hours go with large last half hours, without reliably agreeing on which way.
+The tradeable version, taking the sign of the opening window at 15:30 and
+exiting at 16:00:
 
-The paper's sample was 1993-2013. This is 2024-2026 on a one-hour proxy of a
-half-hour effect. Both differences matter, and neither rescues it: a strategy
-this weak on the only data available to test it is not one to deploy on the
-strength of a citation. It is implemented so it can be re-tested properly on
-the multi-year M30 exports Antigravity can produce from MT5, at the exact
-09:30-10:00 and 15:30-16:00 windows the paper uses.
+    sp500   sign only     n=1035  win 48.8%  mean -0.54bp  t -0.69  total  -5.56%
+            + gap agrees  n= 503  win 50.5%  mean +0.30bp  t +0.25  total  +1.51%
+    nasdaq  sign only     n=1013  win 47.0%  mean -0.95bp  t -1.01  total  -9.67%
+            + gap agrees  n= 504  win 46.4%  mean -0.80bp  t -0.60  total  -4.03%
+    us30    sign only     n=1030  win 49.4%  mean -0.81bp  t -1.20  total  -8.34%
+            + gap agrees  n= 507  win 49.5%  mean +0.15bp  t +0.15  total  +0.75%
+    spy     sign only     n= 485  win 49.7%  mean -0.09bp  t -0.09  total  -0.42%
+            + gap agrees  n= 238  win 49.6%  mean -0.12bp  t -0.09  total  -0.29%
 
-Until that test passes, IntradayMomentumStrategy defaults to
-`require_validation=True` and abstains, rather than shipping a signal whose
-own measurement says it does not work.
+Every t between -1.20 and +0.25 against a Bonferroni threshold of 2.96 at the
+16 hypotheses tried. Win rates below 50% on seven of eight. Totals negative on
+five of eight. And all of it gross of the spread paid in the closing half
+hour, which on a thirty-minute hold is most of the expected move.
+
+This is no longer "unproven on the available proxy". It was tested on exactly
+the data the paper specifies, over 3629 sessions across four instruments, and
+the effect is absent - with the correlation pointing the other way on the
+three longest series. The paper's sample was 1993-2013; whatever was there has
+not survived into 2022-2026, which is the ordinary fate of a published
+anomaly once it is published.
+
+`require_validation` therefore defaults to True and this abstains. It is kept
+rather than deleted because the measurement is worth preserving next to the
+citation, and because a future sample could say something different. It should
+not be switched on without one.
 """
 from __future__ import annotations
 
@@ -84,11 +99,12 @@ class IntradayMomentumStrategy(BaseStrategy):
         if self.require_validation:
             return SignalResult.abstain(
                 self.name, bars.symbol,
-                "INTRADAY_MOMENTUM_NOT_VALIDATED: measured t=0.20 (SPY) and "
-                "0.78 (QQQ) over 497 sessions of 1h proxy bars, win rate "
-                "under 50%, gross of spread. Re-test on true 09:30-10:00 and "
-                "15:30-16:00 windows from a multi-year M30 export, then set "
-                "require_validation=False.")
+                "INTRADAY_MOMENTUM_REFUTED: tested on true 09:30-10:00 vs "
+                "15:30-16:00 M30 windows, 3629 sessions across sp500, nasdaq, "
+                "us30 and spy, 2022-2026. Correlation is NEGATIVE on all three "
+                "long series (-0.040, -0.027, -0.053); the sign trade returns t "
+                "between -1.20 and +0.25 against a 2.96 threshold. The effect "
+                "is not present in this sample.")
 
         day = last_complete_session(bars.time)
         if day is None:
@@ -170,29 +186,84 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
 
     Not the Gao et al. strategy. See the module docstring.
 
-    The gap filter is the one piece with a defensible rationale: a breakout in
-    the direction the market already gapped is a continuation of an overnight
-    repricing, while one against the gap is a fade of it, and mixing the two
-    into a single statistic averages two different trades.
+    MEASURED ON 4+ YEARS OF M30, IN R-MULTIPLES (risk = entry to midpoint):
+
+        symbol   filter        n    win%   expR    PF     t
+        sp500    gap aligned  460   38.9  +0.560  1.94  +4.89
+        sp500    no filter    926   36.8  +0.500  1.81  +6.08
+        nasdaq   gap aligned  460   42.2  +0.445  1.81  +4.45
+        nasdaq   no filter    934   39.2  +0.368  1.64  +5.27
+        us30     gap aligned  483   35.4  +0.192  1.31  +2.13
+        us30     no filter    947   35.6  +0.241  1.40  +3.52
+        spy      gap aligned  214   37.9  +0.394  1.65  +2.70
+        spy      no filter    447   36.5  +0.348  1.56  +3.42
+
+    THE GAP FILTER DOES NOT EARN ITS PLACE, which is the opposite of what was
+    expected. It halves the sample on every instrument and lowers the t-statistic
+    on every one; on us30 it lowers expectancy outright (+0.192 against +0.241).
+    The rationale - that a break with the gap is continuation and against it is
+    a fade - is reasonable and simply is not what the data shows. It therefore
+    defaults to OFF, and is kept as a parameter so the claim can be re-tested
+    rather than argued about.
+
+    OUT OF SAMPLE IS WHERE IT GETS HONEST. Chronological 80/20, no filter,
+    1% of the account risked per trade:
+
+        symbol   IS Sharpe  OOS Sharpe  OOS t  retention  maxDD   MC p99 DD
+        sp500      3.02        2.37     2.23     0.79    -13.4%    -29.9%
+        nasdaq     2.77        1.18     1.11     0.43    -14.5%    -30.7%
+        us30       1.80        1.10     1.03     0.61    -20.4%    -39.3%
+        spy        2.30        2.95     1.87     1.28    -17.1%    -29.6%
+
+    NONE clears the 2.96 Bonferroni threshold out of sample. sp500 comes
+    closest at 2.23 - nominally significant uncorrected, not after correcting
+    for the sixteen hypotheses actually tried. nasdaq keeps 43% of its
+    in-sample Sharpe, which is the signature of a fit rather than an edge.
+
+    So: a real effect, strong in sample, surviving only partly out of it, and
+    not proven at the bar this project uses. `require_validation` defaults to
+    True. sp500 and spy are the two worth forward-testing first, on retention.
+
+    SLIPPAGE IS NOT IN ANY OF THESE NUMBERS. The bar that stops a trade travels
+    a median 0.45R BEYOND the stop before it closes. How much of that a live
+    fill would actually eat is not resolvable at 30-minute granularity - the
+    stop may fill at the level and the bar continue afterwards - but the
+    expectancy above is gross of whatever it is, and 0.45R against a +0.50R
+    edge is the difference between a business and nothing. Winners, by
+    contrast, go a median 0.13-0.19R against the entry before working, so the
+    midpoint stop is not being clipped by ordinary noise.
     """
 
     name = "opening_range_breakout"
     requires = (DataNeed.OHLC, DataNeed.SESSION_TIMES)
     validated_on = ()
 
-    def __init__(self, require_gap_alignment: bool = True,
+    def __init__(self, require_gap_alignment: bool = False,
                  min_range_bp: float = 5.0,
+                 require_validation: bool = True,
                  flatten_at=FLATTEN_BY):
         super().__init__(require_gap_alignment=require_gap_alignment,
-                         min_range_bp=min_range_bp)
+                         min_range_bp=min_range_bp,
+                         require_validation=require_validation)
         self.require_gap_alignment = require_gap_alignment
         self.min_range_bp = min_range_bp
+        self.require_validation = require_validation
         self.flatten_at = flatten_at
 
     def min_bars(self) -> int:
         return 4
 
     def _evaluate(self, bars: BarSeries) -> SignalResult:
+        if self.require_validation:
+            return SignalResult.abstain(
+                self.name, bars.symbol,
+                "ORB_OOS_BELOW_THRESHOLD: in-sample t 5.66 (sp500) and 5.19 "
+                "(nasdaq) over 4+ years of M30, but out-of-sample t is 2.23 / "
+                "1.11 against a 2.96 threshold at 16 hypotheses. A real effect "
+                "that is not proven at this bar. Forward-test sp500 and spy "
+                "first (Sharpe retention 0.79 and 1.28), then set "
+                "require_validation=False per instrument.")
+
         day = last_complete_session(bars.time)
         if day is None:
             return SignalResult.abstain(self.name, bars.symbol, "no bars")
