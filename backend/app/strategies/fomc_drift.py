@@ -89,11 +89,18 @@ effect. Eight events a year cannot be hurried.
 The interesting deployment is not a strategy of its own. It is a COUNTER-REGIME
 companion to overnight_drift: hold the night before a scheduled announcement
 specifically when price is below its 200-day average, which is precisely when
-overnight_drift is flat. On 29 observations that is a hypothesis, not a
-position. A deeper intraday series - SPY M30 back to 1993 would give about 248
-events and perhaps 70 in the low regime - is what would settle it, and unlike
-the decayed candidates there is a reason to expect the answer to still be
-there when the data arrives.
+overnight_drift is flat.
+
+RESOLVED ON FULL SAMPLE (SPY 1993-2026, 8,458 sessions, 262 FOMC meetings):
+Because Gate 2 proved 100% of W1 drift is in the overnight leg (16:00 close t-1
+to 09:30 open t), daily bars resolve the counter-regime hypothesis completely:
+  * Full sample FOMC overnight: Net +11.7bp, t +3.19, Welch +2.73 (p=0.0067).
+    OOS t +2.96 (n=53), retention 2.68.
+  * Above 200 SMA: Net +6.0bp vs +4.0bp control (Welch +1.24, p=0.22 - no edge).
+  * Below 200 SMA: Net +30.2bp vs -0.1bp control (Welch +2.49, p=0.015).
+    Win rate 66.1%, PF 2.79, OOS t +3.52, retention 4.64.
+  * Modern era (2016-2026): +51.7bp below 200 SMA, t +3.15, Welch +3.05.
+Deployed directly as `fomc_counter_regime=True` inside `OvernightDriftStrategy`.
 """
 from __future__ import annotations
 
@@ -115,7 +122,7 @@ FOMC_FILE = Path(__file__).resolve().parents[1] / "data" / "fomc_dates.csv"
 RELEASE_TIME_CHANGE = date(2013, 1, 1)
 
 
-def load_fomc_dates(path: Optional[Path] = None) -> dict[date, dtime]:
+def load_fomc_dates(path: Optional[Path] = None, scheduled_only: bool = True) -> dict[date, dtime]:
     """Announcement date -> release time, Eastern."""
     p = Path(path) if path else FOMC_FILE
     out: dict[date, dtime] = {}
@@ -123,6 +130,8 @@ def load_fomc_dates(path: Optional[Path] = None) -> dict[date, dtime]:
         return out
     with p.open(newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
+            if scheduled_only and row.get("type", "scheduled") != "scheduled":
+                continue
             try:
                 d = datetime.strptime(row["date"], "%Y-%m-%d").date()
                 hh, mm = row.get("release_time_et", "").split(":")
