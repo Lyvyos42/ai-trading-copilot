@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Optional
 
 from app.strategies.base import BaseStrategy
+from app.strategies.artemis_squeeze import ArtemisSqueezeStrategy
 from app.strategies.crt import CRTStrategy
 from app.strategies.donchian_fail import DonchianFailureStrategy
 from app.strategies.fomc_drift import FOMCDriftStrategy
@@ -255,6 +256,35 @@ REGISTRY: dict[str, Registration] = {
                "zero cells clear the control at Welch 2.00, the best is +1.65, "
                "only three have positive expectancy at all and the largest is "
                "+0.016R. Silver is negative in all eight of its cells."),
+    ),
+
+    "artemis_squeeze": Registration(
+        strategy=ArtemisSqueezeStrategy,
+        deployment=Deployment.GATED,
+        instruments=("XAUUSD", "XAGUSD"),
+        consensus_weight=0.0,
+        basis=("Underpowered on gold, refuted on silver. 30 cells over XAUUSD "
+               "and XAGUSD H1, 99k bars each, 2009-2026. No cell passes all "
+               "four gates. The best gold cell - pinch 12, ADX > 20, momentum "
+               "cross exit - nets +0.231R at t 1.67 on n=91, and passes modern "
+               "third (t 2.15) and directional symmetry (long +0.202R, short "
+               "+0.256R) while failing out-of-sample (t 1.96 on 19 trades "
+               "against a Bonferroni 3.21) and the control (Welch 1.51). The "
+               "only two cells clearing the control at Welch 2.80 and 2.24 are "
+               "silver cells netting -0.003R and -0.001R - they beat a control "
+               "that loses -0.11R, which is not an edge but a demonstration "
+               "that Welch must be read alongside the level. All 15 atr_trail "
+               "cells are negative, to t -8.82 at n=973, on the same entries "
+               "the momentum-cross exit takes to roughly zero: a 2-ATR trail "
+               "on an H1 metal ratchets into noise. Two spec faults were fixed "
+               "before the grid: the filed |slope| > 5.0 is absolute on a "
+               "price-scaling quantity and fires on 0.1% of gold bars and 0.0% "
+               "of silver, and ATR-normalising it must be calibrated on "
+               "release bars rather than all bars. UNRESOLVED: this "
+               "BB(20,2.0)/KC(20,1.5) construction finds 973 gold releases at "
+               "pinch 6 against 2,316 reported by the collaborating scan, so "
+               "the Keltner parameters under test differ and this verdict does "
+               "not transfer to that construction."),
     ),
 
     "pead_time_sue": Registration(

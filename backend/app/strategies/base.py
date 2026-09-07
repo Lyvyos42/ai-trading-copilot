@@ -200,6 +200,37 @@ class BaseStrategy:
         return out
 
     @staticmethod
+    def ema(values: Sequence[float], n: int) -> list[Optional[float]]:
+        """Seeded on the first n-bar SMA, then span-n smoothing."""
+        out: list[Optional[float]] = [None] * len(values)
+        if len(values) < n:
+            return out
+        k = 2.0 / (n + 1.0)
+        prev = sum(values[:n]) / n
+        out[n - 1] = prev
+        for i in range(n, len(values)):
+            prev = values[i] * k + prev * (1.0 - k)
+            out[i] = prev
+        return out
+
+    @staticmethod
+    def stdev(values: Sequence[float], n: int) -> list[Optional[float]]:
+        """Population standard deviation over a trailing window of n.
+
+        Population, not sample: Bollinger bands are defined that way, and the
+        n-1 divisor would widen every band by sqrt(n/(n-1)) - 2.6% at n=20,
+        which is enough to change whether a squeeze registers.
+        """
+        out: list[Optional[float]] = [None] * len(values)
+        if len(values) < n:
+            return out
+        for i in range(n - 1, len(values)):
+            w = values[i - n + 1:i + 1]
+            m = sum(w) / n
+            out[i] = (sum((v - m) ** 2 for v in w) / n) ** 0.5
+        return out
+
+    @staticmethod
     def rsi(values: Sequence[float], n: int = 14) -> list[Optional[float]]:
         """Wilder's RSI. Seeded on the first n changes, then smoothed."""
         out: list[Optional[float]] = [None] * len(values)
