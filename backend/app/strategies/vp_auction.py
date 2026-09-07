@@ -78,12 +78,24 @@ reference levels other strategies and the chart quote against, and that use
 does not depend on the auction rules being tradeable. It is the RULES that
 failed, not the construct.
 
-SAMPLE LIMIT WORTH STATING
-SPY is the only instrument in the exports with a traded-volume tape, and it
-covers 493 sessions. QQQ was scoped for this study but no qqq_m30 export
-exists - the available files are sp500, nasdaq, us30 and spy. A second
-instrument would not likely rescue a 60%-against-54.6% result, but it has not
-been tried.
+CONFIRMED ON IWM, AND THE SPY NUMBER WAS THE HIGH END OF NOISE
+
+The SPY study rested on 493 sessions and 100 setups. IWM supplies 3818
+sessions from 2011 and 871 setups, nearly nine times as many:
+
+    IWM   opened outside the prior value area   2404
+          setups (returned, held two brackets)   871
+          traversed to the far edge              457     52.5%
+          null: random entry inside the VA               53.5%   n=2271
+          two-proportion z                               -0.50
+
+On the larger sample the setup traverses slightly LESS often than an
+arbitrary entry does. SPY's 60.0% against a 54.6% base was the high end of
+sampling noise, which its z of +0.94 already implied; IWM puts the point
+estimate essentially on the null.
+
+The folklore figure is 80%. Two instruments and 971 setups between them give
+52.5% and 60.0%, against base rates of 53.5% and 54.6%.
 
 WHY THIS IS SPY AND QQQ ONLY
 

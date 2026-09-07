@@ -77,15 +77,50 @@ THE COMPULSORY TESTS, ON SPY
      size - 184 trades over two years leaves 37 out of sample, and 37 trades
      cannot produce t 2.96 at any plausible effect size.
 
-VERDICT: gated, and the closest of the refused candidates.
+SETTLED ON 15 YEARS OF IWM: THE EFFECT DECAYED, IT IS NOT SAMPLE-LIMITED
 
-Nothing here says the effect is absent. It says the only instrument that can
-carry it has two years of data, and on those two years the out-of-sample
-window is too short to clear the bar while the shape of the result -
-retention 0.99 - is what a real edge looks like. A deeper SPY export, or the
-same test on another penny-spread ETF with a real tape, is the way to settle
-it. The CFDs cannot, at any sample size, because the spread eats the risk
-unit.
+The SPY result rested on 184 trades across two years, and the honest reading
+was that the sample could not decide it. IWM supplies 3818 cash sessions from
+2011 and 1318 trades, and it decides it.
+
+    N   exit         n   win%   net expR    PF       t
+    20  midpoint  1318   39.0     +0.083   1.14   +1.83
+    20  1.5R      1318   43.9     +0.024   1.04   +0.71
+    48  midpoint  1016   32.2     +0.123   1.18   +1.87
+    48  1.5R      1016   44.8     +0.058   1.10   +1.52
+
+Nothing clears 2.96. And the pre-registered split, now with 264 out-of-sample
+trades rather than 37:
+
+    in-sample Sharpe 0.61 -> out-of-sample -0.08
+    out-of-sample t -0.14      retention -0.13
+
+Retention is NEGATIVE: the holdout period lost money. The compulsory tests
+mostly pass on IWM - cohort 2 reaches t 2.04 against the required 2.0, longs
++0.120R at t 1.93 - and it does not matter, because the strategy does not
+survive its own holdout.
+
+WHY, AND IT IS THE SAME SHAPE AS TURN-OF-THE-MONTH
+
+    era          n   net expR       t
+    2011-2015  392     +0.318    +3.69
+    2016-2020  432     +0.021    +0.28
+    2021-2026  494     -0.050    -0.68
+
+Strong through 2015, clearing 2.96 comfortably in that window; gone by 2016;
+slightly negative since. SPY's +0.354R at t 2.40 was measured on 2024-2026,
+which sits inside the dead era, on 184 trades.
+
+VERDICT: gated, refuted rather than sample-limited.
+
+The instructive part is that MORE DATA REVERSED THE VERDICT. On two years of
+SPY this was the strongest candidate tested anywhere in the programme, with
+better Sharpe retention than anything else. Promoting it on that basis would
+have deployed a strategy that fifteen years say has not worked since 2015.
+The retention statistic was not wrong; it was computed over a window too
+short to contain the decay.
+
+The CFD cost wall described above is a separate finding and still stands.
 """
 from __future__ import annotations
 
@@ -133,12 +168,11 @@ class DonchianFailureStrategy(BaseStrategy):
         if self.require_validation:
             return SignalResult.abstain(
                 self.name, bars.symbol,
-                "DONCHIAN_FAIL_UNPROVEN: SPY nets +0.354R at t 2.40 with "
-                "out-of-sample Sharpe retention 0.99, but out-of-sample t is "
-                "1.07 against 2.96 on 37 holdout trades, and the required "
-                "intraday cohort reaches only t 1.83 against 2.0. sp500 and "
-                "nasdaq fail outright - sp500's cost is 0.70R inside the "
-                "session against a gross edge of +0.021R.")
+                "DONCHIAN_FAIL_DECAYED: settled on 15 years of IWM. 1318 "
+                "trades give t 1.83 and out-of-sample retention of -0.13 - the "
+                "holdout lost money. By era: t +3.69 in 2011-2015, +0.28 in "
+                "2016-2020, -0.68 in 2021-2026. SPY's +0.354R at t 2.40 was "
+                "184 trades measured inside the dead era.")
 
         n = len(bars)
         i = n - 1

@@ -147,16 +147,18 @@ REGISTRY: dict[str, Registration] = {
     "vp_auction": Registration(
         strategy=VolumeProfileAuctionStrategy,
         deployment=Deployment.GATED,
-        instruments=("SPY", "QQQ"),
+        instruments=("SPY", "QQQ", "IWM"),
         consensus_weight=0.0,
-        basis=("Rules not supported. The 80% rule measures 60.0% on 493 SPY "
-               "sessions, stable across acceptance variants, against a 54.6% "
-               "base rate for a random entry inside the value area - "
-               "two-proportion z 0.94 where 3.08 was needed. Traded: rejection "
-               "-0.023R (t -0.25), acceptance -0.038R at two confirmation bars "
-               "and degrading as confirmation is added. The value area "
-               "construct is retained for reference levels; it is the auction "
-               "rules that failed."),
+        basis=("Rules not supported, now on two instruments. The 80% rule "
+               "measures 60.0% on 493 SPY sessions (100 setups, base rate "
+               "54.6%, z +0.94) and 52.5% on 3818 IWM sessions (871 setups, "
+               "base rate 53.5%, z -0.50). On the larger sample the setup "
+               "traverses slightly LESS often than an arbitrary entry inside "
+               "the value area, so the SPY figure was the high end of noise. "
+               "Traded on SPY: rejection -0.023R (t -0.25), acceptance -0.038R "
+               "and degrading as confirmation is added. build_profile() and "
+               "value_area() are retained for reference levels; it is the "
+               "auction rules that failed, not the construct."),
     ),
 
     "nr7_breakout": Registration(
@@ -192,22 +194,18 @@ REGISTRY: dict[str, Registration] = {
     "donchian_fail": Registration(
         strategy=DonchianFailureStrategy,
         deployment=Deployment.GATED,
-        instruments=("SPY",),
+        instruments=("SPY", "IWM"),
         consensus_weight=0.0,
-        basis=("The closest of the refused candidates. SPY nets +0.354R at "
-               "t 2.40 over 184 trades with out-of-sample Sharpe retention "
-               "0.99 - the OOS Sharpe IS the in-sample one, which is what a "
-               "real edge looks like. It fails on sample size: 37 holdout "
-               "trades cannot reach t 2.96, and the compulsory intraday cohort "
-               "reaches 1.83 against a required 2.0. Shorts are positive "
-               "(+0.270R) but at t 1.26 against longs at 2.34, so part of it "
-               "is equity drift. sp500 and nasdaq fail outright: sp500's cost "
-               "is 0.70R inside the cash session and 1.03R outside against a "
-               "GROSS edge of +0.021R, because a 0.25-ATR stop on M30 bars "
-               "gives a 6.28-point risk unit against a 2.0-point spread. That "
-               "is a general limit on half-hour mean reversion in these CFDs, "
-               "not a fact about Donchian. Settle it with a deeper SPY export "
-               "or another penny-spread ETF with a real tape."),
+        basis=("Refuted on 15 years of IWM, having looked like the strongest "
+               "candidate in the programme on 2 years of SPY. 1318 IWM trades "
+               "give t 1.83 and out-of-sample retention of -0.13: the holdout "
+               "lost money. By era, t +3.69 in 2011-2015, +0.28 in 2016-2020, "
+               "-0.68 in 2021-2026. SPY's +0.354R at t 2.40 with retention "
+               "0.99 was 184 trades measured inside the dead era. More data "
+               "reversed the verdict - the retention statistic was not wrong, "
+               "it was computed over a window too short to contain the decay. "
+               "Separately the CFD cost wall stands: sp500 pays 0.70R in the "
+               "cash session against a gross edge of +0.021R."),
     ),
 
     "pead_time_sue": Registration(

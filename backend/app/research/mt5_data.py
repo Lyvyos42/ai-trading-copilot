@@ -57,6 +57,8 @@ DATASETS = {
     "us30": "us30_m30",
     "spy": "spy_m30",
     "qqq": "qqq_m30",
+    "iwm": "iwm_m30",
+    "dia": "dia_m30",
 }
 
 # MT5 reports `spread` in POINTS - units of the last quoted digit - so it is
@@ -131,6 +133,7 @@ def load_m30(name: str, data_dir: Optional[Path] = None) -> pd.DataFrame:
 # to inference, which is a guess and is labelled as one.
 SYMBOL_DIGITS = {
     "spy_m30": 4, "qqq_m30": 4,      # ETFs: digits 4, point 0.0001
+    "iwm_m30": 2, "dia_m30": 2,      # exported with digits 2, point 0.01
     "sp500_m30": 1, "nasdaq_m30": 1, "us30_m30": 1,
 }
 
