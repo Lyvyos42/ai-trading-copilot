@@ -122,6 +122,74 @@ and the bias-matched control shows only a 0.024R tilt toward shorts across a
 sample where EURUSD went 1.3327 to 1.1626. The short leg beats its own matched
 control by +0.218R at Welch +2.10, so the asymmetry is not the euro downtrend.
 
+TASK D - MACRO CONDITIONING AND CROSS-SECTIONAL POOLING BOTH FAIL TO RESCUE IT
+
+Pooled EURUSD + GBPUSD H4, 773 trades, 2010-2026, clustered by calendar month
+ACROSS pairs so contemporaneous correlated trades cannot count as independent.
+
+    arm             n     net R   naive t  clus t   Welch  OOS clus  perm p
+    baseline      773    +0.075     +1.53   +3.42   +1.90     +1.72   n/a
+    hold_only     619    +0.068     +1.24   +3.22   +2.04     +0.48   0.621
+    congruent     699    +0.082     +1.57   +3.87   +2.01     +2.33   0.304
+    adx <= 25     438    -0.015     -0.24   +0.80   +0.26     +0.23   n/a
+    trail30 <= 2  579    +0.062     +1.06   +1.99   +1.36     +1.26   n/a
+    both          370    -0.014     -0.20   +0.13   -0.15     +0.02   n/a
+
+The best conditioned arm nets +0.082R against a +0.075R baseline and returns
+p = 0.304 against 1,000 circular rotations of its own epoch labels. Fed policy
+epochs carry no information for this signal. (p is n/a where an arm never reads
+the epoch label, so every rotation reproduces it exactly.)
+
+BOTH PROPOSED FILTERS HURT, AND ONE OF THEM IS THE POINT
+
+    ADX(20) <= 25          -0.015R against +0.075R baseline
+    trailing 30d <= 2      +0.062R against +0.075R baseline
+
+The ADX filter removes the profitable trades outright, so the premise that this
+bleeds in trending regimes is backwards at the trade level.
+
+The second is the direct test of the monotonic-dilution finding above. The
+filed specification was to invalidate setups when the MONTHLY trade count
+exceeds two - which is lookahead: at the first trade of a month you cannot know
+it will hold three, and the quiet months carrying +0.93R are quiet only in
+hindsight. Run causally, as entries in the preceding 30 days, the filter makes
+the strategy WORSE. The dilution pattern is real as a description and worthless
+as a rule. Run as filed it would have reported the opposite.
+
+THE POOLED CLUSTERED t IS THE SAME ARTEFACT, AT LARGER SCALE
+
+    per-TRADE mean +0.0750R      per-MONTH mean +0.2242R over 186 months
+    1 trade:  +1.298R (13)   2: +0.487R (24)   3: +0.372R (35)
+    4 trades: +0.211R (38)   5+: -0.104R (76)
+
+So the pooled clustered t of +3.42 is NOT clearance of 2.96. It is the
+month-equal-weighted portfolio again, and that portfolio is untradeable for the
+same reason as before. The honest pooled figure is the per-trade t of +1.53.
+
+CROSS-SECTIONAL POOLING MAKES IT WORSE, NOT BETTER
+
+    pool                          n    net R   naive t   Welch   OOS t
+    EURUSD + GBPUSD             773   +0.075     +1.53   +1.90   +1.34
+    + USDJPY, EURJPY           1560   +0.043     +1.23   +1.23   +0.97
+
+Doubling the sample DROPPED the t from +1.53 to +1.23, where sqrt-n scaling
+alone would have predicted +2.18. The reason is visible per instrument:
+
+    EURUSD +0.112    GBPUSD +0.038    USDJPY +0.027    EURJPY -0.003
+
+Monotonically declining, to nothing. That is the signature of a single-
+instrument result rather than an FX-wide anomaly - if the effect were general,
+adding majors would buy power. At the four-major effect size, clearing 2.96
+would need about 9,066 trades, 5.8x the current pool, which at roughly 100
+trades per pair per 16 years is not reachable from this data.
+
+VERDICT AFTER TASK D: still gated, and the route to promotion is now narrower
+rather than wider. Conditioning does not help, the two proposed filters hurt,
+the clustered t that made it look close is an artefact, and pooling across
+majors weakens it. What remains is EURUSD H4 alone at +0.112R with 384 trades
+and no way to manufacture more of them from history. Forward paper is the only
+honest test left.
+
 VERDICT: gated, underpowered - not refuted. Positive sign in 7 of 8 cells, era
 stability across 16 years, a clean control result on the primary, and no gate
 cleared on significance. This is the same conclusion the engine reached in

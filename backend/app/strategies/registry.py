@@ -467,7 +467,24 @@ REGISTRY: dict[str, Registration] = {
                "match what meanrev_engine.py computes - only the Donchian term "
                "is close - and both were run, the filed list scoring worse on "
                "the primary. Promotion needs an independent sample, not "
-               "another pass over these sixteen years."),
+               "another pass over these sixteen years. TASK D (macro "
+               "conditioning + cross-sectional pooling) CLOSES BOTH ROUTES: "
+               "the best Fed-epoch-conditioned arm nets +0.082R against a "
+               "+0.075R pooled baseline at p=0.304 against 1,000 circular "
+               "rotations of its own labels; the proposed ADX<=25 filter takes "
+               "it to -0.015R and the trade-density filter to +0.062R, both "
+               "worse than baseline. The density filter as filed (monthly "
+               "count) was LOOKAHEAD and would have reported the opposite - "
+               "run causally on a trailing 30-day count it hurts, so the "
+               "monotonic-dilution pattern is a description and not a rule. "
+               "The pooled clustered t of +3.42 is the same estimand artefact "
+               "(per-trade +0.075R vs per-month +0.224R); the honest pooled "
+               "figure is +1.53. Pooling to four majors DROPS t from +1.53 to "
+               "+1.23 where sqrt-n predicted +2.18, with the effect declining "
+               "monotonically EURUSD +0.112 > GBPUSD +0.038 > USDJPY +0.027 > "
+               "EURJPY -0.003 - the signature of a single-instrument result. "
+               "Clearing 2.96 would need ~9,066 trades, 5.8x the pool. Forward "
+               "paper on EURUSD H4 is the only honest test left."),
     ),
 
     "pead_time_sue": Registration(
