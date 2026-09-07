@@ -86,4 +86,92 @@ One caveat worth keeping: zero UNCONDITIONAL information does not strictly
 prove zero CONDITIONAL information - a level could matter only in some regime.
 But a variable this flat is a poor candidate for a conditional effect, and the
 strategies built on it have already been refuted independently.
+
+================================================================================
+ROUND 2 - THE THREE LEVEL TYPES THAT HAVE AN ACTUAL MECHANISM
+================================================================================
+
+The fractal pivots above are arbitrary. These three are not: resting stops
+cluster beyond prior-day extremes, option strikes and human order placement sit
+on round figures, and the fair value gap is the core SMC claim. Same machinery,
+same controls, ~180,000 further observations.
+
+ROUND NUMBERS - the cleanest test in the programme, and it fails
+
+The level is EXOGENOUS: it is not derived from price, so there is no
+circularity. The control is a grid of identical density offset off the round
+figure - same spacing, same touch frequency, just not human-salient.
+
+    pair     grid              n      mean       t   held%
+    EURUSD   round (.00/.50) 9521   -0.0172   -0.66   49.7%
+    EURUSD   offset control 10255   +0.0244   +0.94   49.8%
+    GBPUSD   round          11635   +0.0286   +1.22   51.2%
+    GBPUSD   offset control 12235   +0.0652   +2.81   51.0%
+    XAUUSD   round          14996   +0.0017   +0.09   50.3%
+    XAUUSD   offset control 16215   +0.0061   +0.31   50.4%
+
+    round minus control:  EURUSD t -1.13   GBPUSD t -1.11   XAUUSD t -0.16
+
+Round numbers are NEGATIVE against their own control on all three. And GBPUSD
+is the object lesson: the round grid alone reads t +1.22 and looks promising,
+while an ARBITRARY grid of the same density reads +2.81. Anyone testing round
+numbers without the offset control would have reported a discovery.
+
+PRIOR-DAY HIGH/LOW - the best of the three, and still not significant
+
+Control is the high/low from five sessions back: an equally real extreme, but
+stale, so it isolates recency rather than extremeness.
+
+    pair     level              n      mean       t   held%
+    EURUSD   prior day       3883   +0.0466   +0.98   52.7%
+    EURUSD   5 days back     1958   -0.0658   -1.01   49.0%
+    GBPUSD   prior day       3881   +0.0180   +0.40   51.0%
+    GBPUSD   5 days back     1961   -0.0018   -0.03   49.1%
+    XAUUSD   prior day       3828   -0.1050   -2.40   49.8%
+    XAUUSD   5 days back     1899   -0.1088   -1.71   47.4%
+
+    prior-day minus stale: EURUSD t +1.39   GBPUSD t +0.25   XAUUSD t +0.05
+
+EURUSD holds 52.7% against 49.0% for the stale control - the highest hold rate
+anywhere in this work - but at t +1.39 on the difference it does not clear, and
+the other two instruments show nothing. Gold is significantly NEGATIVE on the
+raw measure (t -2.40): price tends to carry through yesterday's extreme.
+
+SMC FAIR VALUE GAP - the only primitive with a consistent sign
+
+    pair     zone                 n      mean       t   held%
+    EURUSD   FVG               9269   +0.0077   +0.27   49.8%
+    EURUSD   displaced fake    8352   -0.0250   -0.83   49.2%
+    GBPUSD   FVG               9099   +0.0245   +0.84   50.6%
+    GBPUSD   displaced fake    8231   -0.0162   -0.54   49.4%
+    XAUUSD   FVG               9544   +0.0410   +1.54   50.9%
+    XAUUSD   displaced fake    8560   +0.0065   +0.22   50.3%
+
+    FVG minus fake: +0.78, +0.97, +0.88 - positive on all three
+
+    POOLED  FVG n=27912 mean +0.0246 ATR t +1.50   fake n=25143 t -0.67
+            difference +0.0360 ATR at t +1.52, and because the three
+            instruments correlate about 0.67 the effective t is nearer 1.24
+
+This is the only level primitive whose sign is consistent across instruments.
+It is also too small to trade:
+
+    median EURUSD H1 ATR(14)   14.6 pips
+    edge +0.0360 ATR         = +0.52 pips per touch
+    round-trip toll            1.00 pips
+    edge / toll                0.52x
+
+VERDICT ON ALL FIVE PRIMITIVES
+Fractal pivots: nothing, and worse than fakes on gold. Touch counts: flat.
+Level flips: nothing. Round numbers: negative against an arbitrary grid of the
+same density. Prior-day extremes: best raw hold rate seen (52.7% on EURUSD) and
+still inside noise. Fair value gaps: consistent direction on three instruments
+at roughly half the spread.
+
+Across five primitives and about 330,000 observations, the only survivor points
+the right way and is worth 0.52 of its own transaction cost. That is the same
+scissors the programme-level power screen describes, reached from a completely
+different direction - not through strategies, but through the raw inputs the
+strategies were built from.
+
 """
