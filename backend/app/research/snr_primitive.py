@@ -269,4 +269,65 @@ Every other primitive tested - fractal pivots, touch counts, level flips, round
 numbers, prior-day and prior-week extremes, Asian session extremes, order
 blocks, equal highs - shows nothing, and several are mildly anti-predictive.
 
+================================================================================
+CORRECTION 2026-09-08 - THE 11/12 RESULT USED AN UNSTABLE CONTROL
+================================================================================
+
+The displaced-fake control draws ONE random displacement per level. That draw is
+itself a random variable, and its noise is comparable to the effect being
+measured. Measured directly: re-running the same data with 15 different control
+seeds gives a diff-t standard deviation of about 0.5.
+
+    symbol   real t | diff-t over 15 seeds: mean     sd     min     max   >0
+    eurusd    +0.27 |                     -0.30   0.54   -1.46   +0.78   3/15
+    gbpusd    +0.84 |                     +1.16   0.47   +0.33   +2.50  15/15
+    eurgbp    +1.40 |                     +1.00   0.50   +0.20   +2.26  15/15
+    xauusd    +1.54 |                     +1.15   0.46   +0.21   +1.92  15/15
+
+The +0.78 reported for EURUSD was the MAXIMUM of that distribution; its mean is
+-0.30. One symbol was carried by a lucky control draw.
+
+RE-RUN WITH THE CONTROL POOLED OVER 10 DRAWS (~85,000 control observations per
+symbol instead of ~8,500):
+
+    symbol   n real  real t   n ctrl  ctrl t  diff t
+    xagusd     8952   +2.93    79230   +1.67   +2.20
+    xauusd     9544   +1.54    85151   -1.85   +2.06
+    gbpusd     9099   +0.84    81503   -2.21   +1.49
+    audusd     9947   +1.13    89546   -1.20   +1.45
+    usdchf     8967   +1.03    80414   -1.11   +1.33
+    eurgbp     8031   +1.40    72050   +0.08   +1.30
+    nzdusd     9798   +1.26    87980   +0.83   +0.93
+    usdjpy     9421   +1.33    84445   +1.00   +0.92
+    usdcad     9357   -0.11    84367   -1.82   +0.47
+    wti        5363   +0.84    47745   +2.77   -0.09
+    eurjpy     9260   -0.15    82065   -0.05   -0.13
+    eurusd     9269   +0.27    83402   +1.89   -0.34
+
+    positive on 9/12    mean diff-t +0.966    pooled +3.35
+    binomial P(>= 9/12 | null) = 0.073
+
+    PREVIOUSLY REPORTED: 11/12, pooled +2.42, p = 0.003.  SUPERSEDED.
+
+The two moved in opposite directions and both are honest. Pooling the control
+sharpens the magnitude estimate (+2.42 -> +3.35) because it removes noise from
+the comparison, and it weakens the sign test (11/12 -> 9/12, p 0.003 -> 0.073)
+because two of the eleven were control-draw luck.
+
+The binomial is the conservative reading and the one to quote: the twelve
+symbols are correlated at roughly 0.4, so the pooled +3.35 assumes an
+independence that does not hold. Adjusting for an effective N of about 4.5
+gives a realistic pooled t near +2.05.
+
+HONEST STANDING OF THE FVG FINDING
+Real but marginal. Nine of twelve instruments agree, p = 0.073 on the sign test,
+realistic pooled t about +2.0, and the effect remains smaller than the spread on
+every instrument (mean edge/toll 0.32x, best 0.93x on EURGBP). It is the best
+result in this programme and it is not significant at the 5% level.
+
+NEW STANDING RULE
+Any control that involves a random draw must be POOLED over at least 10 draws
+before its statistic is quoted. A single-draw control is not an estimator, it is
+one sample from one. This error inflated a headline from p = 0.073 to p = 0.003.
+
 """
