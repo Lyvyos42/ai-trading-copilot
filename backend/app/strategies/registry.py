@@ -34,6 +34,7 @@ from app.strategies.ibs import IBSMeanReversionStrategy
 from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
 )
+from app.strategies.nr7 import NR7BreakoutStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
@@ -99,15 +100,18 @@ REGISTRY: dict[str, Registration] = {
     "opening_range_breakout": Registration(
         strategy=OpeningRangeBreakoutStrategy,
         deployment=Deployment.OBSERVER,
-        instruments=("SP500", "SPX", "ES", "SPY"),
+        instruments=("SPY",),
         consensus_weight=0.0,
-        basis=("Real in sample, unproven out of it. 926 sp500 trades: win "
-               "36.8%, expectancy +0.500R, PF 1.81, t +6.08. Out of sample "
-               "t 2.23 (sp500) and 1.87 (spy) against a 2.96 threshold, with "
-               "Sharpe retention 0.79 and 1.28. nasdaq retains 0.43 and us30 "
-               "0.61, so neither is deployed even as an observer. Fill "
-               "friction is not the obstacle: a median tick jump is 2.2% of R "
-               "on sp500 and 1.7% on spy. Forward tracking decides promotion."),
+        basis=("SPY only, after costs. The earlier deployment included sp500 "
+               "on a GROSS result; charging the spread quoted on the entry bar "
+               "changes it. sp500 pays 0.299R per trade - its opening range is "
+               "9.1 index points and the cash-session spread is 2.0 - which "
+               "takes +0.500R to +0.201R and collapses out-of-sample retention "
+               "from 0.79 to 0.15. spy pays 0.032R and keeps +0.316R at t "
+               "+3.11, OOS Sharpe 2.72, retention 1.31. nasdaq nets +0.301R "
+               "but retains 0.31; us30 0.17; qqq is negative on 100 trades. "
+               "Tick jump was measured earlier and is small (2.2% of R); the "
+               "SPREAD was not, and it is the larger cost."),
         params={"require_gap_alignment": False, "require_validation": False},
     ),
 
@@ -151,6 +155,20 @@ REGISTRY: dict[str, Registration] = {
                "and degrading as confirmation is added. The value area "
                "construct is retained for reference levels; it is the auction "
                "rules that failed."),
+    ),
+
+    "nr7_breakout": Registration(
+        strategy=NR7BreakoutStrategy,
+        deployment=Deployment.GATED,
+        consensus_weight=0.0,
+        basis=("Pre-registered and refuted. 540 qualifying sessions across "
+               "five instruments, two stop variants. Best full-sample t is "
+               "1.38 against a 2.96 hurdle - it does not clear IN sample - and "
+               "out-of-sample Sharpe retention is NEGATIVE on three of four "
+               "variants. Gross expectancy is +0.04R to +0.21R, so costs are "
+               "not the explanation. Volatility clustering is real; the "
+               "DIRECTION of the expansion being predictable from the opening "
+               "range is the claim that failed."),
     ),
 
     "pead_time_sue": Registration(

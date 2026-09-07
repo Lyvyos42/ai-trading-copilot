@@ -56,7 +56,20 @@ DATASETS = {
     "nasdaq": "nasdaq_m30",
     "us30": "us30_m30",
     "spy": "spy_m30",
+    "qqq": "qqq_m30",
 }
+
+# MT5 reports `spread` in POINTS - units of the last quoted digit - so it is
+# not a price until it is scaled by the instrument's own precision. On sp500,
+# quoted to one decimal, a spread of 50 is 5.0 index points; on spy, quoted to
+# two, a spread of 1 is one cent. Comparing the raw integers across
+# instruments compares nothing.
+#
+# It also matters WHEN it is measured. sp500's median spread is 50 points
+# across all bars and 20 during the cash session: the wide number is the
+# overnight quote, and a strategy that only trades 10:00-15:50 never pays it.
+# Taking the all-bar median overstated the cost of the opening range breakout
+# by more than a factor of two.
 
 
 def load_m30(name: str, data_dir: Optional[Path] = None) -> pd.DataFrame:
@@ -104,6 +117,21 @@ def load_m30(name: str, data_dir: Optional[Path] = None) -> pd.DataFrame:
     out.attrs["volume_kind"] = "traded" if has_real else "tick_count"
     out.attrs["symbol"] = stem
     return out
+
+
+def price_points(name: str, data_dir: Optional[Path] = None) -> float:
+    """Value of one MT5 `point` for this instrument, from how it is quoted."""
+    stem = DATASETS.get(name, name)
+    base = Path(data_dir) if data_dir else DATA_DIR
+    path = base / f"{stem}.parquet"
+    df = pd.read_parquet(path) if path.exists() else pd.read_csv(base / f"{stem}.csv")
+    decimals = int(df["close"].astype(str).str.split(".").str[-1].str.len().mode().iloc[0])
+    return 10.0 ** -decimals
+
+
+def spread_price(df: pd.DataFrame, point: float) -> pd.Series:
+    """Per-bar spread as a price, ready to subtract from a trade result."""
+    return df["spread"].astype(float) * point
 
 
 def rth(df: pd.DataFrame) -> pd.DataFrame:
