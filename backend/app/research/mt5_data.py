@@ -119,9 +119,27 @@ def load_m30(name: str, data_dir: Optional[Path] = None) -> pd.DataFrame:
     return out
 
 
+# MT5 `digits` per symbol, which is NOT recoverable from the exported prices.
+#
+# Inferring it from how the close is printed is wrong and was wrong here. SPY
+# prints as 770.24, two decimals, so inference gives point = 0.01 - but the
+# symbol carries digits = 4 and point = 0.0001, so its spread of 100 is one
+# cent, not one dollar. That mistake made QQQ look like it quoted a $1.00
+# spread and briefly made the whole ETF spread column look like a placeholder.
+#
+# It has to be declared per symbol. A value absent from this table falls back
+# to inference, which is a guess and is labelled as one.
+SYMBOL_DIGITS = {
+    "spy_m30": 4, "qqq_m30": 4,      # ETFs: digits 4, point 0.0001
+    "sp500_m30": 1, "nasdaq_m30": 1, "us30_m30": 1,
+}
+
+
 def price_points(name: str, data_dir: Optional[Path] = None) -> float:
-    """Value of one MT5 `point` for this instrument, from how it is quoted."""
+    """Value of one MT5 `point`, from the symbol's declared digits."""
     stem = DATASETS.get(name, name)
+    if stem in SYMBOL_DIGITS:
+        return 10.0 ** -SYMBOL_DIGITS[stem]
     base = Path(data_dir) if data_dir else DATA_DIR
     path = base / f"{stem}.parquet"
     df = pd.read_parquet(path) if path.exists() else pd.read_csv(base / f"{stem}.csv")

@@ -37,6 +37,7 @@ from app.strategies.intraday_momentum import (
 from app.strategies.nr7 import NR7BreakoutStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
+from app.strategies.turn_of_month import TurnOfMonthStrategy
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
 from app.strategies.vwap_bands import InstitutionalVWAPStrategy
 
@@ -169,6 +170,22 @@ REGISTRY: dict[str, Registration] = {
                "not the explanation. Volatility clustering is real; the "
                "DIRECTION of the expansion being predictable from the opening "
                "range is the claim that failed."),
+    ),
+
+    "turn_of_month": Registration(
+        strategy=TurnOfMonthStrategy,
+        deployment=Deployment.GATED,
+        instruments=("SPY", "QQQ", "ES", "NQ"),
+        consensus_weight=0.0,
+        basis=("Real, and decayed. 296 SPY blocks 1993-2026 return +0.373% "
+               "against +0.105% for every other 4-session block, Welch t 2.81. "
+               "The edge is in the INTRADAY legs (Welch 2.74) not the overnight "
+               "ones (1.13), so it would not duplicate overnight_drift. But it "
+               "fades by era: Welch 2.96 in 1993-2004, 1.40 in 2005-2015, 0.51 "
+               "in 2016-2026. Pre-registered split gives out-of-sample t 0.98 "
+               "and retention 0.54 against a 2.96 / 0.70 hurdle. Lakonishok & "
+               "Smidt published in 1988; the decay is the ordinary fate of a "
+               "documented anomaly."),
     ),
 
     "pead_time_sue": Registration(
