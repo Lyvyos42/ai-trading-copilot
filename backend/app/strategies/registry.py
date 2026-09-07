@@ -47,6 +47,7 @@ from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.pead import PEADTimeScreener
 from app.strategies.turn_of_month import TurnOfMonthStrategy
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
+from app.strategies.vpa_smc import VPASMCStrategy
 from app.strategies.vwap_bands import InstitutionalVWAPStrategy
 
 
@@ -149,6 +150,39 @@ REGISTRY: dict[str, Registration] = {
                "against 3.08 on only 154-218 qualifying sessions. Deployed as "
                "the ibs_max parameter of OvernightDriftStrategy, not as a "
                "second voter."),
+    ),
+
+    "vpa_smc": Registration(
+        strategy=VPASMCStrategy,
+        deployment=Deployment.GATED,
+        instruments=("EURUSD", "GBPUSD"),
+        consensus_weight=0.0,
+        basis=("Refuted on FX M15, unconditioned AND macro-conditioned. 1,761 "
+               "trades over EURUSD primary and GBPUSD validation, 99,000 M15 "
+               "bars each 2022-2026, six cells, using the engine's own "
+               "structural SL/TP. All six negative unconditioned (-0.065 to "
+               "-0.171R) with Welch negative in every cell - it loses to a "
+               "bias-matched random entry - and both legs negative throughout. "
+               "Conditioning on Fed policy epochs (hiking->short only, "
+               "cutting->long only, hold->no permission) makes it WORSE in 5 "
+               "of 6. Against 1,000 circular block permutations of the epoch "
+               "labels, p ranges 0.399-0.911 and the true labelling does worse "
+               "than the median random rotation in 5 of 6 cells. THE NULL "
+               "DISTRIBUTION IS THE LASTING RESULT: a meaningless rotated "
+               "regime yields positive conditioned expectancy ~33% of the time "
+               "and reaches +0.203R at best, which is exactly the magnitude a "
+               "macro-conditioning study reports as a discovery - so any "
+               "conditioned figure without this null is uninterpretable. SCOPE: "
+               "this conditions a strategy with no edge, and no filter turns "
+               "nothing into something; it does not refute Tier 1 conditioning "
+               "in general. A fair test of that thesis needs a base signal with "
+               "a measurable edge, i.e. meanrev H4. Structural note: the "
+               "adapter checks continuation breakout BEFORE the CRS score, so "
+               "continuation share runs 21%/79%/99% across crs_min 6/7/8 and "
+               "the threshold barely binds. Window fixed at 600 bars to make "
+               "the engine's O(history) continuation loop O(600); validated at "
+               "119/119 signal agreement against a 1500-bar window on both "
+               "pairs."),
     ),
 
     "vp_auction": Registration(
