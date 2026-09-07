@@ -38,6 +38,7 @@ from app.strategies.ibs import IBSMeanReversionStrategy
 from app.strategies.intraday_momentum import (
     IntradayMomentumStrategy, OpeningRangeBreakoutStrategy,
 )
+from app.strategies.meanrev import MeanReversionStrategy
 from app.strategies.nr7 import NR7BreakoutStrategy
 from app.strategies.orb_london import LondonORBStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
@@ -319,6 +320,43 @@ REGISTRY: dict[str, Registration] = {
                "entry-window bars quote spread=0, an export artefact floored "
                "at the non-zero median, without which the cost model would "
                "let half the sample trade free."),
+    ),
+
+    "meanrev": Registration(
+        strategy=MeanReversionStrategy,
+        deployment=Deployment.GATED,
+        instruments=("EURUSD", "GBPUSD"),
+        consensus_weight=0.0,
+        basis=("Underpowered, not refuted - the strongest gated candidate in "
+               "the programme. 3,450 trades over EURUSD H4 primary and GBPUSD "
+               "H4 validation, 24,812 bars each, 2010-2026, across 8 cells. No "
+               "cell passes all five gates. The pre-registered primary arm "
+               "nets +0.112R on n=384 (+0.337 ATR/trade, reproducing the "
+               "engine's filed +0.3175) and is the FIRST candidate to pass the "
+               "amended control gate on merit: Welch +2.13 with a genuinely "
+               "positive expectancy rather than a less-negative one. Era "
+               "stability is the best seen here - +0.115/+0.131/+0.056/+0.135R "
+               "over four eras, no decay - and the beta charge is disposed of, "
+               "since the composite fires 192 long / 192 short and the matched "
+               "control shows only a 0.024R short tilt across a sample where "
+               "EURUSD went 1.3327 to 1.1626. It fails on power: OOS clustered "
+               "t +1.69 against 2.96, modern third +1.76 against 2.00, and the "
+               "validation pair fails the control gate at Welch +0.94 with a "
+               "negative short leg. A stationary block bootstrap gives "
+               "P(mean<=0) = 0.028 against an 8-cell Bonferroni bar of 0.006. "
+               "MATERIAL CORRECTION TO THE PRIOR: the engine's clustered t "
+               "figures (+3.42, +2.23, +1.82) are all monthly clustered and "
+               "all inflated, because equal-weighting months changes the "
+               "estimand - months with 1 trade return +0.928R against -0.239R "
+               "for months with 4, monotonically, so the monthly average "
+               "upweights the quiet months that carry the result and shifts "
+               "+0.112R to +0.306R. The more extension signals fire in a "
+               "month, the worse they do. The true prior is weaker than the "
+               "record states. Also recorded: the filed 5-factor list does not "
+               "match what meanrev_engine.py computes - only the Donchian term "
+               "is close - and both were run, the filed list scoring worse on "
+               "the primary. Promotion needs an independent sample, not "
+               "another pass over these sixteen years."),
     ),
 
     "pead_time_sue": Registration(
