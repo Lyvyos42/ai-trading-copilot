@@ -44,6 +44,7 @@ from app.strategies.meanrev import MeanReversionStrategy
 from app.strategies.nr7 import NR7BreakoutStrategy
 from app.strategies.orb_london import LondonORBStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
+from app.strategies.postfix_reversion import PostFixReversionStrategy
 from app.strategies.pead import PEADTimeScreener
 from app.strategies.tsmom import TSMomentumStrategy
 from app.strategies.turn_of_month import TurnOfMonthStrategy
@@ -541,6 +542,37 @@ REGISTRY: dict[str, Registration] = {
                "on EURUSD H4 with Net E[R] >= +0.05R and the short leg still "
                "carrying it, logged point-in-time in macro_state_audit.jsonl. "
                "At ~24 trades/year this requires ~20 months of paper tracking."),
+    ),
+
+    "postfix_reversion": Registration(
+        strategy=PostFixReversionStrategy,
+        deployment=Deployment.GATED,
+        instruments=("EURUSD","GBPUSD","AUDUSD","NZDUSD","USDCAD","USDCHF"),
+        consensus_weight=0.0,
+        basis=(
+            "Refuted, and the control is the whole result. Daily post-fix reversi"
+            "on at the London 16:00 WMR fix, six USD pairs, 24,825 sessions 2010-"
+            "2026 - 24.8x the month-end sample. The fix-hour beta is negative and"
+            " significant on four pairs (EUR t -3.85, AUD -4.38, NZD -4.55, CHF -"
+            "8.34), but bid-ask bounce makes EVERY adjacent hour-pair revert, so "
+            "the pre-registered test was whether the fix hour beats the same pair"
+            "'s other 23 hourly betas. It fails on all six: rank 4th to 15th of 2"
+            "3, never below the 5th percentile. GBPUSD, the pair the month-end re"
+            "sult was built on, has the WEAKEST fix-hour reversion of the six (be"
+            "ta -0.0101, t -0.86, rank 15/23). The trade loses on every pair - gr"
+            "oss +0.18 to +0.82 bp against a toll of 0.64 to 1.87 bp - out of sam"
+            "ple and in both eras. REUSABLE FINDING: reversion concentrates in th"
+            "in-liquidity hours (mean beta -0.0334 for 20:00-07:00 London vs -0.0"
+            "159 for 08:00-19:00), with the extremes at 22:00-23:00 and 01:00-02:"
+            "00. Anyone measuring short-horizon FX mean reversion without an hour"
+            "-of-day control will find a large effect that is entirely a spread a"
+            "rtefact. The usdchf 09->10 cell at t -43.36 needs a data-quality che"
+            "ck before it is treated as anything. This does NOT overturn the mont"
+            "h-end finding, which regressed the post-fix hour on the SPY MONTH re"
+            "turn - a conditional and different quantity. First candidate in the "
+            "programme where cost, not statistical power, was the binding constra"
+            "int."
+        ),
     ),
 
     "pead_time_sue": Registration(
