@@ -489,56 +489,23 @@ REGISTRY: dict[str, Registration] = {
 
     "meanrev": Registration(
         strategy=MeanReversionStrategy,
-        deployment=Deployment.GATED,
-        instruments=("EURUSD", "GBPUSD"),
+        deployment=Deployment.OBSERVER,
+        instruments=("EURUSD",),
         consensus_weight=0.0,
-        basis=("Underpowered, not refuted - the strongest gated candidate in "
-               "the programme. 3,450 trades over EURUSD H4 primary and GBPUSD "
-               "H4 validation, 24,812 bars each, 2010-2026, across 8 cells. No "
-               "cell passes all five gates. The pre-registered primary arm "
-               "nets +0.112R on n=384 (+0.337 ATR/trade, reproducing the "
-               "engine's filed +0.3175) and is the FIRST candidate to pass the "
-               "amended control gate on merit: Welch +2.13 with a genuinely "
-               "positive expectancy rather than a less-negative one. Era "
-               "stability is the best seen here - +0.115/+0.131/+0.056/+0.135R "
-               "over four eras, no decay - and the beta charge is disposed of, "
-               "since the composite fires 192 long / 192 short and the matched "
-               "control shows only a 0.024R short tilt across a sample where "
-               "EURUSD went 1.3327 to 1.1626. It fails on power: OOS clustered "
-               "t +1.69 against 2.96, modern third +1.76 against 2.00, and the "
-               "validation pair fails the control gate at Welch +0.94 with a "
-               "negative short leg. A stationary block bootstrap gives "
-               "P(mean<=0) = 0.028 against an 8-cell Bonferroni bar of 0.006. "
-               "MATERIAL CORRECTION TO THE PRIOR: the engine's clustered t "
-               "figures (+3.42, +2.23, +1.82) are all monthly clustered and "
-               "all inflated, because equal-weighting months changes the "
-               "estimand - months with 1 trade return +0.928R against -0.239R "
-               "for months with 4, monotonically, so the monthly average "
-               "upweights the quiet months that carry the result and shifts "
-               "+0.112R to +0.306R. The more extension signals fire in a "
-               "month, the worse they do. The true prior is weaker than the "
-               "record states. Also recorded: the filed 5-factor list does not "
-               "match what meanrev_engine.py computes - only the Donchian term "
-               "is close - and both were run, the filed list scoring worse on "
-               "the primary. Promotion needs an independent sample, not "
-               "another pass over these sixteen years. TASK D (macro "
-               "conditioning + cross-sectional pooling) CLOSES BOTH ROUTES: "
-               "the best Fed-epoch-conditioned arm nets +0.082R against a "
-               "+0.075R pooled baseline at p=0.304 against 1,000 circular "
-               "rotations of its own labels; the proposed ADX<=25 filter takes "
-               "it to -0.015R and the trade-density filter to +0.062R, both "
-               "worse than baseline. The density filter as filed (monthly "
-               "count) was LOOKAHEAD and would have reported the opposite - "
-               "run causally on a trailing 30-day count it hurts, so the "
-               "monotonic-dilution pattern is a description and not a rule. "
-               "The pooled clustered t of +3.42 is the same estimand artefact "
-               "(per-trade +0.075R vs per-month +0.224R); the honest pooled "
-               "figure is +1.53. Pooling to four majors DROPS t from +1.53 to "
-               "+1.23 where sqrt-n predicted +2.18, with the effect declining "
-               "monotonically EURUSD +0.112 > GBPUSD +0.038 > USDJPY +0.027 > "
-               "EURJPY -0.003 - the signature of a single-instrument result. "
-               "Clearing 2.96 would need ~9,066 trades, 5.8x the pool. Forward "
-               "paper on EURUSD H4 is the only honest test left."),
+        basis=("Forward demo tracking on EURUSD H4 (w=0.0). Does not pass "
+               "re-calibrated live gates on three counts: (1) The OOS clustered "
+               "t +1.69 measures an untradeable month-equal-weighted portfolio "
+               "where quiet 1-trade months make +0.928R while active 4-trade "
+               "months lose -0.239R; the causal per-trade naive OOS t is +1.20 "
+               "(and 2021-2026 naive t is +0.77), both failing the 1.65 bar. "
+               "(2) GBPUSD validation fails 4 of 5 gates: net +0.038R, Welch "
+               "+0.94, short leg -0.019R (symmetry fail), OOS naive t +0.88. "
+               "(3) EURUSD long leg is statistical noise (t +0.35); edge is "
+               "short-only, and cross-asset pooling drops t from +1.53 to +1.23. "
+               "PRE-REGISTERED PROMOTION CRITERION: n >= 40 forward demo trades "
+               "on EURUSD H4 with Net E[R] >= +0.05R and the short leg still "
+               "carrying it, logged point-in-time in macro_state_audit.jsonl. "
+               "At ~24 trades/year this requires ~20 months of paper tracking."),
     ),
 
     "pead_time_sue": Registration(
