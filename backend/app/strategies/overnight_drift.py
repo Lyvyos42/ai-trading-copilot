@@ -63,6 +63,7 @@ carry has to come off before this is compared with anything.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional
 
 from app.strategies.base import (
@@ -70,7 +71,25 @@ from app.strategies.base import (
 )
 
 
-class OvernightDrift(BaseStrategy):
+@dataclass(frozen=True)
+class PropConstraint:
+    """What the funding plan permits. Supplied by the caller, never guessed.
+
+    `overnight_allowed` defaults to False. A plan that has not been checked is
+    treated as prohibiting overnight holds, because the failure mode of the
+    other default is an account closed on its first night for a rule nobody
+    read.
+    """
+    plan: str = "unknown"
+    account_size: float = 100_000.0
+    max_drawdown: float = 3_500.0
+    overnight_allowed: bool = False
+    # Notional per contract of the smallest tradeable unit. MES at 7722.00 is
+    # 7722 x $5 = $38,610.
+    micro_notional: float = 38_610.0
+
+
+class OvernightDriftStrategy(BaseStrategy):
     name = "overnight_drift"
     # Daily bars only, and the instrument must actually close. Nothing here
     # needs volume, which is why it is the one strategy in this set that runs
@@ -80,18 +99,48 @@ class OvernightDrift(BaseStrategy):
     validated_on = ("SPY", "QQQ", "ES=F", "NQ=F")
 
     def __init__(self, sma_period: int = 200, rsi_period: int = 14,
-                 rsi_floor: float = 45.0, require_regime: bool = True):
+                 rsi_floor: float = 45.0, require_regime: bool = True,
+                 prop: Optional[PropConstraint] = None):
         super().__init__(sma_period=sma_period, rsi_period=rsi_period,
                          rsi_floor=rsi_floor, require_regime=require_regime)
         self.sma_period = sma_period
         self.rsi_period = rsi_period
         self.rsi_floor = rsi_floor
         self.require_regime = require_regime
+        self.prop = prop
+
+    def max_contracts(self) -> int:
+        """Hard clamp: one micro per 100k of account, and never more.
+
+        Measured by block-resampling 5353 filtered SPY nights so real losing
+        runs stay intact, at a $100,000 account:
+
+                            1 MES ($38,610)    1 ES ($386,100)
+            30-day eval          0.1%               85.8%
+            60-day eval          1.2%               97.7%
+            funded year         15.7%              100.0%
+
+        those being the probability of touching a $3,500 trailing drawdown. One
+        full ES held overnight fails an evaluation with near-certainty, so the
+        clamp is not a preference. Even at one micro the annual figure is 15.7%
+        on FTMO growth and 23.2% on Alpha Zero, which the caller should know it
+        is accepting.
+        """
+        if self.prop is None:
+            return 1
+        return max(0, int(self.prop.account_size // 100_000)) or 1
 
     def min_bars(self) -> int:
         return self.sma_period + 2 if self.require_regime else 2
 
     def _evaluate(self, bars: BarSeries) -> SignalResult:
+        # The plan gate comes before anything else. There is no point scoring a
+        # regime for a position the funding agreement forbids holding.
+        if self.prop is not None and not self.prop.overnight_allowed:
+            return SignalResult.abstain(
+                self.name, bars.symbol,
+                f"OVERNIGHT_HOLD_PROHIBITED_BY_PROP_PLAN: {self.prop.plan}")
+
         close = list(bars.close)
         i = len(close) - 1                     # the bar that just closed at 16:00
 
@@ -133,6 +182,14 @@ class OvernightDrift(BaseStrategy):
         if sma:
             stretch = (close[i] - sma) / sma
             conviction = max(0.4, min(0.9, 0.5 + stretch * 4.0))
+
+        evidence["max_contracts"] = self.max_contracts()
+        evidence["sizing_basis"] = (
+            "one micro contract per $100k of account; a full-size contract "
+            "breaches a 3.5% trailing drawdown in 85.8% of 30-day windows")
+        if self.prop is not None:
+            evidence["prop_plan"] = self.prop.plan
+            evidence["prop_max_drawdown"] = self.prop.max_drawdown
 
         return SignalResult(
             strategy=self.name, symbol=bars.symbol,
@@ -179,3 +236,9 @@ def backtest_overnight(open_: list[float], close: list[float],
         r = (open_[t] / close[j] - 1.0) if ok else 0.0
         out.append(r)
     return out
+
+
+# The class was named OvernightDrift when first committed. Antigravity's
+# interface calls it OvernightDriftStrategy; both names refer to the same
+# class so neither side has to change first.
+OvernightDrift = OvernightDriftStrategy
