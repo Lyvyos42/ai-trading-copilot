@@ -72,13 +72,99 @@ LOT_NOTIONAL_USD: Dict[str, float] = {
 }
 DEFAULT_LOT_NOTIONAL_USD: float = 100_000.0
 
+# ---------------------------------------------------------------------------
+# PHASE 4, MEASURED 2026-09-12. 4,572,432 tbbo prints on GLBX.MDP3, October 2023
+# (inside the discovery window). M = |trade - mid| / (0.5 * spread), so M = 1.0
+# is execution exactly at the touch and a round trip costs spread * M.
+#
+# THE 4.3x MULTIPLIER WAS RETAIL DEALING-DESK RENT, NOT MARKET STRUCTURE.
+#   GC  96.78% of prints at the touch, median M 1.0000, mean 1.0928
+#   CL  93.92% of prints at the touch, median M 1.0000, mean 1.0401
+# A CLOB charges for DEPTH CONSUMPTION instead: small orders pay ~nothing over
+# the touch, large orders pay more than the dealing desk ever did.
+#
+# MEASURED ON GC AND CL ONLY. ES, YM and RTY were NOT measured, and neither was
+# any MICRO contract -- micros trade their own, thinner book. Applying these
+# numbers to an unmeasured root is an ASSUMPTION and is tagged as such.
+# One month, one regime: October 2023 was not a stress period.
+# ---------------------------------------------------------------------------
+CLOB_M_MEASURED: Dict[str, list] = {
+    # root: [(max_contracts, mean M), ...]
+    'GC': [(1, 1.0417), (5, 1.0829), (20, 1.5235), (100, 3.7230), (10**9, 6.1875)],
+    'CL': [(1, 1.0039), (5, 1.0515), (20, 1.3202), (100, 3.2443), (10**9, 2.3939)],
+}
+# Conservative default for unmeasured roots: the worse of GC/CL at each size.
+CLOB_M_DEFAULT: list = [(1, 1.0417), (5, 1.0829), (20, 1.5235),
+                        (100, 3.7230), (10**9, 6.1875)]
+
+# Micro contract specifications. Notional is price-dependent; these are 2023
+# reference levels used only to express fixed commission in bp.
+MICRO_SPEC: Dict[str, Dict[str, float]] = {
+    'MES': {'point_value': 5.0,   'tick': 0.25, 'tick_usd': 1.25, 'ref_px': 4500.0,  'root': 'ES'},
+    'MYM': {'point_value': 0.5,   'tick': 1.00, 'tick_usd': 0.50, 'ref_px': 34000.0, 'root': 'YM'},
+    'M2K': {'point_value': 5.0,   'tick': 0.10, 'tick_usd': 0.50, 'ref_px': 1850.0,  'root': 'RTY'},
+    'MCL': {'point_value': 100.0, 'tick': 0.01, 'tick_usd': 1.00, 'ref_px': 75.0,    'root': 'CL'},
+    'MGC': {'point_value': 10.0,  'tick': 0.10, 'tick_usd': 1.00, 'ref_px': 1950.0,  'root': 'GC'},
+}
+CME_COMMISSION_RT_USD: float = 1.04      # ESTIMATED: no broker schedule on file
+
+
+def clob_multiplier(contracts: float, root: str = None) -> tuple:
+    """Size-conditioned M for a central limit order book.
+
+    Returns (M, source). The dealing-desk 4.3x is NOT used here; a CLOB charges
+    by depth consumed, so M depends on order size.
+    """
+    table = CLOB_M_MEASURED.get((root or '').upper())
+    src = f'MEASURED (Phase 4 tbbo CLOB Oct 2023, {root})' if table else           'ASSUMED (Phase 4 default; this root was NOT measured)'
+    table = table or CLOB_M_DEFAULT
+    for cap, m in table:
+        if contracts <= cap:
+            return m, src
+    return table[-1][1], src
+
+
+def micro_futures_toll_bp(contract: str, contracts: float = 1.0,
+                          spread_ticks: float = 1.0,
+                          commission_rt_usd: float = CME_COMMISSION_RT_USD) -> Dict[str, Any]:
+    """Round-trip toll in bp for a CME micro contract at a given order size.
+
+    Round trip crosses the spread once: cost = spread * M, since M is defined
+    against the HALF spread and a round trip pays two half-spreads.
+    """
+    c = contract.upper()
+    if c not in MICRO_SPEC:
+        raise KeyError(f"{contract}: not a registered micro contract {sorted(MICRO_SPEC)}")
+    sp = MICRO_SPEC[c]
+    notional = sp['ref_px'] * sp['point_value']
+    tick_bp = sp['tick_usd'] / notional * 1e4
+    m, src = clob_multiplier(contracts, sp['root'])
+    spread_toll = tick_bp * spread_ticks * m
+    comm_bp = commission_rt_usd / notional * 1e4
+    return {
+        'contract': c, 'root': sp['root'], 'order_contracts': contracts,
+        'notional_usd': notional, 'tick_bp': tick_bp,
+        'clob_multiplier': m, 'multiplier_source': src,
+        'spread_toll_bp': spread_toll, 'commission_bp': comm_bp,
+        'total_toll_bp': spread_toll + comm_bp,
+        'commission_source': 'ESTIMATED - no broker schedule on file',
+    }
+
+
 def compute_execution_toll_bp(
     symbol: str,
     broker: str = 'ic_markets_mt5',
     order_type: str = 'market',
     holding_days: float = 0.0,
     annual_swap_rate_pct: float = 3.00,
+    venue: str = 'mt5_cfd',
+    contracts: float = 1.0,
 ) -> Dict[str, Any]:
+    """venue='mt5_cfd' applies the 4.3x dealing-desk multiplier (measured on an
+    MT5 retail book). venue='cme_clob' routes to the size-conditioned CLOB
+    multiplier measured in Phase 4. The two are NOT interchangeable."""
+    if venue == 'cme_clob':
+        return micro_futures_toll_bp(symbol, contracts)
     sym = symbol.lower()
     raw_spread_bp = EMPIRICAL_RAW_SPREAD_BP.get(sym, 0.50)
     comm_dollars = BROKER_COMMISSIONS_RT.get(broker, 7.00)
