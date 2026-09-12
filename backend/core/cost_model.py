@@ -94,6 +94,10 @@ CLOB_M_MEASURED: Dict[str, list] = {
     'CL': [(1, 1.0039), (5, 1.0515), (20, 1.3202), (100, 3.2443), (10**9, 2.3939)],
 }
 # Conservative default for unmeasured roots: the worse of GC/CL at each size.
+# CAUTION on the top tier: the 100+ bucket is n=16 (GC) and n=33 (CL). 6.1875
+# is an order of magnitude, not an estimate. The 21-100 tier is well supported
+# (6,808 / 9,024 prints) and its MEDIAN M is 3.0000, so that band's cost is
+# typical rather than outlier-driven.
 CLOB_M_DEFAULT: list = [(1, 1.0417), (5, 1.0829), (20, 1.5235),
                         (100, 3.7230), (10**9, 6.1875)]
 

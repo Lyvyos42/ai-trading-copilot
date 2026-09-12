@@ -65,6 +65,12 @@ The 4.3x was **rent**, not microstructure.
 | 21–100 | **3.7230** | **3.2443** |
 | 100+ | 6.1875 | 2.3939 |
 
+**Sample counts matter here.** The `100+` tier is **16 prints on GC and 33 on
+CL** — the 6.1875 figure in `CLOB_M_DEFAULT` rests on sixteen observations and
+must not be read as an estimate. The `21-100` tier is better supported (6,808 GC
+/ 9,024 CL) and its **median M is 3.0000**, not merely its mean, so that band's
+cost is a property of typical orders rather than of outliers.
+
 At sweep level — one aggressor order consuming several resting orders, grouped
 by shared `ts_event`:
 
@@ -120,9 +126,16 @@ against the EURUSD CFD's 2.88 bp, because commission on a $7,500 notional is
 4. **One month, one regime.** October 2023 was not a stress period. The size-cost
    curve steepens precisely when volatility spikes, which is when strategies
    trade most.
-5. **Commission is ESTIMATED.** $1.04 RT all-in is plausible for micros but no
+5. **The largest-size tier is 16 observations.** `100+` contracts: n=16 on GC,
+   n=33 on CL. Treat `M = 6.19` as an order of magnitude, not a number.
+6. **Commission is ESTIMATED.** $1.04 RT all-in is plausible for micros but no
    broker schedule is on file; it is tagged `ESTIMATED` in the cost model. It is
    32–50% of total toll on MGC/MES and therefore worth sourcing properly.
+
+**Independently reproduced.** Every figure above was computed twice, by a
+vectorised `np.bincount` implementation and by a `pandas.groupby.apply`
+implementation written separately, agreeing to four decimal places on all
+per-trade and sweep statistics.
 
 ## 7. Consequence for the programme
 
