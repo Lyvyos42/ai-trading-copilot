@@ -35,13 +35,11 @@ FOUR THINGS THAT ARE CONVERTED RATHER THAN TRUSTED
 from __future__ import annotations
 
 import asyncio
-import threading
 from datetime import datetime, time as dtime, timedelta, timezone
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 NY = ZoneInfo("America/New_York")
-_TV_SYNC_LOCK = threading.Lock()
 
 # Symbols beyond app.data.market_data._TV_EXCHANGE that the strategies cover.
 _EXTRA = {
@@ -115,11 +113,6 @@ def restamp_daily(epoch: int) -> int:
     return int(datetime.combine(d, dtime(9, 30), tzinfo=NY).timestamp())
 
 
-def _client():
-    from app.data.market_data import _get_tv_client
-    return _get_tv_client()
-
-
 def _hist_sync(tv_sym: str, exchange: str, interval: str, n_bars: int) -> list[dict]:
     try:
         from tvDatafeed import Interval
@@ -127,32 +120,17 @@ def _hist_sync(tv_sym: str, exchange: str, interval: str, n_bars: int) -> list[d
         raise TVBarsUnavailable(
             "tvDatafeed is not installed on this host - TradingView cannot serve bar "
             "history, and no other vendor is substituted") from exc
-    with _TV_SYNC_LOCK:
-        tv = _client()
-        if tv is None:
-            raise TVBarsUnavailable("TradingView client could not be constructed")
-        attr = _INTERVAL_ATTR.get(interval)
-        if attr is None:
-            raise TVBarsUnavailable(f"interval {interval!r} has no TradingView equivalent")
-        try:
-            df = tv.get_hist(symbol=tv_sym, exchange=exchange,
-                             interval=getattr(Interval, attr), n_bars=n_bars)
-        except Exception:
-            df = None
-        if df is None or len(df) == 0:
-            # Reconnect client once if remote websocket dropped
-            try:
-                from app.data import market_data
-                market_data._tv_client = None
-                tv = _client()
-                if tv is not None:
-                    df = tv.get_hist(symbol=tv_sym, exchange=exchange,
-                                     interval=getattr(Interval, attr), n_bars=n_bars)
-            except Exception:
-                pass
-        if df is None or len(df) == 0:
-            raise TVBarsUnavailable(f"TradingView returned no bars for {exchange}:{tv_sym} {interval}")
-        df.columns = [str(c).lower() for c in df.columns]
+    attr = _INTERVAL_ATTR.get(interval)
+    if attr is None:
+        raise TVBarsUnavailable(f"interval {interval!r} has no TradingView equivalent")
+    # The shared client, its lock, deadline, reconnect and circuit breaker all live
+    # in app/data/tv_client.py - the only place tvDatafeed is called.
+    from app.data import tv_client
+    try:
+        df = tv_client.get_hist(tv_sym, exchange, getattr(Interval, attr), n_bars)
+    except tv_client.TVUnavailable as exc:
+        raise TVBarsUnavailable(str(exc)) from exc
+    df.columns = [str(c).lower() for c in df.columns]
     out = []
     for ts, row in df.iterrows():
         t = epoch_from_tv_index(ts)

@@ -311,7 +311,9 @@ def test_tradingview_loader_conversions():
                                  "volume": [10.0] * len(px)}, index=pd.Index(idx))
 
     try:
-        with _patch(tv_bars, "_client", lambda: FakeTV()):
+        from app.data import tv_client
+        tv_client._reset_for_tests()
+        with _patch(tv_client, "_new_client", lambda: FakeTV()):
             es = asyncio.run(tv_bars.fetch_bars("ES", "1d"))
             xau = asyncio.run(tv_bars.fetch_bars("XAUUSD", "5m", want_traded_volume=True))
     finally:

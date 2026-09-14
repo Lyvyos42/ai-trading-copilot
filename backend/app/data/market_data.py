@@ -293,46 +293,10 @@ _TV_EXCHANGE: dict[str, tuple[str, str]] = {
     "YM":  ("YM1!",  "CBOT"), "RTY": ("RTY1!", "CME"),
 }
 
-# Lazy singleton — TvDatafeed WebSocket connection, reused across requests
-_tv_client = None
-
-
-_tv_unavailable_logged = False
-
-
-def _get_tv_client():
-    """Shared TvDatafeed instance, or None - and it says so when it is None.
-
-    This used to swallow the failure with a bare `except Exception: pass`, and
-    that silence hid the single most important fact about this system's data:
-    tvDatafeed is NOT in requirements.txt, so the import raised on every call
-    in production, the client stayed None, _fetch_tvdatafeed returned None,
-    and EVERY request fell through to yfinance.
-
-    TradingView was first in the fetch chain and never once ran. Every bar
-    every agent has ever analysed came from Yahoo, while the price displayed
-    beside it came from TradingView's scanner API - a different source, which
-    genuinely does work because it is a plain HTTP POST needing no package.
-
-    A fallback that is silent is a fallback nobody audits. This now logs once,
-    loudly, naming the reason.
-    """
-    global _tv_client, _tv_unavailable_logged
-    if _tv_client is None:
-        try:
-            from tvDatafeed import TvDatafeed
-            _tv_client = TvDatafeed()
-        except Exception as exc:
-            if not _tv_unavailable_logged:
-                _tv_unavailable_logged = True
-                log.warning(
-                    "tradingview_client_unavailable",
-                    error=f"{type(exc).__name__}: {exc}",
-                    consequence="ALL bar data is coming from Yahoo, not TradingView",
-                    fix="add tvDatafeed to requirements.txt, or accept Yahoo and "
-                        "stop listing TradingView first in the fetch chain",
-                )
-    return _tv_client
+# The TvDatafeed instance is owned by app/data/tv_client.py - the single,
+# process-wide gate (lock, call deadline, socket cleanup, circuit breaker). No
+# other module constructs one: a second unguarded instance is exactly how
+# concurrent requests wrote frames into each other's sockets.
 
 
 async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
@@ -351,16 +315,15 @@ async def _fetch_tvdatafeed(ticker: str, asset_class: str) -> dict | None:
         except ImportError:
             return None
 
-        tv = _get_tv_client()
-        if tv is None:
+        # Through the single process-wide gate (app/data/tv_client.py): the
+        # tvDatafeed instance is not thread-safe and has no socket timeout, and
+        # this path runs concurrently with the strategy bar loader.
+        from app.data import tv_client
+        try:
+            df = tv_client.get_hist(tv_symbol, exchange, Interval.in_daily, 300)
+        except tv_client.TVUnavailable as exc:
+            log.info("tradingview_daily_unavailable", ticker=ticker, reason=str(exc))
             return None
-
-        df = tv.get_hist(
-            symbol=tv_symbol,
-            exchange=exchange,
-            interval=Interval.in_daily,
-            n_bars=300,
-        )
         if df is None or df.empty:
             return None
 

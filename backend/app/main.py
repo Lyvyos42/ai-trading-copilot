@@ -201,7 +201,15 @@ app.include_router(ws_router)
 # ─── Health check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    # "status" is the liveness contract and stays unconditional. TradingView state
+    # is reported beside it: a blocked data vendor degrades signals, it does not
+    # make the process unhealthy.
+    try:
+        from app.data import tv_client
+        tv = tv_client.status()
+    except Exception as exc:
+        tv = {"error": f"{type(exc).__name__}: {exc}"}
+    return {"status": "healthy", "tradingview": tv}
 
 
 # ─── Global error handler ─────────────────────────────────────────────────────

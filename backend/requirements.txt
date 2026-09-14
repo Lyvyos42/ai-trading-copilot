@@ -30,5 +30,5 @@ openai==1.65.0
 alpaca-py==0.28.0
 stripe==8.0.0
 pyarrow>=23.0.0
-tvdatafeed @ git+https://github.com/baselsm/tvdatafeed.git
+tvdatafeed @ git+https://github.com/baselsm/tvdatafeed.git@cfc26940b273641116effa1b7c12982191b5a941
 pytest>=9.0.0
