@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.api.routes import auth, signals, portfolio, agents, backtest, debate, market, news, profiles, session
 from app.api.routes import evaluation, performance, calendar, correlations, memory
+from app.api.routes import rebal
 from app.api.routes.scanner import router as scanner_router, alerts_router
 from app.api.routes.paper_trading import router as paper_trading_router
 from app.api.routes.billing import router as billing_router
@@ -191,6 +192,7 @@ app.include_router(performance.router)
 app.include_router(calendar.router)
 app.include_router(correlations.router)
 app.include_router(memory.router)
+app.include_router(rebal.router)
 app.include_router(paper_trading_router)
 app.include_router(billing_router)
 app.include_router(ws_router)

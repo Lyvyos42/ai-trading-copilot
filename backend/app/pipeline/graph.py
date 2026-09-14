@@ -2,6 +2,7 @@
 LangGraph DAG — 9-agent multi-agent signal pipeline.
 
 Stage 1 (parallel): 7 analysts (Fundamental, Technical, Sentiment, Macro, OrderFlow, RegimeChange, Correlation)
+Stage 1c (parallel): registered quantitative strategies on TradingView bars (votes weight the trader tally)
 Stage 2: Quant validation (reviews analyst outputs for statistical rigor)
 Stage 3: Bull/Bear researcher debate
 Stage 4: Trader Agent synthesizes final decision (Opus tier)
@@ -86,6 +87,34 @@ async def run_regime_change(state: TradingState) -> TradingState:
 async def run_correlation(state: TradingState) -> TradingState:
     result = await _correlation.analyze(state)
     return {**state, "correlation_analysis": _wrap("correlation", result, ["portfolio_corr"])}
+
+
+# ─── Stage 1c: Registered quantitative strategies ───────────────────────────
+
+async def _quantitative_strategies_block(state: TradingState) -> dict:
+    """Evaluate the registered strategies for this ticker. Never raises.
+
+    A strategy layer that fails must cost its votes, not the signal: the
+    block degrades to empty with the reason, exactly like news or FRED.
+    """
+    from app.agents import strategy_agent
+    try:
+        return await strategy_agent.evaluate_for_pipeline(
+            state.get("ticker", ""), state.get("asset_class", "stocks"),
+            state.get("market_data") or {})
+    except Exception as exc:
+        log.warning("quantitative_strategies_failed", ticker=state.get("ticker"),
+                    error=f"{type(exc).__name__}: {exc}")
+        return {"votes": [], "contributions": [], "observations": [],
+                "abstentions": [], "counted": 0, "abstained": 0,
+                "error": f"{type(exc).__name__}: {exc}", "reasoning": []}
+
+
+async def run_quantitative_strategies(state: TradingState) -> TradingState:
+    block = await _quantitative_strategies_block(state)
+    reasoning = list(state.get("reasoning_chain", []))
+    reasoning.extend(block.get("reasoning", []))
+    return {**state, "quantitative_strategies": block, "reasoning_chain": reasoning}
 
 
 # ─── Stage 2: Quant validation ──────────────────────────────────────────────
@@ -357,6 +386,7 @@ def _build_graph() -> StateGraph:
     g.add_node("order_flow", run_order_flow)
     g.add_node("regime_change", run_regime_change)
     g.add_node("correlation", run_correlation)
+    g.add_node("quant_strategies", run_quantitative_strategies)
     g.add_node("quant", run_quant)
     g.add_node("debate", run_debate)
     g.add_node("trader", run_trader)
@@ -364,11 +394,13 @@ def _build_graph() -> StateGraph:
     g.add_node("risk_gate", run_risk_gate_stage)
     g.add_node("fund_manager", run_fund_manager)
 
-    # Stage 1: all 7 analysts → debate
+    # Stage 1: all 7 analysts → registered quantitative strategies → debate.
+    # The strategy node sits before the trader so its votes are in the tally.
     g.set_entry_point("fundamental")
     for node in ("fundamental", "technical", "sentiment", "macro",
                  "order_flow", "regime_change", "correlation"):
-        g.add_edge(node, "debate")
+        g.add_edge(node, "quant_strategies")
+    g.add_edge("quant_strategies", "debate")
 
     # Sequential stages
     g.add_edge("debate", "trader")
@@ -547,13 +579,19 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
     # ── Stage 1a: Run independent analysts + macro in parallel ───────────────
     t0 = time.monotonic()
     (fundamental_result, technical_result, sentiment_result, macro_result,
-     order_flow_result) = await asyncio.gather(
+     order_flow_result, quant_strategies_block) = await asyncio.gather(
         _fundamental.analyze(initial_state),
         _technical.analyze(initial_state),
         _sentiment.analyze(initial_state),
         _macro.analyze(initial_state),
         _order_flow.analyze(initial_state),
+        # Independent of every analyst, so it runs in the same wave.
+        _quantitative_strategies_block(initial_state),
     )
+
+    # Same list object as initial_state["reasoning_chain"]; extended in place so
+    # later appends to reasoning_prefix still reach every downstream state.
+    reasoning_prefix.extend(quant_strategies_block.get("reasoning", []))
 
     # Inject macro output so regime_change and correlation can use it
     state_with_macro: TradingState = {
@@ -579,6 +617,7 @@ async def run_pipeline(ticker: str, asset_class: str = "stocks", timeframe: str 
         "order_flow_analysis":     _wrap("order_flow", order_flow_result, ["volume", "vwap", "obv", "microstructure_3d"]),
         "regime_change_analysis":  _wrap("regime_change", regime_change_result, ["vix", "credit_spreads"]),
         "correlation_analysis":    _wrap("correlation", correlation_result, ["portfolio_corr"]),
+        "quantitative_strategies": quant_strategies_block,
     }
 
     # ── Apply strategy profile weight multipliers ───────────────────────────

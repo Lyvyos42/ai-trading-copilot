@@ -17,6 +17,9 @@ class TradingState(TypedDict, total=False):
     order_flow_analysis: dict[str, Any]      # NEW — OrderFlowAnalyst
     regime_change_analysis: dict[str, Any]   # NEW — RegimeChangeAnalyst
     correlation_analysis: dict[str, Any]     # NEW — CorrelationAnalyst
+    # Stage 1c: registered quantitative strategies (app/agents/strategy_agent.py).
+    # votes[] are LIVE strategies only; observations[] never reach the tally.
+    quantitative_strategies: dict[str, Any]
     # Stage 2: Quant validation
     quant_validation: dict[str, Any]         # NEW — QuantAnalyst
     # Stage 3: Debate

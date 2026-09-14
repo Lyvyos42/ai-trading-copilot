@@ -166,6 +166,15 @@ class TraderAgent(BaseAgent):
                 if _conf > 0:
                     votes.append((_dir, _conf))
 
+        # Registered quantitative strategies - LIVE registrations only; observers
+        # never appear in `votes`, so nothing here can make one count. A strategy
+        # vote is conviction x registered weight on 0-1, and analyst confidences
+        # are 0-100, so it is rescaled before it joins the same tally.
+        quant_block = state.get("quantitative_strategies") or {}
+        for _d, _c in (quant_block.get("votes") or []):
+            if _d in ("LONG", "SHORT") and _c > 0:
+                votes.append((_d, float(_c) * 100.0))
+
         # How many analysts actually formed a directional opinion. This is the
         # number that decides whether there is a signal at all.
         directional_votes = [(d, c) for d, c in votes if d in ("LONG", "SHORT")]
@@ -212,6 +221,9 @@ QUANT VALIDATION:
 - p-value: {quant.get('p_value', 'N/A')}
 - Win rate: {quant.get('backtest_win_rate', 'N/A')}
 - Sharpe: {quant.get('sharpe_estimate', 'N/A')}
+
+QUANTITATIVE STRATEGIES (registered rules; only LIVE ones are in the vote lean):
+{self._strategy_prompt_block(quant_block)}
 
 DEBATE:
 Bull case: {bull[:300]}
@@ -277,11 +289,125 @@ Output JSON only."""
                     atr_15m = nz(market_data, "atr_15m", atr * 0.196)
                     result["timeframe_levels"] = self._compute_timeframe_levels(current_price, direction, atr, atr_15m, _dec)
 
-                return result
+                return self._apply_strategy_overlay(result, quant_block, current_price, ticker)
             except json.JSONDecodeError:
                 pass
 
-        return self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data, profile_slug, timeframe)
+        result = self._compute_probability_signal(ticker, current_price, direction, votes, tech, risk, fund, sent, macro, market_data, profile_slug, timeframe)
+        return self._apply_strategy_overlay(result, quant_block, current_price, ticker)
+
+    # A strategy must reach this conviction (on its own 0-1 scale) before its
+    # structural levels replace the consensus ATR geometry.
+    STRATEGY_GEOMETRY_MIN_CONVICTION = 0.5
+
+    @staticmethod
+    def _strategy_prompt_block(quant_block: dict) -> str:
+        lines = []
+        for c in quant_block.get("contributions") or []:
+            if c.get("counted"):
+                lines.append(f"- {c.get('label')}: {c['direction']} vote {c.get('vote_confidence', 0):.2f} "
+                             f"(entry {c.get('entry')}, target {c.get('target')}, stop {c.get('stop')}, "
+                             f"horizon {c.get('horizon')}) - {(c.get('reason') or '')[:220]}")
+        for o in quant_block.get("observations") or []:
+            if not o.get("abstained") and o.get("direction") not in (None, "FLAT"):
+                lines.append(f"- OBSERVER, not counted: {o.get('label')}: {o['direction']} - "
+                             f"{(o.get('reason') or '')[:160]}")
+        return "\n".join(lines) if lines else "- none fired for this symbol"
+
+    def _apply_strategy_overlay(self, result: dict, quant_block: dict,
+                                price: float, ticker: str) -> dict:
+        """Put fired strategies into provenance, reasoning and - when one is strong
+        and agrees with the consensus - the trade geometry itself.
+
+        Geometry is taken only from a LIVE strategy that voted in the SAME
+        direction as the final signal with conviction >= the threshold, and only
+        when its levels sit on the correct sides of price. A strategy defined by a
+        time exit (month-end flow) contributes its horizon and exit time, not
+        invented levels.
+        """
+        if not quant_block or result.get("status") == "NO_SIGNAL":
+            if quant_block:
+                result["quantitative_strategies"] = self._strategy_summary(quant_block)
+            return result
+
+        dec = _price_decimals(price, ticker)
+        direction = result.get("direction")
+        chain = result.setdefault("reasoning_chain", [])
+        counted = sorted((c for c in (quant_block.get("contributions") or []) if c.get("counted")),
+                         key=lambda c: c.get("vote_confidence", 0), reverse=True)
+
+        aligned_labels = []
+        for c in counted:
+            ev = c.get("evidence_record") or {}
+            chain.append(
+                f"Quant strategy {c.get('label')}: {c['direction']} (conviction {c['conviction']:.2f} "
+                f"x weight {c['consensus_weight']:.2f}; registry {ev.get('registry_status', 'n/a')}). "
+                f"{c.get('reason', '')}")
+            if c["direction"] == direction:
+                aligned_labels.append(c.get("label") or c.get("registration"))
+            else:
+                chain.append(f"{c.get('label')} opposes the {direction} consensus; its vote is in the "
+                             f"tally but its levels are not used.")
+        for o in quant_block.get("observations") or []:
+            if not o.get("abstained") and o.get("direction") not in (None, "FLAT"):
+                chain.append(f"Observer {o.get('label')} (not counted): {o['direction']}. "
+                             f"{o.get('reason', '')}")
+
+        strong = [c for c in counted if c["direction"] == direction
+                  and c.get("conviction", 0) >= self.STRATEGY_GEOMETRY_MIN_CONVICTION]
+        if strong:
+            best = strong[0]
+            tgt, stp, ent = best.get("target"), best.get("stop"), best.get("entry")
+            long_ = direction == "LONG"
+            tgt_ok = tgt is not None and ((long_ and tgt > price) or (not long_ and tgt < price))
+            stp_ok = stp is not None and ((long_ and stp < price) or (not long_ and stp > price))
+            if tgt_ok or stp_ok:
+                entry = ent if (ent and abs(ent - price) / price <= 0.0025) else price
+                result["entry_price"] = round(entry, dec)
+                if tgt_ok:
+                    result["research_target"] = round(tgt, dec)
+                    result["take_profit_1"] = round(tgt, dec)
+                    result["take_profit_2"] = round(tgt, dec)
+                    result["take_profit_3"] = round(tgt, dec)
+                if stp_ok:
+                    result["invalidation_level"] = round(stp, dec)
+                    result["stop_loss"] = round(stp, dec)
+                rt, il = result.get("research_target"), result.get("invalidation_level")
+                if rt is not None and il is not None and abs(entry - il) > 0:
+                    result["risk_reward_ratio"] = round(abs(rt - entry) / abs(entry - il), 1)
+                result["geometry_source"] = best.get("registration")
+                chain.append(
+                    f"Trade geometry from {best.get('label')}: entry {result['entry_price']}, "
+                    f"research target {result.get('research_target')}"
+                    f"{'' if tgt_ok else ' (consensus ATR - strategy target not usable)'}, "
+                    f"invalidation {result.get('invalidation_level')}"
+                    f"{'' if stp_ok else ' (consensus ATR - strategy stop not usable)'}.")
+            elif tgt is None and stp is None:
+                chain.append(f"{best.get('label')} is defined by its exit time, not by price levels; "
+                             f"target and invalidation remain the consensus ATR geometry.")
+            if best.get("horizon"):
+                result["analytical_window"] = best["horizon"]
+            if best.get("time_exit_utc"):
+                result["strategy_time_exit_utc"] = best["time_exit_utc"]
+
+        if aligned_labels:
+            prior = [x for x in (result.get("strategy_sources") or [])
+                     if x != "multi_factor_alpha_3.20" and x not in aligned_labels]
+            result["strategy_sources"] = aligned_labels + prior
+
+        result["quantitative_strategies"] = self._strategy_summary(quant_block)
+        return result
+
+    @staticmethod
+    def _strategy_summary(quant_block: dict) -> dict:
+        keep = ("registration", "label", "direction", "conviction", "vote_confidence",
+                "entry", "stop", "target", "time_exit_utc", "horizon", "reason", "counted")
+        return {
+            "counted": [{k: c.get(k) for k in keep} for c in quant_block.get("contributions") or []
+                        if c.get("counted")],
+            "observers": [{k: o.get(k) for k in keep} for o in quant_block.get("observations") or []],
+            "abstentions": list(quant_block.get("abstentions") or []),
+        }
 
     def _build_system_prompt(self, profile_slug: str) -> str:
         """Build system prompt with strategy profile injection."""
@@ -495,7 +621,8 @@ Output JSON only."""
         # Confidence is capped by how many analysts actually contributed. Two
         # agreeing agents out of seven should not read like seven agreeing:
         # the old formula could return 92 on a single unopposed vote.
-        coverage = n_directional / 7.0
+        # Strategy votes join the analyst panel, so the count can exceed seven.
+        coverage = min(1.0, n_directional / 7.0)
         confidence = min(92, max(35, 45 + conviction * 50)) * (0.55 + 0.45 * coverage)
 
         # Research target & invalidation level (replaces TP/SL)

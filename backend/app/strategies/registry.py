@@ -31,6 +31,7 @@ from typing import Optional
 
 from app.strategies.artemis_squeeze import ArtemisSqueezeStrategy
 from app.strategies.base import BaseStrategy
+from app.strategies.cme_rebal_flow import CMERebalFlowStrategy
 from app.strategies.consensus_9 import Consensus9Strategy
 from app.strategies.crt import CRTStrategy
 from app.strategies.decasteljau import DecasteljauStrategy
@@ -46,6 +47,7 @@ from app.strategies.orb_london import LondonORBStrategy
 from app.strategies.overnight_drift import OvernightDriftStrategy
 from app.strategies.postfix_reversion import PostFixReversionStrategy
 from app.strategies.pead import PEADTimeScreener
+from app.strategies.ten_am_macro import TenAMMacroStrategy
 from app.strategies.tsmom import TSMomentumStrategy
 from app.strategies.turn_of_month import TurnOfMonthStrategy
 from app.strategies.vp_auction import VolumeProfileAuctionStrategy
@@ -95,7 +97,10 @@ REGISTRY: dict[str, Registration] = {
                "maxDD -17.4%/-15.4%, Sharpe retention 1.00/0.96 out of sample. "
                "OOS t 2.36/2.47 against a 2.73 threshold - below it, but the "
                "retention and the 30-year prior carry it. Sized at one micro "
-               "per 100k and gated on the funding plan permitting the hold."),
+               "per 100k and gated on the funding plan permitting the hold. "
+               "IBS gate audit (IBS_GATE_01, 7786 sessions): In-sample 1993-2016 "
+               "+4.68 bp (t +2.11); OOS 2017-2023 -1.19 bp (t -0.26, sign inverted). "
+               "Retained per §8 as live condition."),
         params={"require_regime": True},
     ),
 
@@ -131,12 +136,70 @@ REGISTRY: dict[str, Registration] = {
     "institutional_vwap": Registration(
         strategy=InstitutionalVWAPStrategy,
         deployment=Deployment.LIVE,
-        instruments=("ES", "NQ", "SPY", "QQQ", "MES", "MNQ", "6E", "6B", "6J"),
+        instruments=("ES", "NQ", "SPY", "QQQ", "MES", "MNQ", "US30", "YM", "MYM",
+                     "6E", "6B", "6J"),
         consensus_weight=0.5,
-        basis=("Deployed on the traded-volume allowlist only. Not backtested "
-               "in this project - it is an execution benchmark rather than an "
-               "anomaly, and its value is the reference level, not a directional "
-               "claim. Its weight reflects that."),
+        basis=("Rule ported 2026-09-13 from Institutional Edge "
+               "core/research_strategies/institutional_vwap.py so both systems read the "
+               "same bar identically: 09:30 ET anchored VWAP, volume-weighted 2-sigma "
+               "pierce-and-reject between 10:00 and 15:30, target VWAP, stop 2.5 sigma, "
+               "incoherent geometry declined. NOT BACKTESTED in either project - it is "
+               "an execution benchmark and its value is the reference level, not a "
+               "measured directional edge. Traded-volume series only; US30 abstains "
+               "unless its bars carry traded volume (the cash index does not)."),
+        params={"anchor": "ny_rth"},
+    ),
+
+    "institutional_vwap_london": Registration(
+        strategy=InstitutionalVWAPStrategy,
+        deployment=Deployment.OBSERVER,
+        instruments=("XAUUSD", "EURUSD", "GBPUSD", "USDJPY"),
+        consensus_weight=0.0,
+        basis=("UNTESTED VARIANT, observer only. The same pierce-and-reject rule "
+               "anchored at 08:00 Europe/London. The source module never ran a London "
+               "anchor, so this is a new hypothesis rather than a deployment. Bars are "
+               "the CME tape (GC, 6E, 6B) shifted onto TradingView spot, because spot "
+               "has no traded volume; USDJPY has no same-orientation contract (6J is "
+               "the reciprocal) and abstains."),
+        params={"anchor": "london"},
+    ),
+
+    "cme_rebal_flow": Registration(
+        strategy=CMERebalFlowStrategy,
+        deployment=Deployment.LIVE,
+        instruments=("ES", "YM", "RTY", "MES", "MYM", "M2K", "SPY", "DIA", "IWM"),
+        consensus_weight=0.7,
+        excludes=("turn_of_month",),
+        basis=("CME_REBAL_FLOW_01, CANDIDATE. Edge +30.06 bp per event, 95% CI "
+               "[+1.89, +58.23], net t +2.34, z +2.63 against a 1,000-draw "
+               "sign-permutation null, mid-month placebo dissociates by 57.9 bp. Gate 4 "
+               "fails on one era (2020-23, t -0.24). Validated on ES/YM/RTY 2010-2023 and "
+               "368 SPY months; deployed on those indices, their micros and the ETFs on "
+               "the same index (DIA, IWM). Registered rule only: z from the 5th-to-last "
+               "session close, no threshold, entry at the 4th-to-last open, exit at "
+               "month-end settlement, NO stop and NO target. K from the published "
+               "exchange calendar. Equity leg only - the bond leg is not modelled."),
+    ),
+
+    "cme_rebal_flow_nasdaq": Registration(
+        strategy=CMERebalFlowStrategy,
+        deployment=Deployment.OBSERVER,
+        instruments=("QQQ", "NQ", "MNQ"),
+        consensus_weight=0.0,
+        basis=("Observer only. The Nasdaq-100 was never in the CME_REBAL_FLOW_01 panel "
+               "(ES, YM, RTY, SPY), so a vote here would extend a measured result to an "
+               "unmeasured index. Forward-tracked for a future pre-registration."),
+    ),
+
+    "ten_am_macro": Registration(
+        strategy=TenAMMacroStrategy,
+        deployment=Deployment.OBSERVER,
+        instruments=("SPY", "QQQ", "US30", "ES", "NQ", "EURUSD", "GBPUSD", "XAUUSD"),
+        consensus_weight=0.0,
+        basis=("OBSERVE in Institutional Edge: no backtest, no control, no cost model. "
+               "Mechanism checks only (anchor lands on 10:00 ET across DST, causal on "
+               "99,000 XAUUSD M5 bars, one setup per session, R:R floor honoured). Rule "
+               "is the source module's defaults on M5 bars. Forward data only."),
     ),
 
     "ibs_mean_reversion": Registration(
@@ -526,8 +589,12 @@ REGISTRY: dict[str, Registration] = {
     "meanrev": Registration(
         strategy=MeanReversionStrategy,
         deployment=Deployment.OBSERVER,
-        instruments=("EURUSD",),
+        instruments=("EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"),
         consensus_weight=0.0,
+        # Observers are never counted, so emitting is safe; with the default
+        # require_validation=True it abstained on every bar and the forward record
+        # its own promotion criterion depends on could never accumulate.
+        params={"require_validation": False},
         basis=("Forward demo tracking on EURUSD H4 (w=0.0). Does not pass "
                "re-calibrated live gates on three counts: (1) The OOS clustered "
                "t +1.69 measures an untradeable month-equal-weighted portfolio "
@@ -541,7 +608,10 @@ REGISTRY: dict[str, Registration] = {
                "PRE-REGISTERED PROMOTION CRITERION: n >= 40 forward demo trades "
                "on EURUSD H4 with Net E[R] >= +0.05R and the short leg still "
                "carrying it, logged point-in-time in macro_state_audit.jsonl. "
-               "At ~24 trades/year this requires ~20 months of paper tracking."),
+               "At ~24 trades/year this requires ~20 months of paper tracking. "
+               "2026-09-13: forward-tracking widened to the seven G10 USD pairs for the "
+               "record; promotion remains EURUSD-specific. A directive to set it LIVE at "
+               "weight 0.5 was not applied because this criterion is unmet."),
     ),
 
     "postfix_reversion": Registration(

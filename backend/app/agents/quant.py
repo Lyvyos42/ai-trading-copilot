@@ -70,6 +70,11 @@ class QuantAnalyst(BaseAgent):
         )
 
         strategy_ctx = self._strategy_context(state)
+        strategy_review = self.strategy_review(state)
+        review_lines = "\n".join(
+            f"  - {r['label']} [{r['deployment']}{', COUNTED' if r['counted'] else ''}]: "
+            f"{r['direction']} | registry {r['registry_status']} | {r['headline_metrics']}"
+            for r in strategy_review) or "  - none fired for this symbol"
         user_msg = f"""{strategy_ctx}Validate the statistical edge for {ticker}.
 
 ANALYST CONSENSUS: {long_count} LONG / {short_count} SHORT / {len(analysts) - long_count - short_count} NEUTRAL
@@ -82,6 +87,9 @@ Individual analysts:
 Current price: {close}
 ATR(14): {atr:.4f}
 
+REGISTERED QUANTITATIVE STRATEGIES THAT FIRED (pre-registered evidence, not a backtest of this signal):
+{review_lines}
+
 Assess:
 1. Historical win rate for similar setups (5yr backtest estimate)
 2. P-value: is this edge statistically significant at p < 0.05?
@@ -93,11 +101,62 @@ Output JSON only."""
         raw = await self._call_claude(SYSTEM_PROMPT, user_msg, state=state)
         if raw:
             try:
-                return json.loads(raw)
+                out = json.loads(raw)
+                out["quantitative_strategy_review"] = strategy_review
+                return out
             except json.JSONDecodeError:
                 pass
 
-        return self._mock_analysis(ticker, consensus_dir, avg_conf, long_count, short_count, len(analysts))
+        out = self._mock_analysis(ticker, consensus_dir, avg_conf, long_count, short_count, len(analysts))
+        out["quantitative_strategy_review"] = strategy_review
+        if strategy_review:
+            out.setdefault("validation_notes", []).extend(
+                f"{r['label']}: {r['registry_status']} - {r['headline_metrics']}"
+                for r in strategy_review)
+        return out
+
+    @staticmethod
+    def strategy_review(state: TradingState) -> list[dict]:
+        """Cross-reference fired strategies with their pre-registered record.
+
+        Deterministic. Every figure comes from app/strategies/evidence_snapshot.py,
+        which copies core/evidence.py; a metric the record does not contain is
+        reported as None. This does NOT set statistical_edge, p_value or
+        backtest_win_rate for the consensus signal - those describe a different
+        object, and no backtest of this combined signal exists.
+        """
+        block = state.get("quantitative_strategies") or {}
+        rows = []
+        entries = [(c, "live") for c in block.get("contributions") or []] + \
+                  [(o, "observer") for o in block.get("observations") or []]
+        for item, deployment in entries:
+            if item.get("abstained") or item.get("direction") in (None, "FLAT"):
+                continue
+            ev = item.get("evidence_record") or {}
+            metrics = {k: ev.get(k) for k in (
+                "edge_bp_per_event", "edge_ci95_bp", "net_t", "gross_t_portfolio",
+                "z_vs_sign_permutation_null", "oos_t", "oos_t_threshold",
+                "clustered_t_filed", "per_trade_oos_t", "n_events", "n_sessions",
+                "n_trades", "win_rate") if k in ev}
+            headline = ", ".join(f"{k}={v}" for k, v in metrics.items()) or "no measured edge on record"
+            if ev.get("gates"):
+                headline += f"; gates: {ev['gates']}"
+            rows.append({
+                "strategy": item.get("registration") or item.get("strategy"),
+                "label": item.get("label"),
+                "deployment": deployment,
+                "counted": bool(item.get("counted")),
+                "direction": item.get("direction"),
+                "conviction": item.get("conviction"),
+                "strategy_z": (item.get("evidence") or {}).get("z"),
+                "registry_status": ev.get("registry_status", "UNRECORDED"),
+                "metrics": metrics,
+                "historical_win_rate": ev.get("win_rate"),
+                "headline_metrics": headline,
+                "caveat": ev.get("caveat"),
+                "evidence_snapshot": ev.get("snapshot"),
+            })
+        return rows
 
     def _mock_analysis(self, ticker: str, consensus_dir: str, avg_conf: float,
                        long_count: int, short_count: int, total: int) -> dict:
