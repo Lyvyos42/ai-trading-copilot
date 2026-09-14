@@ -209,7 +209,10 @@ async def health():
         tv = tv_client.status()
     except Exception as exc:
         tv = {"error": f"{type(exc).__name__}: {exc}"}
-    return {"status": "healthy", "tradingview": tv}
+    import os as _os
+    # Render sets RENDER_GIT_COMMIT on native services: which build is serving.
+    return {"status": "healthy", "commit": (_os.environ.get("RENDER_GIT_COMMIT") or "")[:7] or None,
+            "tradingview": tv}
 
 
 # ─── Global error handler ─────────────────────────────────────────────────────

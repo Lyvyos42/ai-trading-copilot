@@ -45,9 +45,11 @@ NY = ZoneInfo("America/New_York")
 _EXTRA = {
     "SPY": ("SPY", "AMEX"), "QQQ": ("QQQ", "NASDAQ"),
     "DIA": ("DIA", "AMEX"), "IWM": ("IWM", "AMEX"),
-    "MES": ("MES1!", "CME"), "MNQ": ("MNQ1!", "CME"),
-    "MYM": ("MYM1!", "CBOT"), "M2K": ("M2K1!", "CME"),
-    "GC": ("GC1!", "COMEX"), "MGC": ("MGC1!", "COMEX"),
+    # Micros sit on the *_MINI venues on TradingView (verified live 2026-09-14):
+    # CME:MES1! and COMEX:MGC1! return symbol_error. MYM1! resolves on CBOT.
+    "MES": ("MES1!", "CME_MINI"), "MNQ": ("MNQ1!", "CME_MINI"),
+    "MYM": ("MYM1!", "CBOT"), "M2K": ("M2K1!", "CME_MINI"),
+    "GC": ("GC1!", "COMEX"), "MGC": ("MGC1!", "COMEX_MINI"),
     "6E": ("6E1!", "CME"), "6B": ("6B1!", "CME"), "6A": ("6A1!", "CME"),
 }
 
@@ -59,7 +61,8 @@ FUTURES_TAPE = {
     "AUDUSD": ("6A1!", "CME"),
 }
 
-_TRADED_VENUES = {"CME", "CBOT", "COMEX", "NYMEX", "CME_MINI", "AMEX", "NASDAQ", "NYSE", "BINANCE"}
+_TRADED_VENUES = {"CME", "CBOT", "COMEX", "NYMEX", "CME_MINI", "CBOT_MINI", "COMEX_MINI",
+                  "NYMEX_MINI", "AMEX", "NASDAQ", "NYSE", "BINANCE"}
 _TICK_VENUES = {"OANDA"}
 
 _INTERVAL_ATTR = {

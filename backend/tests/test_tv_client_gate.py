@@ -187,6 +187,112 @@ def test_transient_failure_is_retried_once_on_a_fresh_client():
     assert len(df) == 3 and calls["n"] == 2
 
 
+def test_first_construction_never_reaches_the_stdin_prompt():
+    """tvDatafeed prompts on stdin when its cache dir is missing; a server has none."""
+    import tempfile
+    import types
+
+    tmp = tempfile.mkdtemp()
+    base = os.path.join(tmp, ".tv_datafeed") + os.sep
+
+    class PromptingTvDatafeed:
+        path = base
+
+        def __init__(self):
+            if not os.path.exists(self.path):
+                os.mkdir(self.path)
+                raise EOFError("EOF when reading a line")   # input() with no stdin
+            self.ws = None
+
+        def get_hist(self, symbol, exchange, interval, n_bars):
+            return _df()
+
+    fake = types.ModuleType("tvDatafeed")
+    fake.TvDatafeed = PromptingTvDatafeed
+    saved = sys.modules.get("tvDatafeed")
+    sys.modules["tvDatafeed"] = fake
+    tv_client._reset_for_tests()
+    try:
+        df = tv_client.get_hist("ES1!", "CME", "D", 10)
+        assert len(df) == 3
+        assert tv_client.status()["last_error"] is None
+        assert os.path.isdir(os.path.join(base, "chrome"))
+    finally:
+        if saved is not None:
+            sys.modules["tvDatafeed"] = saved
+        else:
+            sys.modules.pop("tvDatafeed", None)
+        tv_client._reset_for_tests()
+
+
+def test_construction_failure_is_retried_once():
+    calls = {"n": 0}
+
+    def factory():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise EOFError("EOF when reading a line")
+        return OverlapDetector()
+    df = _with(factory, lambda: tv_client.get_hist("ES1!", "CME", "D", 10))
+    assert len(df) == 3 and calls["n"] == 2
+
+
+def test_unknown_symbol_fails_fast_without_tripping_breaker():
+    """TradingView answers a bad symbol with symbol_error and never completes."""
+    class _Sock:
+        def __init__(self):
+            self.frames = iter([
+                '~m~87~m~{"m":"critical_error","p":["qs_x","invalid_parameters"]}',
+                '~m~60~m~{"m":"symbol_error","p":["cs_x","symbol_1","invalid symbol"]}',
+            ])
+            self.closed = threading.Event()
+
+        def recv(self):
+            try:
+                return next(self.frames)
+            except StopIteration:
+                self.closed.wait(60)          # TradingView goes quiet
+                raise ConnectionError("aborted")
+
+        def abort(self):
+            self.closed.set()
+
+        def close(self):
+            self.closed.set()
+
+    class FakeTv:
+        def __init__(self):
+            self.ws = None
+            self.constructed = True
+
+        def _TvDatafeed__create_connection(self):
+            self.ws = _Sock()
+
+        def get_hist(self, symbol, exchange, interval, n_bars):
+            self._TvDatafeed__create_connection()
+            while True:
+                try:
+                    frame = self.ws.recv()
+                except Exception:
+                    break
+                if "series_completed" in frame:
+                    break
+            return None
+
+    def run():
+        t0 = time.monotonic()
+        for _ in range(tv_client.BREAKER_THRESHOLD + 1):
+            try:
+                tv_client.get_hist("ES1!", "CME", "D", 10, timeout=5)
+                raise AssertionError("expected TVUnavailable")
+            except tv_client.TVUnavailable as exc:
+                assert "symbol_error" in str(exc)
+        assert time.monotonic() - t0 < 2.0, "symbol error waited for the deadline"
+        st = tv_client.status()
+        assert st["circuit_open"] is False and st["timeouts"] == 0
+    _with(lambda: tv_client._watch_symbol_errors(FakeTv()), run)
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0

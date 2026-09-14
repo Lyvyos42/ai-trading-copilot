@@ -319,7 +319,7 @@ def test_tradingview_loader_conversions():
     finally:
         sys.modules.pop("tvDatafeed", None)
 
-    assert es["volume_kind"] == "traded" and es["source"] == "tradingview:CME:ES1!", es["source"]
+    assert es["volume_kind"] == "traded" and es["source"] == "tradingview:CME_MINI:ES1!", es["source"]
     assert datetime.fromtimestamp(es["candles"][0]["time"], tz=NY) == datetime(2026, 10, 7, 9, 30, tzinfo=NY)
     assert [c["time"] for c in xau["candles"]] == [int(x.timestamp()) for x in gc_times]
     assert xau["volume_kind"] == "traded" and xau["candles"][-1]["close"] == 2400.0

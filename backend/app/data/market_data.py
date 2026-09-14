@@ -289,8 +289,10 @@ _TV_EXCHANGE: dict[str, tuple[str, str]] = {
     "ITA40":  ("IT40",   "TVC"),
     "STOXX50":("STOXX50","TVC"),
     # ── Index Futures (CME/CBOT) ──────────────────────────────────────────────
-    "ES":  ("ES1!",  "CME"),  "NQ":  ("NQ1!",  "CME"),
-    "YM":  ("YM1!",  "CBOT"), "RTY": ("RTY1!", "CME"),
+    # E-mini contracts are listed on TradingView under CME_MINI, not CME: "CME:ES1!"
+    # returns symbol_error (verified live 2026-09-14). YM1! resolves on CBOT.
+    "ES":  ("ES1!",  "CME_MINI"),  "NQ":  ("NQ1!",  "CME_MINI"),
+    "YM":  ("YM1!",  "CBOT"),      "RTY": ("RTY1!", "CME_MINI"),
 }
 
 # The TvDatafeed instance is owned by app/data/tv_client.py - the single,

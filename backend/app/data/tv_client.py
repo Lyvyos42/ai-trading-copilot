@@ -27,6 +27,12 @@ WHAT THIS DOES ABOUT EACH
   3. The socket is closed after every call, successful or not.
   4. A fast failure is retried once on a fresh client (a dropped socket is the common
      case). A timeout is not retried - it has already cost the deadline.
+  4b. A bad symbol fails FAST. tvDatafeed's recv loop exits only on
+     "series_completed", and TradingView never sends that for an unknown symbol - it
+     sends symbol_error / series_error and goes quiet, so the call used to hang to the
+     deadline (CME:ES1!, 25 s, observed live). The socket's recv is wrapped to abort on
+     those frames. The result is a symbol-level failure: no retry, no breaker count.
+     (Every request also receives a benign quote-session critical_error; it is ignored.)
   5. A circuit breaker: after BREAKER_THRESHOLD consecutive connection-level failures
      (exceptions or timeouts - not an empty result for one symbol) the gate opens for
      BREAKER_COOLDOWN_S and callers fail immediately. A host TradingView blocks (a
@@ -66,9 +72,53 @@ class TVUnavailable(RuntimeError):
 
 
 def _new_client():
-    """Constructed lazily; patched in tests."""
+    """Constructed lazily; patched in tests.
+
+    tvDatafeed's constructor calls __assert_dir(), which - when ~/.tv_datafeed/ does
+    not exist - creates it and then asks on stdin whether to install chromedriver.
+    A server has no stdin, so input() raises EOFError. Render's filesystem is
+    ephemeral and a free instance restarts after sleeping, so the FIRST construction
+    on every fresh container failed (observed on the live host 2026-09-14). The cache
+    and chrome-profile directories are created here first, so the prompt branch is
+    unreachable.
+    """
+    import os
     from tvDatafeed import TvDatafeed
-    return TvDatafeed()
+    base = getattr(TvDatafeed, "path", None)
+    if base:
+        os.makedirs(os.path.join(base, "chrome"), exist_ok=True)
+    return _watch_symbol_errors(TvDatafeed())
+
+
+_SYMBOL_ERROR_FRAMES = ('"m":"symbol_error"', '"m":"series_error"')
+
+
+def _watch_symbol_errors(client):
+    """Abort the socket as soon as TradingView reports an unknown symbol.
+
+    tvDatafeed opens a new socket inside get_hist through a name-mangled private
+    method; that method is wrapped on the instance so each new socket's recv is
+    watched. Flags `_tv_symbol_error` on the client for the gate to read.
+    """
+    create = getattr(client, "_TvDatafeed__create_connection", None)
+    if create is None:
+        return client
+
+    def create_and_watch():
+        create()
+        ws = client.ws
+        recv = ws.recv
+
+        def watched_recv():
+            frame = recv()
+            if any(tag in frame for tag in _SYMBOL_ERROR_FRAMES):
+                client._tv_symbol_error = frame[:200]
+                raise ConnectionAbortedError("TradingView symbol_error")
+            return frame
+        ws.recv = watched_recv
+
+    client._TvDatafeed__create_connection = create_and_watch
+    return client
 
 
 def _close_socket(client) -> None:
@@ -139,11 +189,20 @@ def get_hist(symbol: str, exchange: str, interval, n_bars: int,
                 try:
                     client = _state["client"] = _new_client()
                 except Exception as exc:
+                    if attempt == 1:
+                        continue                   # one retry, as for a failed call
                     reason = f"client construction failed: {type(exc).__name__}: {exc}"
                     _record_failure(reason, connection_level=True)
                     raise TVUnavailable(reason) from exc
 
+            client._tv_symbol_error = None
             df, err, timed_out = _attempt(client, symbol, exchange, interval, n_bars, timeout)
+            if getattr(client, "_tv_symbol_error", None):
+                # The connection is fine; the symbol is not. Keep the client, do not
+                # retry, do not count toward the breaker.
+                _record_failure(f"{exchange}:{symbol} symbol_error", connection_level=False)
+                raise TVUnavailable(f"TradingView does not recognise {exchange}:{symbol} "
+                                    f"(symbol_error)")
             if df is not None and len(df) > 0:
                 _state["consecutive_failures"] = 0
                 _state["last_ok_epoch"] = int(time.time())
