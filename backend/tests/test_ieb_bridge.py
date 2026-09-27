@@ -200,3 +200,17 @@ def test_research_numbers():
     assert research.auc([(80, True)])["auc"] is None
     neg = [{"resolved": True, "exit_reason": "stop", "r_multiple": -1.0 + 0.01 * i} for i in range(12)]
     assert research.finding(research.card(neg))["label"] == "NEGATIVE"
+
+
+def test_promotion_rules():
+    empty = research.card([])
+    assert research.promotion("DISABLED", empty, True)["next"] is None
+    assert "rebuilt" in research.promotion("BETA", empty, False, "rebuilt from paper history")["note"]
+    p = research.promotion("BETA", empty, True)
+    assert p["next"] == "LIVE" and not any(r["met"] for r in p["requirements"][:3])
+    good = [{"resolved": True, "exit_reason": "target" if i % 3 else "stop", "r_multiple": 1.0 if i % 3 else -1.0,
+             "direction_correct": bool(i % 3)} for i in range(200)]
+    p = research.promotion("BETA", research.card(good), True)
+    assert all(r["met"] for r in p["requirements"])
+    neg = [{"resolved": True, "exit_reason": "stop", "r_multiple": -1.0 + 0.01 * i} for i in range(12)]
+    assert research.promotion("SHADOW", research.card(neg), True)["requirements"][0]["met"] is False

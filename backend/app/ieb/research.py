@@ -195,3 +195,53 @@ def score_research(pairs: list[tuple[float, bool]]) -> dict:
     below = [w for s, w in pairs if s < 50]
     return {"n": len(pairs), "bands": bands, "below_50": len(below), "discrimination": auc(pairs),
             "n_needed_per_band_for_10pt_interval": n_for_rate_precision()}
+
+
+# ── promotion pipeline ───────────────────────────────────────────────────────
+PIPELINE = ["RESEARCH", "SHADOW", "BETA", "LIVE", "AUTOMATION_ELIGIBLE"]
+PIPELINE_RULES = {
+    "RESEARCH": "Idea or backtest only. No forward record yet.",
+    "SHADOW": "Runs forward; every signal and outcome is recorded and sent to Copilot. Not published.",
+    "BETA": "Published (Telegram / Copilot) with its sample shown, or 'insufficient sample'. Needs: no NEGATIVE "
+            "finding, and the owner's decision to publish.",
+    "LIVE": "Needs, on forward records of ONE code version: TP1-before-stop rate measured to +/-10 points, mean R "
+            "measured to +/-0.25 R, and the mean-R interval above zero before costs.",
+    "AUTOMATION_ELIGIBLE": "Needs: the LIVE conditions still met after a measured execution profile (costs, "
+                           "slippage), and a Prop Guard risk profile. Switched on only by the owner.",
+    "DEMOTION": "A NEGATIVE finding (mean-R interval below zero, n >= 10) moves a module back to SHADOW. A code or "
+                "parameter change starts a new version with its own record.",
+}
+
+
+def promotion(status: str | None, c: dict, forward: bool, not_forward_note: str | None = None) -> dict:
+    """Which rules for the next pipeline step are met, computed from the card. Never promotes by itself."""
+    r, tp = c["r"], c["tp1_before_stop"]
+    neg = finding(c)["label"] == "NEGATIVE"
+    reqs: list[dict] = []
+    if status in (None, "DISABLED", "RETIRED", "PAUSED"):
+        return {"next": None, "requirements": [], "note": "not running - no promotion path until it is switched on"}
+    if not forward:
+        return {"next": None, "requirements": [],
+                "note": not_forward_note or "promotion counts forward records of one code version only"}
+    if status in ("RESEARCH", "SHADOW"):
+        nxt = "SHADOW" if status == "RESEARCH" else "BETA"
+        reqs.append({"rule": "no NEGATIVE finding", "met": not neg})
+        reqs.append({"rule": "owner decides to publish", "met": None, "detail": "a decision, not a measurement"})
+        return {"next": nxt, "requirements": reqs}
+    need_tp = max(0, n_for_rate_precision(p=tp["rate"] if tp["rate"] is not None else 0.5) - tp["n"])
+    live = [
+        {"rule": "TP1-before-stop rate measured to +/-10 points", "met": bool(tp["adequate"]),
+         "detail": f"n={tp['n']}" + (f", about {need_tp} more target/stop outcomes" if not tp["adequate"] else "")},
+        {"rule": "mean R measured to +/-0.25 R", "met": bool(r.get("adequate")),
+         "detail": f"n={r['n']}" + (f", half-width {r['half_width']:.2f} R" if r.get("half_width") is not None else "")},
+        {"rule": "mean-R interval above zero before costs", "met": r.get("lo") is not None and r["lo"] > 0},
+        {"rule": "no NEGATIVE finding", "met": not neg},
+    ]
+    if status == "BETA":
+        return {"next": "LIVE", "requirements": live}
+    if status == "LIVE":
+        return {"next": "AUTOMATION_ELIGIBLE", "requirements": live + [
+            {"rule": "LIVE conditions hold after a measured execution profile", "met": None,
+             "detail": "execution-layer results are recorded; the profile check is not computed here yet"},
+            {"rule": "Prop Guard risk profile attached", "met": None, "detail": "set by the owner"}]}
+    return {"next": None, "requirements": []}

@@ -465,6 +465,14 @@ async def lab_modules(db: AsyncSession = Depends(get_db)):
                                            "outcome_definition": COPILOT_OUTCOME_DEF} if copilot_meta else None)),
                 **_population(recs),
             }
+            status_ = (entry["registry"] or {}).get("status")
+            if ver == "unknown_at_backfill":
+                fwd, why = False, "rebuilt from paper history - informative, not a forward record of one version"
+            elif ver.startswith("unversioned"):
+                fwd, why = False, "made before versioning - the code version that produced these is not known"
+            else:
+                fwd, why = True, None
+            entry["promotion"] = R.promotion(status_, entry["card"], fwd, why)
             if mid.startswith("copilot_"):
                 entry["direction_disagrees_with_votes"] = sum(1 for r in recs if r.get("direction_vs_votes") == "disagrees")
             mod["versions"][ver] = entry
@@ -477,11 +485,12 @@ async def lab_modules(db: AsyncSession = Depends(get_db)):
                 "signals": c["signals"], "resolved": c["resolved"],
                 "tp1_before_stop": c["tp1_before_stop"]["rate"], "tp1_n": c["tp1_before_stop"]["n"],
                 "mean_r": c["r"]["mean"], "r_lo": c["r"]["lo"], "r_hi": c["r"]["hi"], "r_n": c["r"]["n"],
-                "finding": e["finding"]["label"],
+                "finding": e["finding"]["label"], "next_step": e["promotion"]["next"],
                 "score": "none" if not c["score_distribution"]["n"] else "consensus score recorded",
             })
     return {"generated_at": _now().isoformat() + "Z", "definitions": R.__doc__, "modules": modules,
-            "comparison": comparison, "sample_rules": {"rate_half_width": R.RATE_HALF_WIDTH,
+            "comparison": comparison, "pipeline": R.PIPELINE, "pipeline_rules": R.PIPELINE_RULES,
+            "sample_rules": {"rate_half_width": R.RATE_HALF_WIDTH,
                                                         "mean_r_half_width": R.R_HALF_WIDTH,
                                                         "n_for_10pt_rate_at_p_0_5": R.n_for_rate_precision()}}
 
