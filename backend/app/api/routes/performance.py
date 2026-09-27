@@ -186,6 +186,34 @@ async def by_agent(db: AsyncSession = Depends(get_db), user: dict = Depends(get_
     return {"agents": leaderboard}
 
 
+# ─── Model-level calibration (public, aggregate only) ────────────────────────
+# The one endpoint here that is NOT scoped to the caller, on purpose: it answers
+# "when the Copilot shows X%, how often did such signals reach take-profit 1
+# first?" for the model as a whole. It returns counts per 10-point band only -
+# no user ids, tickers or individual signals - so it leaks no tenant's record.
+_GLOBAL_CAL_CACHE: dict = {"at": 0.0, "data": None}
+
+
+@router.get("/calibration/global")
+async def calibration_global(db: AsyncSession = Depends(get_db)):
+    import time
+    from app.services.calibration import global_calibration
+
+    now = time.time()
+    if _GLOBAL_CAL_CACHE["data"] is not None and now - _GLOBAL_CAL_CACHE["at"] < 600:
+        return _GLOBAL_CAL_CACHE["data"]
+    result = await db.execute(
+        select(Signal.signal_mode, Signal.direction, Signal.probability_score,
+               Signal.confidence_score, Signal.outcome)
+        .where(Signal.status.notin_(_UNSCORED))
+        .where(Signal.outcome.in_(["WIN", "LOSS", "EXPIRED", "AMBIGUOUS"]))
+    )
+    data = global_calibration(result.all())
+    data["cached_seconds"] = 600
+    _GLOBAL_CAL_CACHE.update(at=now, data=data)
+    return data
+
+
 @router.get("/calibration")
 async def calibration(db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     """Confidence vs actual win rate — bucketed by 10% intervals."""

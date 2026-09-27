@@ -4,6 +4,7 @@ import { useState, memo } from "react";
 import { Clock, Shield, Zap, ChevronDown, ChevronUp, Target, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
 import { type Signal, executePosition, resolveSignal } from "@/lib/api";
 import { formatPrice, timeAgo, formatPositionSize } from "@/lib/utils";
+import ConfidenceNote from "@/components/ConfidenceNote";
 import { cn } from "@/lib/utils";
 
 const AGENT_LABELS: Record<string, string> = {
@@ -493,6 +494,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
             <span className="text-[14px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
           </div>
           <ProbabilityBar bullPct={bullPct} bearPct={bearPct} tall />
+          {!isNoSignal && <ConfidenceNote signal={signal} pct={displayPct} />}
         </div>
 
         {/* Research Target + Invalidation Level + R:R + Position Size */}
@@ -565,7 +567,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
               {formatPositionSize(signal.position_size_pct)}
             </div>
             <div className="text-[13px] font-mono text-muted-foreground mt-0.5">
-              {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "Kelly-adjusted" : "uncalibrated"}
+              {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "half-Kelly, measured win rate" : "not sized: no measured win rate"}
             </div>
           </div>
         </div>

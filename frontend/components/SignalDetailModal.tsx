@@ -3,6 +3,7 @@
 import { X, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { cn, formatPrice, formatPositionSize } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
+import ConfidenceNote from "@/components/ConfidenceNote";
 
 interface SignalDetailModalProps {
   signal: Signal;
@@ -93,6 +94,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                 <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
                 <div className="bg-[hsl(var(--bear)/0.7)] transition-all" style={{ width: `${bearPct}%` }} />
               </div>
+              <ConfidenceNote signal={signal} pct={isBullish ? bullPct : bearPct} />
             </div>
 
             {/* Research Target + Invalidation + R:R + Position Size */}
@@ -133,7 +135,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
                   {formatPositionSize(signal.position_size_pct)}
                 </span>
                 <span className="text-[13px] font-mono text-muted-foreground mt-0.5">
-                  {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "Kelly-adjusted" : "uncalibrated"}
+                  {typeof signal.position_size_pct === "number" && signal.position_size_pct > 0 ? "half-Kelly, measured win rate" : "not sized: no measured win rate"}
                 </span>
               </div>
             </div>
