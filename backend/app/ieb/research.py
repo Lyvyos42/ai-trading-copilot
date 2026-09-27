@@ -41,9 +41,17 @@ def wilson(k: int, n: int) -> tuple[float | None, float | None]:
     return max(0.0, c - h), min(1.0, c + h)
 
 
+# exact Student-t 97.5% quantiles for small df (the expansion below is too narrow at df 1-2)
+_T975 = {1: 12.7062, 2: 4.3027, 3: 3.1824, 4: 2.7764, 5: 2.5706, 6: 2.4469, 7: 2.3646, 8: 2.3060,
+         9: 2.2622, 10: 2.2281}
+
+
 def t_crit(df: int) -> float:
+    """Student-t 97.5% quantile: exact table for df <= 10, Cornish-Fisher expansion above (error < 0.1%)."""
     if df <= 0:
         return float("nan")
+    if df in _T975:
+        return _T975[df]
     z = Z
     return (z + (z ** 3 + z) / (4 * df) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * df ** 2)
             + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * df ** 3))
