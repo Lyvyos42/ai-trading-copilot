@@ -376,13 +376,13 @@ function Pipeline({ lab }: { lab: LabModules }) {
           <li key={s} className="border border-border/50 rounded p-3">
             <div className="flex items-center justify-between mb-1">
               <span className="font-mono text-[12px] font-bold tracking-wider">{i + 1}. {s.replace("_", " ")}</span>
-              <span className="font-mono text-[12px] text-muted-foreground">{counts[s] ?? 0} modules</span>
+              <span className="font-mono text-[12px] text-muted-foreground">{counts[s] ?? 0} {(counts[s] ?? 0) === 1 ? "module" : "modules"}</span>
             </div>
             <p className="text-[12px] text-foreground/70 leading-relaxed">{lab.pipeline_rules[s]}</p>
           </li>))}
       </ol>
       <p className="text-[12px] text-foreground/70 mt-3">{lab.pipeline_rules.DEMOTION}</p>
-      <p className="text-[12px] text-muted-foreground mt-1">Switched off: {counts.DISABLED ?? 0} modules.</p>
+      <p className="text-[12px] text-muted-foreground mt-1">Switched off: {counts.DISABLED ?? 0} {(counts.DISABLED ?? 0) === 1 ? "module" : "modules"}.</p>
     </Panel>
   );
 }
