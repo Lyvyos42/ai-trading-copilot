@@ -578,8 +578,8 @@ export default function AgentPerformancePage() {
             A signal is scored WIN only if market price action touches the research target within the analytical window. A signal is marked LOSS if price touches the invalidation level first. Signals that expire without touching either level are excluded from win-rate calculation.
           </div>
           <div>
-            <div className="text-foreground font-bold mb-1">Truth Layer Guarantee</div>
-            All simulated fills, RNG fallbacks, and synthetic benchmark histories have been permanently eliminated. No plausible estimates are used to fill missing market data. What you see is genuine execution history.
+            <div className="text-foreground font-bold mb-1">Data integrity</div>
+            All simulated fills, RNG fallbacks, and synthetic benchmark histories have been permanently eliminated. No plausible estimates are used to fill missing market data. What you see is the real outcome history of the signals.
           </div>
         </div>
       </div>

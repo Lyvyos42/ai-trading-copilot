@@ -9,7 +9,7 @@ const SECTIONS = [
     description: "Your central hub. View watchlist tickers with live price data, a quick-glance signal feed, portfolio summary, and market overview. Add or remove tickers from your watchlist to customize your monitoring.",
     features: [
       "Watchlist with real-time price indicators",
-      "Latest signal feed with probability scores",
+      "Latest signal feed with Consensus Scores",
       "Portfolio equity snapshot",
       "Quick-access navigation to all tools",
     ],
@@ -20,7 +20,7 @@ const SECTIONS = [
     href: "/signals",
     description: "The core intelligence engine. Enter any ticker and timeframe to run a full 9-agent analysis pipeline. Each agent (Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant, Risk Manager) independently evaluates the asset before the Trader agent produces a probability-based consensus.",
     features: [
-      "Probability score (0-100) instead of simple BUY/SELL",
+      "Consensus Score (0-100), not a probability - with the Historical Outcome Rate for its band",
       "Research target and invalidation level",
       "Risk/Reward ratio calculation",
       "Bull case and bear case narratives from each agent",
