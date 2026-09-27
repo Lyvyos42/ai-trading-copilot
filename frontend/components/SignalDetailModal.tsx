@@ -87,8 +87,8 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
             {/* Probability bar */}
             <div className="mb-4">
               <div className="flex justify-between text-[14px] font-mono mb-1">
-                <span className="text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
-                <span className="text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
+                <span className="text-bull font-bold">BULLISH {bullPct.toFixed(0)}/100</span>
+                <span className="text-bear font-bold">BEARISH {bearPct.toFixed(0)}/100</span>
               </div>
               <div className="w-full flex h-2.5 rounded overflow-hidden">
                 <div className="bg-[hsl(var(--bull)/0.7)] transition-all" style={{ width: `${bullPct}%` }} />
@@ -149,6 +149,7 @@ export function SignalDetailModal({ signal, onClose }: SignalDetailModalProps) {
             <span>WINDOW: <span className="text-[hsl(var(--foreground))] font-bold">{signal.analytical_window}</span></span>
           )}
           <span><Clock className="inline h-3 w-3" /> {new Date(signal.timestamp).toLocaleString()}</span>
+          <span title="Code version that produced this signal">version {signal.signal_version || "before versioning"}</span>
         </div>
 
         {/* Bull / Bear cases */}

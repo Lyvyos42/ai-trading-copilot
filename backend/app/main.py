@@ -62,6 +62,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE signals ADD COLUMN conviction_tier VARCHAR",
             # Signal mode column (auto-scanner)
             "ALTER TABLE signals ADD COLUMN signal_mode VARCHAR(20) DEFAULT 'AI'",
+            # Code version that produced each signal (directive s39)
+            "ALTER TABLE signals ADD COLUMN signal_version VARCHAR(40)",
             # User model — active_profile column (Phase 3)
             "ALTER TABLE users ADD COLUMN active_profile VARCHAR DEFAULT 'balanced'",
             # Stripe billing columns

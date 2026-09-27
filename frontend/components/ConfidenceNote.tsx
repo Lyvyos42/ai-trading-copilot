@@ -45,21 +45,20 @@ export default function ConfidenceNote({ signal, pct }: { signal: Signal; pct: n
   const band = cal?.modes?.[mode]?.vote_share?.bands?.find(b => b.band === bandName);
 
   let record: string;
-  if (cal === undefined) record = "Loading the track record for this band…";
-  else if (cal === null) record = "Track record unavailable right now.";
-  else if (!band || band.n === 0) record = `No resolved signals in the ${bandName}% band yet.`;
-  else if (!band.enough) record = `Signals shown ${bandName}%: only ${band.n} resolved so far - not enough to compare.`;
-  else record = `Signals shown ${bandName}%: ${band.n} resolved, ${band.wins} reached take-profit 1 before the stop (${band.observed_pct.toFixed(0)}%, 95% range ${band.lo_pct.toFixed(0)}-${band.hi_pct.toFixed(0)}%).`;
+  if (cal === undefined) record = "Loading the Historical Outcome Rate for this band…";
+  else if (cal === null) record = "Historical Outcome Rate unavailable right now.";
+  else if (!band || !band.enough) record = `Historical Outcome Rate for ${bandName} score signals: insufficient sample (${band?.n ?? 0} resolved). Not enough historical signals to establish a measured rate.`;
+  else record = `Historical TP1-before-stop rate for ${bandName} score signals: ${band.observed_pct.toFixed(0)}% · Sample: ${band.n} · 95% interval: ${band.lo_pct.toFixed(0)}-${band.hi_pct.toFixed(0)}%`;
 
   return (
     <div className="mt-2 rounded border border-border/60 bg-background/40 px-2.5 py-2 text-[12px] leading-snug font-mono text-muted-foreground">
       <div>
-        <span className="text-foreground">{Math.round(pct)}%</span> = share of the analysts&apos; votes on this side.{" "}
-        <span className="text-warn">Not a measured probability.</span>
+        <span className="text-foreground">{Math.round(pct)}/100 Consensus Score</span> = how strongly the analysts agree on this side.{" "}
+        <span className="text-warn">Not a probability.</span>
       </div>
       <div className="mt-1">{record}</div>
       <a href={EXPLAINER} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-primary/80 hover:text-primary underline-offset-2 hover:underline">
-        What the percentage means
+        What the score means
       </a>
     </div>
   );

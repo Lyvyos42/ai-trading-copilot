@@ -87,10 +87,14 @@ def calibrate(pairs: Iterable[tuple[float, bool]]) -> dict:
 
 
 def global_calibration(rows: Iterable) -> dict:
-    """rows: (signal_mode, direction, probability_score, confidence_score, outcome)."""
+    """rows: (signal_mode, direction, probability_score, confidence_score, outcome[, signal_version])."""
     by_mode: dict[str, dict] = defaultdict(lambda: {"vote_share": [], "confidence": [], "expired": 0, "ambiguous": 0,
                                                     "direction_disagrees_with_votes": 0})
-    for mode, direction, prob, conf, outcome in rows:
+    versions: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for row in rows:
+        mode, direction, prob, conf, outcome = row[:5]
+        version = (row[5] if len(row) > 5 else None) or "unversioned (before 2026-09-27)"
+        versions[mode or "AI"][version] += 1
         m = by_mode[mode or "AI"]
         if outcome == "EXPIRED":
             m["expired"] += 1
@@ -115,6 +119,7 @@ def global_calibration(rows: Iterable) -> dict:
     for mode, m in sorted(by_mode.items()):
         modes[mode] = {"vote_share": calibrate(m["vote_share"]), "confidence": calibrate(m["confidence"]),
                        "expired": m["expired"], "ambiguous": m["ambiguous"],
-                       "direction_disagrees_with_votes": m["direction_disagrees_with_votes"]}
+                       "direction_disagrees_with_votes": m["direction_disagrees_with_votes"],
+                       "versions": dict(versions[mode])}
     return {"definitions": DEFINITIONS, "outcome_definition": OUTCOME_DEFINITION, "band_width": BAND,
             "min_n_to_compare": MIN_N_TO_COMPARE, "modes": modes}

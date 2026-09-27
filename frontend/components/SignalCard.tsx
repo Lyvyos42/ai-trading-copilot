@@ -174,7 +174,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
               "text-[13px] font-mono font-semibold px-1.5 rounded border",
               leanBg, leanColor
             )}>
-              {Math.round(displayPct)}% {lean}
+              {Math.round(displayPct)}/100 {lean}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -490,8 +490,8 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
         {/* Probability bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[14px] font-mono text-bull font-bold">{bullPct.toFixed(0)}% BULLISH</span>
-            <span className="text-[14px] font-mono text-bear font-bold">{bearPct.toFixed(0)}% BEARISH</span>
+            <span className="text-[14px] font-mono text-bull font-bold">BULLISH {bullPct.toFixed(0)}/100</span>
+            <span className="text-[14px] font-mono text-bear font-bold">BEARISH {bearPct.toFixed(0)}/100</span>
           </div>
           <ProbabilityBar bullPct={bullPct} bearPct={bearPct} tall />
           {!isNoSignal && <ConfidenceNote signal={signal} pct={displayPct} />}
@@ -767,9 +767,9 @@ function ProbabilityDonut({ score, isBullish }: { score: number; isBullish?: boo
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-[13px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}%</span>
-        <span className="text-[11px] font-mono text-muted-foreground leading-none mt-0.5">
-          {isBull ? "BULL" : "BEAR"}
+        <span className="text-[13px] font-mono font-bold leading-none" style={{ color }}>{Math.round(score)}</span>
+        <span className="text-[10px] font-mono text-muted-foreground leading-none mt-0.5">
+          /100 {isBull ? "BULL" : "BEAR"}
         </span>
       </div>
     </div>

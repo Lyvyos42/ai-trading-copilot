@@ -9,6 +9,7 @@ import math
 import os
 import time
 import uuid
+from app.services.signal_version import SIGNAL_VERSION
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -475,6 +476,7 @@ async def generate_signal(
         bear_case=final.get("bear_case"),
         conviction_tier=final.get("conviction_tier"),
         signal_mode=final.get("signal_mode", "AI"),
+        signal_version=SIGNAL_VERSION,
     )
 
     # Save to DB — non-blocking: return signal even if DB write fails.
@@ -855,6 +857,7 @@ def _signal_to_dict(signal: Signal, state: dict | None = None, current_price: fl
         "timestamp": (signal.created_at.isoformat() + "Z") if signal.created_at else None,
         "expiry_time": (signal.expiry_time.isoformat() + "Z") if signal.expiry_time else None,
         "signal_mode": getattr(signal, "signal_mode", None) or "AI",
+        "signal_version": getattr(signal, "signal_version", None),
     }
     if state:
         d["pipeline_latency_ms"] = state.get("pipeline_latency_ms")

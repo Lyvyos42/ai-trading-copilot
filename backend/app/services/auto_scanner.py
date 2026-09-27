@@ -11,6 +11,7 @@ zero-cost system. Signals are tagged with signal_mode="AUTO_SCAN" so the
 frontend can distinguish them from manual AI analysis.
 """
 import asyncio
+from app.services.signal_version import SIGNAL_VERSION
 from datetime import datetime, timedelta
 
 import structlog
@@ -348,6 +349,7 @@ async def _generate_signal_for_user(
             timeframe_levels=final.get("timeframe_levels", {}),
             status="ACTIVE",
             signal_mode="AUTO_SCAN",
+            signal_version=SIGNAL_VERSION,
             # Honour the thesis window. A hardcoded 24h gave a 3.5-ATR target
             # one day to be reached while the 1.5-ATR stop only needed a normal
             # session's range — the stop was reachable and the target was not,

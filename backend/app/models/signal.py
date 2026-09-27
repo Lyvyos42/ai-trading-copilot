@@ -62,6 +62,8 @@ class Signal(Base):
     bear_case: Mapped[str | None] = mapped_column(Text, nullable=True)
     conviction_tier: Mapped[str | None] = mapped_column(String, nullable=True)
     signal_mode: Mapped[str | None] = mapped_column(String(20), nullable=True, default="AI")
+    # Code version that produced the signal (app/services/signal_version.py). Never rewritten.
+    signal_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     expiry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

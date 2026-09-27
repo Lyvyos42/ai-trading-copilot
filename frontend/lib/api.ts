@@ -238,6 +238,7 @@ export interface Signal {
   timestamp: string;
   expiry_time: string;
   signal_mode?: string | null;
+  signal_version?: string | null;
   pipeline_latency_ms?: number;
   agent_detail?: Record<string, unknown>;
 }

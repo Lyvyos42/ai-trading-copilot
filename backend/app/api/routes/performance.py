@@ -204,7 +204,7 @@ async def calibration_global(db: AsyncSession = Depends(get_db)):
         return _GLOBAL_CAL_CACHE["data"]
     result = await db.execute(
         select(Signal.signal_mode, Signal.direction, Signal.probability_score,
-               Signal.confidence_score, Signal.outcome)
+               Signal.confidence_score, Signal.outcome, Signal.signal_version)
         .where(Signal.status.notin_(_UNSCORED))
         .where(Signal.outcome.in_(["WIN", "LOSS", "EXPIRED", "AMBIGUOUS"]))
     )

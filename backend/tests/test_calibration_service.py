@@ -41,3 +41,11 @@ def test_signal_trading_against_the_vote_majority_is_counted_not_calibrated():
     ai = g["modes"]["AI"]
     assert ai["direction_disagrees_with_votes"] == 1
     assert ai["vote_share"]["n"] == 1 and ai["confidence"]["n"] == 1
+
+
+def test_versions_are_reported_and_old_rows_labelled():
+    g = global_calibration([("AI", "LONG", 70.0, 60.0, "WIN", "copilot-abc1234"),
+                            ("AI", "LONG", 72.0, 60.0, "LOSS", None),
+                            ("AI", "LONG", 71.0, 60.0, "WIN")])
+    v = g["modes"]["AI"]["versions"]
+    assert v["copilot-abc1234"] == 1 and v["unversioned (before 2026-09-27)"] == 2
