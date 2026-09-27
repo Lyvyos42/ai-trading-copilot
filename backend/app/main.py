@@ -16,6 +16,7 @@ from app.api.routes.scanner import router as scanner_router, alerts_router
 from app.api.routes.paper_trading import router as paper_trading_router
 from app.api.routes.billing import router as billing_router
 from app.api.websocket import router as ws_router
+from app.ieb.routes import router as ieb_router, lab_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 log = structlog.get_logger()
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
         import app.models.news   # noqa: F401
         import app.models.alert  # noqa: F401
         import app.models.memory  # noqa: F401
+        import app.ieb.models  # noqa: F401
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -198,6 +200,8 @@ app.include_router(rebal.router)
 app.include_router(paper_trading_router)
 app.include_router(billing_router)
 app.include_router(ws_router)
+app.include_router(ieb_router)
+app.include_router(lab_router)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────
