@@ -221,3 +221,15 @@ def test_pause_notice_shows_paused_then_resumes(client):
     assert client.get("/api/v1/ieb/status").json()["instances"][0]["state"] == "PAUSED"
     signed(client, "/api/v1/ieb/heartbeat", {"paused": False})
     assert client.get("/api/v1/ieb/status").json()["instances"][0]["state"] == "CONNECTED"
+
+
+def test_telegram_record_counts_only_posted_signals(client):
+    signed(client, "/api/v1/ieb/signals", {"signals": [sig_payload("sig_posted_000001"), sig_payload("sig_notposted_0001")]})
+    signed(client, "/api/v1/ieb/telegram", {"items": [{"signal_id": "sig_posted_000001", "kind": "signal", "message_id": 7}]})
+    rec = client.get("/api/v1/ieb/telegram-record").json()
+    assert rec["posted"] == 1 and rec["open"] == 1 and rec["signals"][0]["telegram_url"] == "https://t.me/NeuralICC/7"
+    signed(client, "/api/v1/ieb/outcomes", {"outcomes": [{"signal_id": "sig_posted_000001", "exit_reason": "stop",
+                                                          "r_multiple": -1.0, "exit_timestamp": "2026-09-28T10:00:00+00:00"}]})
+    rec = client.get("/api/v1/ieb/telegram-record").json()
+    assert rec["open"] == 0 and rec["results"]["stop"] == 1 and rec["total_r"] == -1.0
+    assert rec["cumulative"][-1]["cum_r"] == -1.0

@@ -14,6 +14,7 @@ Signed (Ed25519, app/ieb/auth.py) - only an IEB installation can write:
 Public, read-only (aggregates and the signal records the public channel already shows):
     GET /api/v1/ieb/status            CONNECTED | DEGRADED | OFFLINE | PAUSED | UNAUTHENTICATED per instance
     GET /api/v1/ieb/signals/recent    newest IEB signals with module, version and outcome
+    GET /api/v1/ieb/telegram-record   the signals posted to the Telegram channel, results and running totals
     GET /api/v1/lab/modules           registry + research card per module version (IEB and Copilot)
     GET /api/v1/lab/score             Consensus Score research for the Copilot signal generators
 """
@@ -377,6 +378,43 @@ async def recent_signals(limit: int = 50, source: str | None = None, db: AsyncSe
         q = q.where(IebSignal.source == source)
     rows = (await db.execute(q)).scalars().all()
     return {"signals": [_public_signal(s) for s in rows]}
+
+
+# ── Telegram record: the public forward record, only what was actually posted ─
+TELEGRAM_CHANNEL = "NeuralICC"          # public username of the IEB channel (Bot API getChat, 2026-09-27)
+
+
+def _tg_link(mid: int | None) -> str | None:
+    return f"https://t.me/{TELEGRAM_CHANNEL}/{mid}" if mid else None
+
+
+@router.get("/telegram-record")
+async def telegram_record(db: AsyncSession = Depends(get_db)):
+    """Every signal posted to the channel, its result, and running totals over exactly those
+    signals - nothing selected afterwards, unknown exits shown and not counted."""
+    rows = (await db.execute(select(IebSignal).where(IebSignal.telegram_message_id.isnot(None))
+                             .order_by(IebSignal.generated_at.desc()))).scalars().all()
+    recs = [{**_ieb_rec(s), "module_id": s.module_id} for s in rows]
+    c = R.card(recs)
+    resolved = sorted((s for s in rows if s.resolved and s.r_multiple is not None and s.exit_reason != "unknown"),
+                      key=lambda s: s.exit_timestamp or s.generated_at)
+    cum, series = 0.0, []
+    for s in resolved:
+        cum += s.r_multiple
+        series.append({"t": _iso(s.exit_timestamp or s.generated_at), "r": round(s.r_multiple, 4), "cum_r": round(cum, 4),
+                       "signal_id": s.signal_id})
+    counts = {k: sum(1 for s in rows if s.resolved and s.exit_reason == k) for k in ("target", "stop", "other", "unknown", "no_stop")}
+    return {
+        "channel": f"https://t.me/{TELEGRAM_CHANNEL}",
+        "posted": len(rows), "open": sum(1 for s in rows if not s.resolved), "results": counts,
+        "tp1_before_stop": c["tp1_before_stop"], "r": c["r"], "total_r": round(cum, 4),
+        "by_module": R.breakdown(recs, "module_id"), "cumulative": series,
+        "signals": [{**_public_signal(s), "telegram_url": _tg_link(s.telegram_message_id),
+                     "result_url": _tg_link(s.telegram_outcome_message_id)} for s in rows],
+        "definitions": {"r": "signed move from entry to exit / distance from entry to stop, at the module's own prices, before costs",
+                        "tp1_before_stop": "among results that ended at TP1 or at the stop, the share that reached TP1 first",
+                        "unknown": "exit price not known - shown, never counted as zero"},
+    }
 
 
 # ── Signal Lab ───────────────────────────────────────────────────────────────

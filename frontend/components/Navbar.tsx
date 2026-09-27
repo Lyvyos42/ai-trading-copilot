@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { href: "/performance",  label: "PERFORMANCE",  Icon: IconSignal },
   { href: "/agent-performance", label: "AI RESULTS", Icon: IconBacktest },
   { href: "/signal-lab",   label: "SIGNAL LAB",   Icon: IconGrid },
+  { href: "/telegram-record", label: "TG RECORD", Icon: IconSignal },
   { href: "/journal",      label: "JOURNAL",      Icon: IconPortfolio },
   { href: "/news",         label: "INTEL",        Icon: IconIntel },
   { href: "/portfolio",    label: "PORTFOLIO",    Icon: IconPortfolio },
