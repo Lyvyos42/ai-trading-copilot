@@ -66,6 +66,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE signals ADD COLUMN signal_mode VARCHAR(20) DEFAULT 'AI'",
             # Code version that produced each signal (directive s39)
             "ALTER TABLE signals ADD COLUMN signal_version VARCHAR(40)",
+            # IEB switched its Copilot connection off on purpose (shown as PAUSED)
+            "ALTER TABLE ieb_instances ADD COLUMN paused BOOLEAN",
             # User model — active_profile column (Phase 3)
             "ALTER TABLE users ADD COLUMN active_profile VARCHAR DEFAULT 'balanced'",
             # Stripe billing columns

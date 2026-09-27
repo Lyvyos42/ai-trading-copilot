@@ -105,6 +105,8 @@ class IebInstance(Base):
     last_error_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_auth_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     backlog: Mapped[dict] = mapped_column(JSONEncodedValue, nullable=False, default=dict)
+    # switched off on purpose in IEB (its COPILOT header switch): shown as PAUSED, not OFFLINE
+    paused: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     modules_active: Mapped[list] = mapped_column(JSONEncodedValue, nullable=False, default=list)
     # Copilot -> IEB: handed back on every heartbeat. IEB records it; the local instance stays the
     # execution authority and acts on nothing here until that is built and switched on explicitly.

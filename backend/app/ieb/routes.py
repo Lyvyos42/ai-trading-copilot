@@ -12,7 +12,7 @@ Signed (Ed25519, app/ieb/auth.py) - only an IEB installation can write:
     A bad or missing signature answers 401 {"status": "unauthorized"}.
 
 Public, read-only (aggregates and the signal records the public channel already shows):
-    GET /api/v1/ieb/status            CONNECTED | DEGRADED | OFFLINE | UNAUTHENTICATED per instance
+    GET /api/v1/ieb/status            CONNECTED | DEGRADED | OFFLINE | PAUSED | UNAUTHENTICATED per instance
     GET /api/v1/ieb/signals/recent    newest IEB signals with module, version and outcome
     GET /api/v1/lab/modules           registry + research card per module version (IEB and Copilot)
     GET /api/v1/lab/score             Consensus Score research for the Copilot signal generators
@@ -311,6 +311,7 @@ async def heartbeat(request: Request, db: AsyncSession = Depends(get_db)):
     body = await request.json()
     inst = await _instance(db, instance_id)
     inst.last_heartbeat = inst.last_request_ok_at = _now()
+    inst.paused = bool(body.get("paused"))
     inst.version = str(body.get("version") or "")[:64] or None
     inst.backlog = body.get("backlog") if isinstance(body.get("backlog"), dict) else {}
     inst.modules_active = body.get("modules_active") if isinstance(body.get("modules_active"), list) else []
@@ -327,6 +328,8 @@ def connection_state(inst: IebInstance, now: datetime | None = None) -> str:
     now = now or _now()
     if inst.last_auth_failure_at and (inst.last_request_ok_at is None or inst.last_auth_failure_at > inst.last_request_ok_at):
         return "UNAUTHENTICATED"
+    if inst.paused:
+        return "PAUSED"                              # switched off in IEB on purpose
     if inst.last_heartbeat is None or now - inst.last_heartbeat > timedelta(seconds=HEARTBEAT_OK_SECONDS):
         return "OFFLINE"
     pending = sum(int(v) for v in (inst.backlog or {}).values() if isinstance(v, (int, float)))

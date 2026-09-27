@@ -214,3 +214,10 @@ def test_promotion_rules():
     assert all(r["met"] for r in p["requirements"])
     neg = [{"resolved": True, "exit_reason": "stop", "r_multiple": -1.0 + 0.01 * i} for i in range(12)]
     assert research.promotion("SHADOW", research.card(neg), True)["requirements"][0]["met"] is False
+
+
+def test_pause_notice_shows_paused_then_resumes(client):
+    assert signed(client, "/api/v1/ieb/heartbeat", {"paused": True}).status_code == 200
+    assert client.get("/api/v1/ieb/status").json()["instances"][0]["state"] == "PAUSED"
+    signed(client, "/api/v1/ieb/heartbeat", {"paused": False})
+    assert client.get("/api/v1/ieb/status").json()["instances"][0]["state"] == "CONNECTED"

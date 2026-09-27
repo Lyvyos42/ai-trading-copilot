@@ -94,6 +94,7 @@ const STATE_STYLE: Record<string, { cls: string; text: string }> = {
   DEGRADED: { cls: "text-amber-300 border-amber-400/40 bg-amber-400/10", text: "Connected, but with a recent error or a delivery backlog." },
   OFFLINE: { cls: "text-muted-foreground border-border", text: "No heartbeat in the last 3 minutes - IEB is off, or its PC is." },
   UNAUTHENTICATED: { cls: "text-bear border-bear/40 bg-bear/10", text: "The last request carrying this instance id failed its signature check." },
+  PAUSED: { cls: "text-sky-300 border-sky-400/30 bg-sky-400/10", text: "Switched off on purpose in IEB. Signals made meanwhile are sent when it is switched back on." },
 };
 
 function Badge({ children, cls }: { children: React.ReactNode; cls: string }) {
