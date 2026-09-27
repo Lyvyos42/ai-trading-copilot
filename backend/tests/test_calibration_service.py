@@ -34,3 +34,10 @@ def test_global_keeps_modes_and_definitions_apart_and_skips_unscored():
     assert ai["vote_share"]["n"] == 2                       # neutral has no side
     assert ai["confidence"]["n"] == 3                       # neutral still has a confidence
     assert "not a measured probability" in g["definitions"]["vote_share"]
+
+
+def test_signal_trading_against_the_vote_majority_is_counted_not_calibrated():
+    g = global_calibration([("AI", "LONG", 32.0, 60.0, "WIN"), ("AI", "LONG", 70.0, 60.0, "LOSS")])
+    ai = g["modes"]["AI"]
+    assert ai["direction_disagrees_with_votes"] == 1
+    assert ai["vote_share"]["n"] == 1 and ai["confidence"]["n"] == 1

@@ -46,7 +46,8 @@ def wilson(k: int, n: int) -> tuple[Optional[float], Optional[float]]:
 
 
 def vote_share(direction: Optional[str], probability_score: Optional[float]) -> Optional[float]:
-    """The displayed percentage for the signal's own side; None for neutral or missing."""
+    """The share of votes on the signal's own side; None for neutral or missing. Can be below 50 on
+    older rows whose direction disagrees with the vote (see global_calibration)."""
     if probability_score is None or not direction:
         return None
     d = direction.upper()
@@ -87,7 +88,8 @@ def calibrate(pairs: Iterable[tuple[float, bool]]) -> dict:
 
 def global_calibration(rows: Iterable) -> dict:
     """rows: (signal_mode, direction, probability_score, confidence_score, outcome)."""
-    by_mode: dict[str, dict] = defaultdict(lambda: {"vote_share": [], "confidence": [], "expired": 0, "ambiguous": 0})
+    by_mode: dict[str, dict] = defaultdict(lambda: {"vote_share": [], "confidence": [], "expired": 0, "ambiguous": 0,
+                                                    "direction_disagrees_with_votes": 0})
     for mode, direction, prob, conf, outcome in rows:
         m = by_mode[mode or "AI"]
         if outcome == "EXPIRED":
@@ -100,6 +102,11 @@ def global_calibration(rows: Iterable) -> dict:
             continue
         won = outcome == "WIN"
         vs = vote_share(direction, prob)
+        if vs is not None and vs < 50:
+            # The card shows the majority side (e.g. 68% BEARISH) while the signal traded the other
+            # side: the number on screen did not describe this trade. Counted, never calibrated.
+            m["direction_disagrees_with_votes"] += 1
+            continue
         if vs is not None:
             m["vote_share"].append((vs, won))
         if conf is not None:
@@ -107,6 +114,7 @@ def global_calibration(rows: Iterable) -> dict:
     modes = {}
     for mode, m in sorted(by_mode.items()):
         modes[mode] = {"vote_share": calibrate(m["vote_share"]), "confidence": calibrate(m["confidence"]),
-                       "expired": m["expired"], "ambiguous": m["ambiguous"]}
+                       "expired": m["expired"], "ambiguous": m["ambiguous"],
+                       "direction_disagrees_with_votes": m["direction_disagrees_with_votes"]}
     return {"definitions": DEFINITIONS, "outcome_definition": OUTCOME_DEFINITION, "band_width": BAND,
             "min_n_to_compare": MIN_N_TO_COMPARE, "modes": modes}
