@@ -4,6 +4,7 @@ Classifies articles into categories and scores sentiment using keyword matching.
 No paid APIs required.
 """
 import asyncio
+import os
 import re
 import uuid
 from datetime import datetime, timezone

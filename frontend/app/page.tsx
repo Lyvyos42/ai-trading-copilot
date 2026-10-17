@@ -1,51 +1,38 @@
 import Link from "next/link";
-import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal, GeoOctahedron, GeoCylinder, GeoCube, GeoSphere, GeoIcosahedron, GeoTorus, GeoPrism, GeoDodecahedron, GeoTetrahedron, GeoDiamond } from "@/components/icons/GeoIcons";
+import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal } from "@/components/icons/GeoIcons";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
-
-const AGENTS = [
-  { name: "Fundamental",    geo: GeoOctahedron,    color: "#D4A240", model: "sonnet-4-6" },
-  { name: "Technical",      geo: GeoCylinder,       color: "#f59e0b", model: "sonnet-4-6" },
-  { name: "Sentiment",      geo: GeoSphere,         color: "#7c3aed", model: "sonnet-4-6" },
-  { name: "Macro",          geo: GeoIcosahedron,    color: "#06b6d4", model: "sonnet-4-6" },
-  { name: "Order Flow",     geo: GeoPrism,          color: "#ec4899", model: "sonnet-4-6" },
-  { name: "Regime",         geo: GeoDodecahedron,   color: "#8b5cf6", model: "sonnet-4-6" },
-  { name: "Correlation",    geo: GeoTetrahedron,    color: "#14b8a6", model: "sonnet-4-6" },
-  { name: "Quant",          geo: GeoDiamond,        color: "#3b82f6", model: "sonnet-4-6" },
-  { name: "Risk",           geo: GeoTorus,          color: "#f97316", model: "sonnet-4-6" },
-  { name: "Trader",         geo: GeoCube,           color: "#22c55e", model: "opus-4-6" },
-];
 
 const FEATURES = [
   {
     icon: IconAgents,
-    title: "9 Specialized AI Agents",
-    description: "Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant analysts debate every signal. Final decision by TraderAgent powered by Claude Opus.",
+    title: "Nine Rule-Based Checks",
+    description: "Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant and Risk checks each vote long, short or no edge on every signal.",
   },
   {
     icon: IconBacktest,
-    title: "80+ Quant Strategies",
-    description: "Peer-reviewed strategies from Kakushadze & Serur 2018 — momentum, mean-reversion, carry, stat-arb, and more.",
+    title: "25 Built-In Strategies",
+    description: "Rule-based momentum, mean-reversion, breakout and calendar strategies add their votes to the checks.",
   },
   {
     icon: IconTrendUp,
     title: "Multi-Asset Coverage",
-    description: "Stocks, ETFs, Fixed Income, FX, Commodities, Crypto, Futures across all major global markets.",
+    description: "Stocks, ETFs, FX, commodities, crypto and futures.",
   },
   {
     icon: IconTerminal,
     title: "Explainable Signals",
-    description: "Full reasoning chain from each agent. See exactly which strategies triggered and why — no black boxes.",
+    description: "See which checks voted, which way, and the reasons behind each vote. No black boxes.",
   },
   {
     icon: IconSignal,
-    title: "Real-Time Pipeline",
-    description: "LangGraph multi-agent DAG processes signals in under 30 seconds. WebSocket stream for live alerts.",
+    title: "Score With a Record",
+    description: "The Consensus Score is the share of votes that agree, not a probability. Each signal shows how past signals in the same score band turned out.",
   },
   {
     icon: IconShield,
-    title: "Kelly Criterion Sizing",
-    description: "Risk Manager enforces half-Kelly position sizing, max 15% drawdown circuit breaker, and correlation limits.",
+    title: "Risk Check",
+    description: "Hard veto rules check every signal. A half-Kelly size is suggested only when a measured backtest win rate exists.",
   },
 ];
 
@@ -54,7 +41,7 @@ const TIERS = [
     name: "Free",
     price: "$0",
     period: null,
-    features: ["Paper trading", "2 signals / day", "1 asset class", "Delayed data"],
+    features: ["2 signals / day", "Consensus Score and reasoning", "Historical Outcome Rate by score band"],
     cta: "Start Free",
     highlight: false,
     color: "hsl(var(--muted-foreground))",
@@ -63,7 +50,7 @@ const TIERS = [
     name: "Retail",
     price: "$49",
     period: "/mo",
-    features: ["All 80+ strategies", "All asset classes", "Real-time data", "100 signals / day"],
+    features: ["3 signals / day", "25 built-in rule-based strategies", "All asset classes", "Real-time data"],
     cta: "Get Started",
     highlight: false,
     color: "hsl(var(--primary))",
@@ -72,7 +59,7 @@ const TIERS = [
     name: "Pro",
     price: "$149",
     period: "/mo",
-    features: ["Custom agent tuning", "API access", "Webhook execution", "Priority support"],
+    features: ["Everything in Retail", "10 signals / day", "Priority support"],
     cta: "Go Pro",
     highlight: true,
     color: "hsl(var(--bull))",
@@ -81,7 +68,7 @@ const TIERS = [
     name: "Enterprise",
     price: "$499",
     period: "/mo",
-    features: ["Dedicated infra", "Custom models", "White-label option", "SLA guarantee"],
+    features: ["Everything in Pro", "30 signals / day", "Custom requirements on request"],
     cta: "Contact Sales",
     highlight: false,
     color: "#f59e0b",
@@ -90,10 +77,9 @@ const TIERS = [
 ];
 
 const STATS = [
-  { value: "80+",   label: "Strategies" },
-  { value: "9",     label: "AI Agents" },
-  { value: "<30s",  label: "Per Signal" },
-  { value: "8",     label: "Asset Classes" },
+  { value: "25", label: "Strategies" },
+  { value: "9",  label: "Checks" },
+  { value: "2",  label: "Free / Day" },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -142,7 +128,7 @@ export default function HomePage() {
                 color: "hsl(var(--primary))",
               }}
             >
-              9 AI AGENTS LIVE — LANGGRAPH + CLAUDE OPUS 4
+              RULE-BASED SIGNALS · CONSENSUS SCORE · PUBLIC RECORD
             </span>
           </div>
         </div>
@@ -158,7 +144,7 @@ export default function HomePage() {
               color: "hsl(var(--foreground))",
             }}
           >
-            AI Multi-Agent
+            Rule-Based Signals
             <br />
             <span style={{ color: "hsl(var(--primary))" }}>Trading Copilot</span>
           </h1>
@@ -166,8 +152,8 @@ export default function HomePage() {
             className="text-base leading-relaxed max-w-xl mx-auto"
             style={{ color: "hsl(var(--muted-foreground))" }}
           >
-            80+ peer-reviewed quantitative strategies. 9 specialized AI agents that debate every trade.
-            Full reasoning chain. No black boxes.
+            25 built-in strategies and nine rule-based checks vote on every signal.
+            You see the score, the votes and the reasons. No black boxes.
           </p>
         </div>
 
@@ -212,50 +198,9 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Agent geometry display — 6 rotating 3D shapes */}
-        <div className="flex items-center justify-center gap-4 flex-wrap mb-16">
-          {AGENTS.map((agent) => {
-            const GeoComp = agent.geo;
-            return (
-              <div key={agent.name} className="flex flex-col items-center gap-2">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: 60,
-                    height: 60,
-                    background: `${agent.color}08`,
-                    border: `1px solid ${agent.color}20`,
-                    borderRadius: "3px",
-                    /* Ambient occlusion */
-                    boxShadow: `inset 0 -2px 4px ${agent.color}10, inset 0 1px 0 ${agent.color}18`,
-                  }}
-                >
-                  <div style={{ animation: `rotate-idle-${agent.name === "Fundamental" ? "octahedron" : agent.name === "Technical" ? "cylinder" : agent.name === "Sentiment" ? "sphere" : agent.name === "Macro" ? "icosahedron" : agent.name === "Risk" ? "torus" : "cube"} ${agent.name === "Risk" ? "8s" : agent.name === "Technical" ? "10s" : agent.name === "Fundamental" ? "14s" : agent.name === "Sentiment" ? "16s" : agent.name === "Macro" ? "18s" : "12s"} linear infinite`, transformStyle: "preserve-3d" }}>
-                    <GeoComp size={38} color={agent.color} strokeWidth={1.1} />
-                  </div>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                  <span
-                    className="text-[13px] font-bold tracking-[0.08em]"
-                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: agent.color }}
-                  >
-                    {agent.name.toUpperCase()}
-                  </span>
-                  <span
-                    className="text-[11px]"
-                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground) / 0.6)" }}
-                  >
-                    {agent.model}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
         {/* Stats row */}
         <div
-          className="grid grid-cols-2 md:grid-cols-4 gap-px max-w-2xl mx-auto"
+          className="grid grid-cols-3 gap-px max-w-xl mx-auto"
           style={{
             background: "hsl(var(--border))",
             border: "1px solid hsl(var(--border))",
@@ -301,7 +246,7 @@ export default function HomePage() {
             className="font-bold max-w-lg"
             style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
           >
-            9-agent pipeline combining peer-reviewed quant strategies with explainable AI consensus.
+            Rule-based checks, a Consensus Score, and the reasons behind every signal.
           </h2>
         </div>
 
@@ -384,20 +329,6 @@ export default function HomePage() {
                     zIndex: 2,
                   }}
                 />
-              )}
-
-              {highlight && (
-                <div
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-[11px] font-bold tracking-[0.1em]"
-                  style={{
-                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                    background: "hsl(var(--bull))",
-                    color: "hsl(0 0% 5%)",
-                    borderRadius: "2px",
-                  }}
-                >
-                  MOST POPULAR
-                </div>
               )}
 
               <div className="p-5 flex-1">

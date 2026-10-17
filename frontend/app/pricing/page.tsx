@@ -70,11 +70,11 @@ const TIERS = [
 const FAQ = [
   {
     q: "Is this financial advice?",
-    a: "No. AI Trading Copilot provides signals and analysis only. It does not hold customer funds or execute trades. Users connect their own brokerage accounts. This is a software tool, not a financial advisor.",
+    a: "No. Trading Copilot provides signals and analysis only. It does not hold customer funds or execute trades. Users connect their own brokerage accounts. This is a software tool, not a financial advisor.",
   },
   {
     q: "How are signals generated?",
-    a: "A 9-agent LangGraph pipeline runs: 8 analyst agents work in parallel (Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant), then a bull/bear debate, then TraderAgent (Claude Opus 4) synthesizes the final probability signal. RiskManager and 15 hard veto rules validate every output.",
+    a: "Nine rule-based checks run on every request. Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation and Quant each vote long, short or no edge, and the 25 built-in strategies add their votes. The reasons are grouped into a bull case and a bear case, and the Risk Manager plus a set of hard veto rules check the result. A signal is published only when at least 2 checks give a direction.",
   },
   {
     q: "What strategies are included?",

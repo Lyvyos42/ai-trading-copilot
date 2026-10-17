@@ -262,15 +262,15 @@ export default function SignalsPage() {
               className="text-[13px] font-bold tracking-[0.1em]"
               style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
             >
-              SIGN IN TO USE AI SIGNAL GENERATOR
+              SIGN IN TO USE THE SIGNAL GENERATOR
             </span>
           </div>
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["2 AI signals / day", "Stocks & ETFs only", "Paper trading portfolio", "Market intel & news"] },
-                { label: "RETAIL — $49/mo", color: "hsl(var(--primary))", features: ["Unlimited signals", "All 8 asset classes", "All 80+ strategies", "Bull/Bear agent debate"] },
-                { label: "PRO — $149/mo", color: "#f59e0b", features: ["Everything in Retail", "Custom agent tuning", "API & webhook access", "Priority support"] },
+                { label: "FREE", color: "hsl(var(--muted-foreground))", features: ["2 signals / day", "Consensus Score and reasoning", "Historical Outcome Rate by score band"] },
+                { label: "RETAIL — $49/mo", color: "hsl(var(--primary))", features: ["3 signals / day", "25 built-in rule-based strategies", "All asset classes", "Real-time data"] },
+                { label: "PRO — $149/mo", color: "#f59e0b", features: ["Everything in Retail", "10 signals / day", "Priority support"] },
               ].map(({ label, color, features }) => (
                 <div
                   key={label}
@@ -345,7 +345,7 @@ export default function SignalsPage() {
               <IconSignal size={12} color="hsl(var(--primary))" />
               <span className="terminal-label" style={{ color: "hsl(var(--foreground) / 0.6)" }}>Signal Generator</span>
               <span className="text-[13px]" style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}>
-                — 9-Agent LangGraph Pipeline
+                — nine rule-based checks
               </span>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="live-dot" />
@@ -985,9 +985,9 @@ export default function SignalsPage() {
       <UpgradeModal
         isOpen={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        feature="Unlimited AI Signals"
+        feature="More signals per day"
         requiredTier="retail"
-        reason="Free accounts can run 5 AI analyses per day. Upgrade to Retail for unlimited signals across all asset classes."
+        reason="Free accounts get 2 signals per day. Retail gives 3 per day, Pro 10 and Enterprise 30."
       />
     </div>
   );

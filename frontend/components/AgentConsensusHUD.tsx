@@ -8,13 +8,11 @@ import {
   TrendingUp,
   TrendingDown,
   Scale,
-  Brain,
   ChevronDown,
   ChevronUp,
   AlertCircle,
   HelpCircle,
   Terminal,
-  Cpu,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -69,9 +67,9 @@ export function AgentConsensusHUD({
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-border/40">
             <div className="flex items-center gap-1.5">
-              <Brain className="h-4 w-4 text-primary animate-pulse" />
+              <Scale className="h-4 w-4 text-primary" />
               <span className="text-xs font-mono font-bold tracking-wider text-foreground">
-                9-AGENT AI BRAIN
+                CONSENSUS SCORE
               </span>
             </div>
             <span className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary uppercase">
@@ -79,24 +77,17 @@ export function AgentConsensusHUD({
             </span>
           </div>
 
-          {/* Deliberation Scanner Matrix */}
+          {/* Idle: nothing analysed for this symbol yet */}
           <div className="p-4 rounded-md border border-border/60 bg-surface-2/40 text-center relative overflow-hidden">
-            <div className="relative w-28 h-28 mx-auto my-2 flex items-center justify-center">
-              <svg className="w-full h-full animate-spin" style={{ animationDuration: "12s" }} viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 6" className="text-primary/30" />
-                <circle cx="50" cy="50" r="32" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 4" className="text-primary/40" />
-                <circle cx="50" cy="50" r="18" fill="none" stroke="currentColor" strokeWidth="1" className="text-primary/20" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Cpu className="h-8 w-8 text-primary animate-pulse" />
-              </div>
+            <div className="w-14 h-14 mx-auto my-2 rounded-full border border-primary/30 bg-primary/5 flex items-center justify-center">
+              <Scale className="h-6 w-6 text-primary" />
             </div>
 
             <div className="text-xs font-mono font-bold text-foreground mb-1">
-              NEURAL CONSENSUS READY
+              NO ANALYSIS YET
             </div>
             <p className="text-[11px] font-mono text-muted-foreground leading-relaxed max-w-xs mx-auto mb-3">
-              No precomputed signal dossier cached for <strong className="text-primary">{activeTicker}</strong>. Initialize 9-agent consensus to evaluate CVD order flow, macro yield spread, and quantitative Z-scores.
+              Run the nine rule-based checks on <strong className="text-primary">{activeTicker}</strong>. Each check votes long, short or no edge.
             </p>
 
             {onGenerate && (
@@ -111,44 +102,27 @@ export function AgentConsensusHUD({
                 )}
               >
                 <Zap className="h-3.5 w-3.5" />
-                <span>{loading ? "DELIBERATING 9 AGENTS..." : `ANALYZE ${activeTicker} NOW`}</span>
+                <span>{loading ? "RUNNING 9 CHECKS..." : `ANALYZE ${activeTicker} NOW`}</span>
               </button>
             )}
           </div>
 
-          {/* Institutional Telemetry Blueprint */}
+          {/* How to read the result */}
           <div className="space-y-2">
             <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-              Autonomous Deliberation Protocol
+              How to read the result
             </div>
-            <div className="space-y-1 text-[11px] font-mono">
-              <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
-                <span className="text-muted-foreground">Technical & Momentum</span>
-                <span className="text-primary/70">15m Breakouts</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
-                <span className="text-muted-foreground">Quantitative Edge</span>
-                <span className="text-primary/70">Z-Score & Mean Reversion</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
-                <span className="text-muted-foreground">Macro Stance</span>
-                <span className="text-primary/70">Treasury Curve</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
-                <span className="text-muted-foreground">Microstructure</span>
-                <span className="text-primary/70">CVD Order Absorption</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-surface-2/60 border border-border/30">
-                <span className="text-muted-foreground">Risk Manager</span>
-                <span className="text-primary/70">Kelly Calibration</span>
-              </div>
-            </div>
+            <ul className="space-y-1 text-[11px] font-mono text-muted-foreground leading-relaxed">
+              <li className="p-1.5 rounded bg-surface-2/60 border border-border/30">A signal is published only when at least 2 checks give a direction.</li>
+              <li className="p-1.5 rounded bg-surface-2/60 border border-border/30">The Consensus Score is the share of the weighted votes that point up. It is not a probability of profit.</li>
+              <li className="p-1.5 rounded bg-surface-2/60 border border-border/30">A check without data stands down and is shown as NO DATA.</li>
+            </ul>
           </div>
         </div>
 
         <div className="pt-3 border-t border-border/40 text-center">
           <span className="text-[11px] font-mono text-muted-foreground">
-            Zero-Fabrication Quantitative Architecture
+            Rule-based checks · the score is not a probability
           </span>
         </div>
       </div>
@@ -197,7 +171,7 @@ export function AgentConsensusHUD({
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-warn" />
               <span className="text-[12px] font-mono font-bold tracking-wider text-foreground">
-                9-AGENT CONSENSUS
+                CONSENSUS SCORE
               </span>
             </div>
             <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase border bg-warn/10 text-warn border-warn/30">
@@ -244,7 +218,7 @@ export function AgentConsensusHUD({
             {/* Gate Rule Specification */}
             <div className="text-[11px] font-mono text-muted-foreground border-t border-border/30 pt-1.5 flex items-center justify-between">
               <span>HURDLE CRITERION:</span>
-              <span className="text-foreground font-semibold">≥2 CONCORDANT VOTES (CONVICTION ≥55%)</span>
+              <span className="text-foreground font-semibold">≥2 DIRECTIONAL VOTES</span>
             </div>
           </div>
         </div>
@@ -261,7 +235,7 @@ export function AgentConsensusHUD({
             <div className="p-2 rounded bg-surface-2/60 border border-border/40 text-foreground/90 font-medium">
               {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0
                 ? matchingSignal.status_reasons[0]
-                : "Fewer than 2 directional votes from specialist analysts; consensus withheld to protect portfolio risk limits."}
+                : "Fewer than 2 checks gave a direction, so no signal was published."}
             </div>
 
             {/* Secondary reasons or detailed agent notes */}
@@ -349,8 +323,8 @@ export function AgentConsensusHUD({
             <div className="p-2 rounded bg-surface-0 border border-border/30 text-[11px] text-muted-foreground">
               <span className="text-primary font-bold mr-1">WHAT UNLOCKS A TRADE:</span>
               {directionalVotes.length > 0
-                ? `A second confirming specialist aligned with ${directionalVotes.map((v) => `${v.agent.name} ${v.direction}`).join(", ")} reaching conviction ≥ 55%.`
-                : `A directional catalyst producing statistical Z-score divergence or CVD order book imbalance.`}
+                ? `One more check giving a direction (so far: ${directionalVotes.map((v) => `${v.agent.name} ${v.direction}`).join(", ")}).`
+                : `At least 2 checks giving a direction.`}
             </div>
           </div>
         </div>
@@ -364,7 +338,7 @@ export function AgentConsensusHUD({
             <div className="flex items-center gap-1.5">
               <Terminal className="h-3 w-3 text-primary" />
               <span className="text-[11px] font-mono font-bold text-foreground tracking-wider uppercase">
-                DEBATE TRANSCRIPT & REASONING
+                REASONING
               </span>
             </div>
             {debaterOpen ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
@@ -381,7 +355,7 @@ export function AgentConsensusHUD({
                 ))
               ) : (
                 <div className="p-1.5 rounded bg-surface-1/80 border border-border/30 text-muted-foreground">
-                  Specialist analysts abstained from publishing directional conviction due to conflicting momentum and neutral macro indicators.
+                  No reasoning lines were returned for this run.
                 </div>
               )}
             </div>
@@ -394,7 +368,7 @@ export function AgentConsensusHUD({
             onClick={() => setRosterOpen(!rosterOpen)}
             className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
           >
-            <span>SPECIALIST ANALYST ROSTER ({AGENTS.length} AGENTS)</span>
+            <span>THE {AGENTS.length} CHECKS AND THEIR VOTES</span>
             {rosterOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
 
@@ -471,24 +445,15 @@ export function AgentConsensusHUD({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (prob / 100) * circumference;
 
-  // 5 Institutional Telemetry Pillars
-  const pillars = [
-    { label: "Technical", value: Math.min(95, Math.max(20, prob + 2)), color: "#f59e0b" },
-    { label: "Quant", value: Math.min(95, Math.max(20, prob - 3)), color: "#3b82f6" },
-    { label: "Macro", value: Math.min(90, Math.max(20, prob - 10)), color: "#D4A240" },
-    { label: "Order Flow", value: Math.min(95, Math.max(20, prob - 6)), color: "#ec4899" },
-    { label: "Regime", value: Math.min(95, Math.max(20, prob + 1)), color: "#8b5cf6" },
-  ];
-
   return (
     <div className="flex flex-col h-full bg-surface-1 border-l border-border/40 overflow-hidden select-none">
       {/* 2027 Circular Radial Gauge & Header */}
       <div className="p-3 border-b border-border/40 bg-surface-2/40 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
-            <Brain className="h-3.5 w-3.5 text-primary" />
+            <Scale className="h-3.5 w-3.5 text-primary" />
             <span className="text-[12px] font-mono font-bold tracking-wider text-foreground">
-              9-AGENT CONSENSUS
+              CONSENSUS SCORE
             </span>
           </div>
           <span
@@ -544,7 +509,7 @@ export function AgentConsensusHUD({
                   <TrendingDown className="h-3 w-3 text-bear" />
                 )}
                 <span className={isBull ? "text-bull" : "text-bear"}>
-                  {isBull ? "BULLISH EDGE" : "BEARISH EDGE"}
+                  {isBull ? "BULLISH" : "BEARISH"}
                 </span>
               </div>
             </div>
@@ -552,34 +517,7 @@ export function AgentConsensusHUD({
         </div>
 
         <div className="text-center text-[11px] font-mono text-muted-foreground">
-          AI_CONSENSUS_{matchingSignal.direction}: {prob}% CONFLUENCE
-        </div>
-      </div>
-
-      {/* Analytical Telemetry Meters */}
-      <div className="px-3 py-2 border-b border-border/40 bg-surface-1/90 space-y-1.5 shrink-0">
-        <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
-          Neon Analytical Telemetry
-        </div>
-        <div className="space-y-1.5">
-          {pillars.map((pillar) => (
-            <div key={pillar.label} className="space-y-0.5">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-muted-foreground">{pillar.label}</span>
-                <span className="font-bold text-foreground">{pillar.value}%</span>
-              </div>
-              <div className="h-1.5 w-full bg-surface-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${pillar.value}%`,
-                    backgroundColor: pillar.color,
-                    boxShadow: `0 0 8px ${pillar.color}80`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+          {prob}% of the weighted votes point up. Not a probability of profit.
         </div>
       </div>
 
@@ -592,7 +530,7 @@ export function AgentConsensusHUD({
           <div className="flex items-center gap-1.5">
             <Terminal className="h-3 w-3 text-primary" />
             <span className="text-[11px] font-mono font-bold text-foreground tracking-wider uppercase">
-              LIVE BULL vs BEAR DEBATE TERMINAL
+              REASONING
             </span>
           </div>
           {debaterOpen ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
@@ -608,32 +546,9 @@ export function AgentConsensusHUD({
                 </div>
               ))
             ) : (
-              <>
-                <div className="p-1 rounded bg-surface-1/80 border border-border/30">
-                  <span className="text-bull font-bold mr-1.5">[BULL_AGENT]</span>
-                  <span className="text-foreground/90">
-                    Strong momentum expansion confirmed above London high with rising CVD absorption.
-                  </span>
-                </div>
-                <div className="p-1 rounded bg-surface-1/80 border border-border/30">
-                  <span className="text-bear font-bold mr-1.5">[BEAR_AGENT]</span>
-                  <span className="text-foreground/90">
-                    Overbought RSI divergence near upper 4h Bollinger band, watch for retest.
-                  </span>
-                </div>
-                <div className="p-1 rounded bg-surface-1/80 border border-border/30">
-                  <span className="text-primary font-bold mr-1.5">[QUANT_MODEL]</span>
-                  <span className="text-foreground/90">
-                    Z-Score deviation +2.18 sigma with statistical mean-reversion boundary intact.
-                  </span>
-                </div>
-                <div className="p-1 rounded bg-surface-1/80 border border-border/30">
-                  <span className="text-info font-bold mr-1.5">[MACRO_INSIGHT]</span>
-                  <span className="text-foreground/90">
-                    10Y Treasury yield stability provides macro tailwind for equity beta.
-                  </span>
-                </div>
-              </>
+              <div className="p-1.5 rounded bg-surface-1/80 border border-border/30 text-muted-foreground">
+                No reasoning lines were returned for this run.
+              </div>
             )}
 
             {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0 && (
@@ -656,7 +571,7 @@ export function AgentConsensusHUD({
           onClick={() => setRosterOpen(!rosterOpen)}
           className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-surface-3 transition-colors"
         >
-          <span>SPECIALIST ANALYST ROSTER ({AGENTS.length} AGENTS)</span>
+          <span>THE {AGENTS.length} CHECKS AND THEIR VOTES</span>
           {rosterOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
 

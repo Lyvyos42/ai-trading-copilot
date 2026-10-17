@@ -6,7 +6,7 @@ import { createCheckout } from "@/lib/api";
 interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  feature: string;           // e.g. "Unlimited AI Signals"
+  feature: string;           // e.g. "More signals per day"
   requiredTier: "free" | "retail" | "pro";
   reason?: string;           // optional description
 }
@@ -19,7 +19,7 @@ const TIER_INFO = {
     color: "text-muted-foreground",
     borderColor: "border-border",
     icon: Zap,
-    features: ["2 AI signals/day", "Paper trading", "Basic charts", "Market intel"],
+    features: ["2 signals / day", "Consensus Score and reasoning", "Historical Outcome Rate by score band"],
   },
   retail: {
     label: "RETAIL",
@@ -28,7 +28,7 @@ const TIER_INFO = {
     color: "text-primary",
     borderColor: "border-primary/50",
     icon: TrendingUp,
-    features: ["Unlimited signals", "All 80+ strategies", "All asset classes", "Real-time data", "Full backtest"],
+    features: ["3 signals / day", "25 built-in rule-based strategies", "All asset classes", "Real-time data"],
   },
   pro: {
     label: "PRO",
@@ -37,7 +37,7 @@ const TIER_INFO = {
     color: "text-yellow-400",
     borderColor: "border-yellow-400/50",
     icon: Crown,
-    features: ["Everything in Retail", "Custom agent tuning", "API access", "Webhook execution", "Priority support"],
+    features: ["Everything in Retail", "10 signals / day", "Priority support"],
   },
 };
 

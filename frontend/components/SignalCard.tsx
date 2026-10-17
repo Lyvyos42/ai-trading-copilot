@@ -374,7 +374,7 @@ export const SignalCard = memo(function SignalCard({ signal, onExecute, onResolv
               INSTITUTIONAL RESTRAINT ACTIVATED
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              The 9-agent quantitative consensus pipeline evaluated {signal.ticker} and determined market conditions do not meet the strict criteria required to publish a tradeable signal.
+              The nine rule-based checks evaluated {signal.ticker}; conditions did not meet the criteria to publish a tradeable signal.
             </p>
             {signal.status_reasons && signal.status_reasons.length > 0 && (
               <div className="mt-2 space-y-1 pt-2 border-t border-border/30">

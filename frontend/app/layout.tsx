@@ -5,10 +5,10 @@ import { MarketBar } from "@/components/MarketBar";
 import { KeepAlive } from "@/components/KeepAlive";
 
 export const metadata: Metadata = {
-  title: "AI Trading Copilot — Multi-Agent Trading Terminal",
+  title: "Trading Copilot — Quant Neural Edge",
   description:
-    "80+ quantitative strategies powered by 6 specialized AI agents. Live market data, news intelligence, multi-agent debate — built for retail traders.",
-  keywords: ["trading", "AI", "quantitative", "signals", "multi-agent", "LangGraph", "Claude"],
+    "Rule-based trading signals: nine checks vote on every signal. Consensus Score, the reasons behind it, and the historical outcome rate of its score band.",
+  keywords: ["trading", "quantitative", "signals", "consensus score", "rule-based"],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

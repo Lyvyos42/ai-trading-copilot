@@ -406,7 +406,7 @@ export function TradingCanvasHUD({
             ) : analyzing ? (
               <div className="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-[12px] font-mono text-primary flex items-center gap-1.5 animate-pulse">
                 <Activity className="h-3 w-3 animate-spin" />
-                <span>SYNTHESIZING 9-AGENT CONSENSUS FOR {ticker}...</span>
+                <span>RUNNING THE 9 CHECKS FOR {ticker}...</span>
               </div>
             ) : matchingSignal && isNoSignal ? (
               <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono flex items-center gap-2 text-muted-foreground">
@@ -415,14 +415,14 @@ export function TradingCanvasHUD({
                 <span className="truncate max-w-md text-foreground/80">
                   {matchingSignal.status_reasons && matchingSignal.status_reasons.length > 0
                     ? matchingSignal.status_reasons[0]
-                    : "Fewer than 2 directional votes from specialist analysts; consensus withheld"}
+                    : "Fewer than 2 checks gave a direction; no signal published"}
                 </span>
               </div>
             ) : (
               <div className="px-2 py-0.5 rounded bg-surface-2/80 border border-border/30 text-[12px] font-mono flex items-center gap-2 text-muted-foreground">
                 <span>TELEMETRY: STANDBY</span>
                 <span>•</span>
-                <span>NO ACTIVE DOSSIER FOR {ticker} — INITIALIZE 9-AGENT SYNTHESIS</span>
+                <span>NO ANALYSIS FOR {ticker} YET — PRESS ANALYZE NOW</span>
               </div>
             )}
           </div>
@@ -442,7 +442,7 @@ export function TradingCanvasHUD({
               )}
             >
               <Zap className="h-3 w-3" />
-              <span>{analyzing ? "DELIBERATING..." : "ANALYZE NOW"}</span>
+              <span>{analyzing ? "RUNNING..." : "ANALYZE NOW"}</span>
             </button>
           )}
 

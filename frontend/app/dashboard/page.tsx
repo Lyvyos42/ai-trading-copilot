@@ -615,7 +615,7 @@ export default function DashboardPage() {
           </div>
         </main>
 
-        {/* Right Pane: 9-Agent Consensus Brain */}
+        {/* Right Pane: consensus score of the rule-based checks */}
         <aside
           className={cn(
             "w-full lg:w-[340px] xl:w-[380px] shrink-0 h-full flex flex-col",

@@ -110,7 +110,7 @@ export default function PortfolioPage() {
           <h1 className="text-lg sm:text-2xl font-bold mb-1 font-mono">PORTFOLIO</h1>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
             <AlertCircle className="h-3 w-3" />
-            Paper trading — no real funds. Open positions via AI signals on the Terminal.
+            Paper trading — no real funds. Open positions from signals on the Terminal.
           </div>
         </div>
         <div className="flex items-center gap-2">

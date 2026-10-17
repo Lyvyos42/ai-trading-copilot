@@ -20,17 +20,17 @@ const AGENT_META: Record<string, {
   seq: number;
   role: string;
 }> = {
-  FundamentalAnalyst:   { color: "#D4A240", model: "sonnet-4-6", seq: 1,  role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
-  TechnicalAnalyst:     { color: "#f59e0b", model: "sonnet-4-6", seq: 2,  role: "Price action. EMA crossovers, RSI divergence, volume-weighted momentum." },
-  SentimentAnalyst:     { color: "#7c3aed", model: "sonnet-4-6", seq: 3,  role: "Market sentiment. News NLP, social positioning, fear/greed index." },
-  MacroAnalyst:         { color: "#06b6d4", model: "sonnet-4-6", seq: 4,  role: "Macro regime. GDP, CPI, Fed policy, carry trades, cross-asset correlation." },
-  OrderFlowAnalyst:     { color: "#ec4899", model: "sonnet-4-6", seq: 5,  role: "Order flow analysis. VPIN, bid/ask imbalance, block trades, dark pool activity." },
-  RegimeChangeAnalyst:  { color: "#8b5cf6", model: "sonnet-4-6", seq: 6,  role: "Regime detection. VIX term structure, cross-asset correlation, credit spreads, sector rotation." },
-  CorrelationAnalyst:   { color: "#14b8a6", model: "sonnet-4-6", seq: 7,  role: "Portfolio correlation. Concentration risk, contagion detection, Kelly adjustments." },
-  QuantAnalyst:         { color: "#3b82f6", model: "sonnet-4-6", seq: 8,  role: "Quant validation. 5yr backtest, p-value testing, Sharpe ratio, statistical edge." },
-  RiskManager:          { color: "#f97316", model: "sonnet-4-6", seq: 9,  role: "Risk enforcement. Kelly sizing, drawdown limits, portfolio correlation." },
-  TraderAgent:          { color: "#22c55e", model: "opus-4-6",   seq: 10, role: "Final decision. Synthesizes all analysts, issues execution signal." },
-  RiskGate:             { color: "#ef4444", model: "none",       seq: 11, role: "15 hard veto rules (pure Python). Cannot be overridden by AI reasoning." },
+  FundamentalAnalyst:   { color: "#D4A240", model: "rule-based", seq: 1,  role: "Fundamental analysis. P/E, P/B, earnings momentum, balance sheet stress." },
+  TechnicalAnalyst:     { color: "#f59e0b", model: "rule-based", seq: 2,  role: "Price action. EMA crossovers, RSI divergence, volume-weighted momentum." },
+  SentimentAnalyst:     { color: "#7c3aed", model: "rule-based", seq: 3,  role: "Market sentiment. News NLP, social positioning, fear/greed index." },
+  MacroAnalyst:         { color: "#06b6d4", model: "rule-based", seq: 4,  role: "Macro regime. GDP, CPI, Fed policy, carry trades, cross-asset correlation." },
+  OrderFlowAnalyst:     { color: "#ec4899", model: "rule-based", seq: 5,  role: "Order flow analysis. VPIN, bid/ask imbalance, block trades, dark pool activity." },
+  RegimeChangeAnalyst:  { color: "#8b5cf6", model: "rule-based", seq: 6,  role: "Regime detection. VIX term structure, cross-asset correlation, credit spreads, sector rotation." },
+  CorrelationAnalyst:   { color: "#14b8a6", model: "rule-based", seq: 7,  role: "Portfolio correlation. Concentration risk, contagion detection, Kelly adjustments." },
+  QuantAnalyst:         { color: "#3b82f6", model: "rule-based", seq: 8,  role: "Quant validation. 5yr backtest, p-value testing, Sharpe ratio, statistical edge." },
+  RiskManager:          { color: "#f97316", model: "rule-based", seq: 9,  role: "Risk enforcement. Kelly sizing, drawdown limits, portfolio correlation." },
+  TraderAgent:          { color: "#22c55e", model: "rule-based",   seq: 10, role: "Final decision. Synthesizes all analysts, issues execution signal." },
+  RiskGate:             { color: "#ef4444", model: "rule-based", seq: 11, role: "Hard veto rules (pure Python). Nothing can override them." },
 };
 
 /** Micro latency sparkline — pure SVG, no library */
@@ -133,7 +133,7 @@ function PipelineDiagram() {
 
 /** 3D Agent Card — the core visual identity piece */
 function AgentCard({ agent, isActive = false }: { agent: AgentStatus; isActive?: boolean }) {
-  const meta = AGENT_META[agent.name] || { color: "#D4A240", model: "sonnet-4-6", seq: 0, role: "" };
+  const meta = AGENT_META[agent.name] || { color: "#D4A240", model: "rule-based", seq: 0, role: "" };
   const geo = ROLE_GEOMETRY[agent.name];
   const GeoComponent = geo?.Component;
   const animClass = geo?.animationClass || "shape-researcher";
@@ -389,7 +389,7 @@ export default function AgentsPage() {
             className="text-[13px] font-bold"
             style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
           >
-            — LangGraph DAG Pipeline
+            — rule-based pipeline
           </span>
           <button
             onClick={loadAgents}

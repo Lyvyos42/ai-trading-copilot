@@ -55,7 +55,7 @@ export default function LoginPage() {
             <Zap className="h-5 w-5 text-primary" />
           </div>
           <h1 className="text-xl font-bold">{isRegister ? "Create Account" : "Welcome Back"}</h1>
-          <p className="text-sm text-muted-foreground mt-1">AI Trading Copilot</p>
+          <p className="text-sm text-muted-foreground mt-1">Trading Copilot</p>
         </div>
 
         <div className="p-6 rounded-xl border border-border/50 bg-card space-y-4">

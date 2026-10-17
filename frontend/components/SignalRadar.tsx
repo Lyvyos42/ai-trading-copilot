@@ -83,14 +83,14 @@ function RadarScannerDial({ count, scanning }: { count: number; scanning: boolea
       <div className="flex-1 min-w-0 font-mono">
         <div className="flex items-center justify-between text-[12px]">
           <span className="text-primary font-bold tracking-wider">ALGO_CONF_RADAR</span>
-          <span className="text-bull font-bold">{scanning ? "SWEEPING..." : "92% ACTIVE"}</span>
+          <span className="text-bull font-bold">{scanning ? "SCANNING..." : "READY"}</span>
         </div>
         <div className="text-[12px] text-muted-foreground truncate">
-          {scanning ? "Polling microstructure L2 books..." : `${count} institutional setups detected`}
+          {scanning ? "Running the checks across the catalogue..." : `${count} setups found`}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="h-1.5 w-1.5 rounded-full bg-bull animate-pulse" />
-          <span className="text-[11px] text-muted-foreground uppercase">Liquidity Clusters Monitored</span>
+          <span className="text-[11px] text-muted-foreground uppercase">Rule-based scan</span>
         </div>
       </div>
     </div>
@@ -226,7 +226,7 @@ export function SignalRadar({
             <p className="text-[12px] font-mono text-muted-foreground/70 max-w-xs mx-auto">
               {viewMode === "MY_DESK"
                 ? "Click 'Adopt Signal' on any setup to monitor live price action and distance to target here."
-                : "Trigger 'SCAN NOW' to run multi-agent confluence screening across the market catalogue."}
+                : "Press 'SCAN NOW' to run the rule-based checks across the market catalogue."}
             </p>
           </div>
         ) : (

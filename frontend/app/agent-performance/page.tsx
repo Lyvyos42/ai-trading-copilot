@@ -571,7 +571,7 @@ export default function AgentPerformancePage() {
         <div className="grid md:grid-cols-3 gap-4 text-xs font-mono text-muted-foreground leading-relaxed">
           <div>
             <div className="text-foreground font-bold mb-1">Signal Generation</div>
-            Each trade proposal is synthesized by a multi-agent consensus pipeline: specialist analysts run across independent domains, followed by a bull/bear debater protocol. When data feeds fail or edge is unclear, agents strictly abstain.
+            Each trade proposal comes from the nine rule-based checks: each check votes on its own domain, the reasons are grouped into a bull case and a bear case, and the votes are combined. When a data feed fails or no edge is clear, a check abstains.
           </div>
           <div>
             <div className="text-foreground font-bold mb-1">Evaluation Criteria</div>
@@ -587,7 +587,7 @@ export default function AgentPerformancePage() {
       {/* Disclaimer footer */}
       <div className="text-center px-4 py-6 border-t border-border/30">
         <p className="text-[12px] font-mono text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-          All performance metrics reflect live, hand-resolved pipeline executions. AI Trading Copilot does not fabricate historical track records or fill missing values with synthetic estimates. Contact quantneuraledge@gmail.com for questions.
+          All performance metrics reflect live, hand-resolved pipeline executions. Trading Copilot does not fabricate historical track records or fill missing values with synthetic estimates. Contact quantneuraledge@gmail.com for questions.
         </p>
       </div>
     </div>
