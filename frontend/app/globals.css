@@ -661,3 +661,251 @@
 .feature-card:hover {
   background: hsl(var(--surface-2));
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   GOLD MONOLITH scope — Strategy Truth Lab (/lab) + Live Terminal (/terminal)
+   Owner's choice 2026-11-14. Reference: MONOLITH_v1.0 HERITAGE TERMINAL.
+
+   This is NOT a second design system. It re-points the existing semantic
+   tokens (--surface-N, --primary, --border, --bear, --warn ...) inside the
+   .monolith wrapper, so every Tailwind class already used in the app
+   (bg-surface-1, text-primary, border-border, text-muted-foreground) resolves
+   to the MONOLITH palette there and nowhere else.
+
+   Reference palette          token here
+   #050505 background         --surface-0
+   #0F0F0F surface            --surface-1
+   #151515 container          --surface-2
+   #1E1E1E container-high     --surface-3
+   #252525 container-highest  --surface-4 and --border
+   #333333 outline            --border-strong
+   #E0E0E0 on-surface         --foreground
+   #888888 on-surface-variant --muted-foreground (lifted to #8F8F8F: AA on --surface-3)
+   #E6A532 primary            --primary
+   #B88428 primary-dim        --m-gold-dim
+   #FF8C42 secondary          --warn
+   #CC4444 negative           --bear (lifted to #D85A5A: #CC4444 is 4.35:1 as text)
+   ═════════════════════════════════════════════════════════════════════════════ */
+.monolith {
+  --surface-0: 0 0% 2%;
+  --surface-1: 0 0% 5.9%;
+  --surface-2: 0 0% 8.2%;
+  --surface-3: 0 0% 11.8%;
+  --surface-4: 0 0% 14.5%;
+  --background: var(--surface-0);
+  --card: var(--surface-1);
+  --foreground: 0 0% 88%;
+  --muted-foreground: 0 0% 56%;
+  --primary: 38 78% 55%;
+  --primary-foreground: 0 0% 2%;
+  --ring: 38 78% 55%;
+  --border: 0 0% 14.5%;
+  --border-strong: 0 0% 20%;
+  --bear: 0 62% 60%;
+  --warn: 24 100% 63%;
+  --m-gold-dim: 38 64% 44%;
+  /* fixed status bar at the bottom of the shell */
+  --m-status-h: 24px;
+
+  position: relative;
+  background: hsl(var(--surface-0));
+  color: hsl(var(--foreground));
+  font-family: var(--font-manrope), 'Manrope', system-ui, sans-serif;
+  /* Manrope sets a narrow word space; at 12-13px on black the words run
+     together, so prose gets a little air and a sturdier weight. Display
+     text keeps the reference's tight tracking through its own classes. */
+  font-weight: 500;
+  letter-spacing: 0;
+  word-spacing: 0.08em;
+}
+
+.monolith h1, .monolith h2, .monolith h3, .monolith h4 {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+/* Digits: JetBrains Mono, always tabular. Beats the app-wide
+   [class*="font-mono"] rule, which points at Berkeley / IBM Plex Mono. */
+.monolith .m-num,
+.monolith .font-mono {
+  font-family: var(--font-jbmono), 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+.monolith ::selection { background: hsl(var(--primary)); color: #000; }
+
+/* Scanlines: 4px pitch, gold at 2% - the reference value. Decorative only. */
+.m-scanline {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0.3;
+  background: linear-gradient(to bottom, transparent 50%, hsl(38 78% 55% / 0.02) 50%);
+  background-size: 100% 4px;
+}
+
+/* Dotted plot background, 24px pitch (reference .grid-bg) */
+.m-gridbg {
+  background-color: #000;
+  background-image: radial-gradient(circle, #1a1a1a 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Panel header bar */
+.m-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 0 12px;
+  background: hsl(var(--surface-1));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Section title: gold tick + wide-tracked caps */
+.m-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+}
+.m-title::before {
+  content: '';
+  width: 4px;
+  height: 12px;
+  flex-shrink: 0;
+  background: hsl(var(--primary));
+}
+
+.m-label {
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid hsl(var(--border-strong));
+  color: hsl(var(--muted-foreground));
+}
+.m-chip-gold {
+  border-color: hsl(var(--primary) / 0.4);
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+}
+
+/* Buttons - flat, square, caps. No gradients. */
+.m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+}
+.m-btn:disabled, .m-btn[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.m-btn-primary {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: #000;
+}
+.m-btn-primary:hover:not(:disabled) { background: hsl(var(--m-gold-dim)); border-color: hsl(var(--m-gold-dim)); }
+.m-btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.m-btn-ghost {
+  background: hsl(var(--surface-4));
+  border-color: hsl(var(--border-strong));
+  color: hsl(var(--foreground));
+}
+.m-btn-ghost:hover:not(:disabled) { background: hsl(var(--surface-3)); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.4); }
+.m-btn-ghost:active:not(:disabled) { transform: translateY(1px); }
+.m-btn-sm { padding: 4px 8px; font-size: 10px; letter-spacing: 0.12em; }
+
+/* Field shell: black well, outline border, gold on focus */
+.m-field {
+  background: #000;
+  border: 1px solid hsl(var(--border-strong));
+  transition: border-color 120ms ease-out;
+}
+.m-field:focus-within { border-color: hsl(var(--primary) / 0.6); }
+.m-field textarea, .m-field input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: hsl(var(--foreground));
+}
+.m-field textarea::placeholder, .m-field input::placeholder { color: hsl(0 0% 46%); }
+
+/* Focus: 2px gold, square. Fields show focus on their shell instead. */
+.monolith :focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 0;
+}
+.monolith .m-field textarea:focus-visible,
+.monolith .m-field input:focus-visible { outline: none; }
+.monolith .m-field:focus-within { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.6); }
+
+/* Live dot in gold (reference: REAL_TIME / CORE_STABLE) */
+.m-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 6px hsl(var(--primary) / 0.6);
+  animation: pulse-live 1.6s ease-in-out infinite;
+}
+
+@keyframes m-spin { to { transform: rotate(360deg); } }
+.m-spin { animation: m-spin 900ms linear infinite; }
+
+@keyframes m-rise {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.m-rise { animation: m-rise 280ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+.m-glow { filter: drop-shadow(0 0 6px hsl(38 78% 55% / 0.35)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .monolith *, .monolith *::before, .monolith *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

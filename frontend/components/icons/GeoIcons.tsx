@@ -515,3 +515,150 @@ export const ROLE_GEOMETRY: Record<string, {
   TraderAgent:          { Component: GeoCube,          animationClass: "shape-generator",    label: "Cube" },
   RiskGate:             { Component: GeoHexShield,     animationClass: "shape-executor",     label: "HexShield" },
 };
+
+// ─── Truth Lab + Live Terminal ────────────────────────────────────────────────
+// Same construction rules as above: 16×16 grid, stroke only, no fills.
+
+function Svg({ size = 16, color = "currentColor", strokeWidth = 1.5, className, style, children }: IconProps & { children: React.ReactNode }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style} aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+}
+
+/** Truth Lab — a flask with a level line */
+export function IconFlask(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <line x1="5.5" y1="2" x2="10.5" y2="2" />
+      <path d="M6.5 2v4.2L2.9 12.4a1 1 0 0 0 .9 1.6h8.4a1 1 0 0 0 .9-1.6L9.5 6.2V2" />
+      <line x1="4.6" y1="10.5" x2="11.4" y2="10.5" />
+    </Svg>
+  );
+}
+
+/** Noise-area bands — an opening cone with a price path breaking out */
+export function IconBands(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2 8C6 6.6 10 5.6 14 5" />
+      <path d="M2 8c4 1.4 8 2.4 12 3" />
+      <polyline points="2,8 5,8.8 7.5,7 10,5.4 14,2.5" />
+    </Svg>
+  );
+}
+
+/** Verdict PASS — a check inside a square */
+export function IconVerdictPass(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="2" y="2" width="12" height="12" />
+      <polyline points="5,8.3 7.2,10.5 11.2,5.7" />
+    </Svg>
+  );
+}
+
+/** Verdict FAILED — a cross inside a square */
+export function IconVerdictFail(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="2" y="2" width="12" height="12" />
+      <line x1="5.5" y1="5.5" x2="10.5" y2="10.5" />
+      <line x1="10.5" y1="5.5" x2="5.5" y2="10.5" />
+    </Svg>
+  );
+}
+
+/** Verdict NEAR MISS — a target with the mark just off centre */
+export function IconVerdictNear(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="8" cy="8" r="6" />
+      <circle cx="8" cy="8" r="2.2" />
+      <line x1="10.6" y1="4.2" x2="12.6" y2="6.2" />
+      <line x1="12.6" y1="4.2" x2="10.6" y2="6.2" />
+    </Svg>
+  );
+}
+
+/** Verdict REAL BUT NOT TRADABLE — a no-entry sign: it exists, you cannot use it */
+export function IconVerdictReal(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="8" cy="8" r="6" />
+      <line x1="4.8" y1="8" x2="11.2" y2="8" />
+    </Svg>
+  );
+}
+
+export function IconCheck(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <polyline points="3,8.5 6.5,12 13,4.5" />
+    </Svg>
+  );
+}
+
+export function IconPlus(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <line x1="8" y1="3" x2="8" y2="13" />
+      <line x1="3" y1="8" x2="13" y2="8" />
+    </Svg>
+  );
+}
+
+/** Three-quarter ring, for a spinner */
+export function IconSpinner(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M8 2a6 6 0 1 0 6 6" />
+    </Svg>
+  );
+}
+
+/** Big-move windows — bars of unequal height on a baseline */
+export function IconWindows(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <line x1="2" y1="14" x2="14" y2="14" />
+      <line x1="4" y1="11.5" x2="4" y2="9.5" />
+      <line x1="7" y1="11.5" x2="7" y2="3" />
+      <line x1="10" y1="11.5" x2="10" y2="6.5" />
+      <line x1="13" y1="11.5" x2="13" y2="9.5" />
+    </Svg>
+  );
+}
+
+/** Crowd positioning — two figures */
+export function IconCrowd(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="5.5" cy="5.5" r="2" />
+      <path d="M2 13c0-2.2 1.5-3.8 3.5-3.8S9 10.800 9 13" />
+      <circle cx="11" cy="6.5" r="1.6" />
+      <path d="M11 9.800c1.700 0 3 1.300 3 3.200" />
+    </Svg>
+  );
+}
+
+/** Prediction-market odds — a percent sign */
+export function IconOdds(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="4.5" cy="4.5" r="2" />
+      <circle cx="11.5" cy="11.5" r="2" />
+      <line x1="12.5" y1="3.5" x2="3.5" y2="12.5" />
+    </Svg>
+  );
+}
+
+export function IconArrowUpRight(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <line x1="4.5" y1="11.5" x2="11.5" y2="4.5" />
+      <polyline points="6,4.5 11.5,4.5 11.5,10" />
+    </Svg>
+  );
+}

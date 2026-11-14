@@ -22,9 +22,13 @@ import {
   IconShield,
   IconCalendar,
   IconGrid,
+  IconFlask,
+  IconBands,
 } from "@/components/icons/GeoIcons";
 
 const NAV_ITEMS = [
+  { href: "/lab",          label: "TRUTH LAB",    Icon: IconFlask },
+  { href: "/terminal",     label: "TERMINAL",     Icon: IconBands },
   { href: "/dashboard",    label: "DASHBOARD",    Icon: IconTerminal },
   { href: "/signals",      label: "SIGNALS",      Icon: IconSignal },
   { href: "/performance",  label: "PERFORMANCE",  Icon: IconSignal },
