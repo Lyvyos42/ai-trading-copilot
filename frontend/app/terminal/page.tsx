@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { MonolithShell, type RailSection } from "@/components/monolith/MonolithShell";
 import { LiveTerminal } from "@/components/monolith/terminal/LiveTerminal";
+import { RESEARCH_PUBLIC } from "@/lib/visibility";
 import {
   IconBands,
   IconCalendar,
@@ -13,7 +14,7 @@ import {
 export const metadata: Metadata = {
   title: "Live Terminal — Quant Neural Edge",
   description:
-    "Validated, rule-based signals shown live with their record: noise-area bands on USTEC and US500, big-move windows, the calendar, crowd positioning and prediction-market odds.",
+    "Validated, rule-based signals shown live with their record: noise-area bands on USTEC and US500, big-move windows and the calendar.",
 };
 
 const SECTIONS: RailSection[] = [
@@ -21,8 +22,12 @@ const SECTIONS: RailSection[] = [
   { href: "#signals", label: "SIGS", title: "Validated signals", Icon: IconSignal },
   { href: "#windows", label: "WNDW", title: "Big-move windows", Icon: IconWindows },
   { href: "#calendar", label: "CAL", title: "Calendar", Icon: IconCalendar },
-  { href: "#positioning", label: "CRWD", title: "Crowd positioning", Icon: IconCrowd },
-  { href: "#odds", label: "ODDS", title: "Market odds", Icon: IconOdds },
+  ...(RESEARCH_PUBLIC
+    ? [
+        { href: "#positioning", label: "CRWD", title: "Crowd positioning", Icon: IconCrowd },
+        { href: "#odds", label: "ODDS", title: "Market odds", Icon: IconOdds },
+      ]
+    : []),
 ];
 
 export default function TerminalPage() {
