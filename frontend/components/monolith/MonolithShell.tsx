@@ -4,24 +4,26 @@
  * status bar. The app's own navbar and market ticker stay above it.
  *
  * Fonts are loaded with next/font so Manrope and JetBrains Mono ship only
- * with these two routes and no other page changes.
+ * with these two routes and no other page changes. They are self-hosted
+ * (app/fonts, latin variable WOFF2 + OFL licences): next/font/google in
+ * Next 14.2.5 crashed the Vercel build while fetching them.
  */
 import Link from "next/link";
-import { Manrope, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { IconBands, IconFlask } from "@/components/icons/GeoIcons";
 
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+const manrope = localFont({
+  src: "../../app/fonts/manrope-latin-var.woff2",
+  weight: "400 800",
   variable: "--font-manrope",
   display: "swap",
 });
 
-const jbmono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
+const jbmono = localFont({
+  src: "../../app/fonts/jetbrains-mono-latin-var.woff2",
+  weight: "400 700",
   variable: "--font-jbmono",
   display: "swap",
 });
