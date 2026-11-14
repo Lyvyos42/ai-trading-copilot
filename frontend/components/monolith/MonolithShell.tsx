@@ -12,6 +12,7 @@ import Link from "next/link";
 import localFont from "next/font/local";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { RESEARCH_PUBLIC } from "@/lib/visibility";
 import { IconBands, IconFlask } from "@/components/icons/GeoIcons";
 
 const manrope = localFont({
@@ -38,7 +39,7 @@ export interface RailSection {
 }
 
 const PAGES: { key: "lab" | "terminal"; href: string; label: string; title: string; Icon: IconType }[] = [
-  { key: "lab", href: "/lab", label: "LAB", title: "Strategy Truth Lab", Icon: IconFlask },
+  ...(RESEARCH_PUBLIC ? [{ key: "lab" as const, href: "/lab", label: "LAB", title: "Strategy Truth Lab", Icon: IconFlask }] : []),
   { key: "terminal", href: "/terminal", label: "TERM", title: "Live Terminal", Icon: IconBands },
 ];
 

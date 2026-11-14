@@ -10,6 +10,7 @@
  * It never forecasts direction - the big-move panel is timing only.
  */
 import Link from "next/link";
+import { RESEARCH_PUBLIC } from "@/lib/visibility";
 import { useState } from "react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,7 @@ export function LiveTerminal() {
         </div>
       </header>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_400px] min-[1700px]:grid-cols-[minmax(0,1fr)_420px_400px]">
+      <div className={cn("grid lg:grid-cols-[minmax(0,1fr)_400px]", RESEARCH_PUBLIC && "min-[1700px]:grid-cols-[minmax(0,1fr)_420px_400px]")}>
         <div className="flex min-w-0 flex-col border-border lg:border-r">
           <ChartPanel />
           <CalendarPanel />
@@ -70,10 +71,12 @@ export function LiveTerminal() {
           <WindowsPanel />
         </div>
 
-        <div className="grid min-w-0 md:grid-cols-2 lg:col-span-2 min-[1700px]:col-span-1 min-[1700px]:grid-cols-1 min-[1700px]:grid-rows-[auto_1fr]">
-          <PositioningPanel />
-          <OddsPanel />
-        </div>
+        {RESEARCH_PUBLIC && (
+          <div className="grid min-w-0 md:grid-cols-2 lg:col-span-2 min-[1700px]:col-span-1 min-[1700px]:grid-cols-1 min-[1700px]:grid-rows-[auto_1fr]">
+            <PositioningPanel />
+            <OddsPanel />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -388,7 +391,7 @@ function SignalsPanel() {
                       {signed(r, s.unit === "pips" ? 0 : 2)}
                     </span>
                   ))}
-                  {s.lab_example_id && (
+                  {RESEARCH_PUBLIC && s.lab_example_id && (
                     <Link
                       href={`/lab?example=${s.lab_example_id}`}
                       className="ml-auto flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-primary hover:underline"

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { RESEARCH_PUBLIC } from "@/lib/visibility";
 import { MonolithShell, type RailSection } from "@/components/monolith/MonolithShell";
 import { TruthLab } from "@/components/monolith/lab/TruthLab";
 import { IconGrid, IconLock, IconShield, IconTarget } from "@/components/icons/GeoIcons";
@@ -21,6 +23,7 @@ function first(v: string | string[] | undefined): string | undefined {
 }
 
 export default function LabPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+  if (!RESEARCH_PUBLIC) notFound();                  // research stays private (owner 2026-11-14)
   return (
     <MonolithShell
       active="lab"
