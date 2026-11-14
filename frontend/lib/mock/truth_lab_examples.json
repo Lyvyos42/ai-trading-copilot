@@ -1,0 +1,109 @@
+{
+ "source": "IEB research lab sealed tests, 2026-11-14",
+ "examples": [
+  {
+   "id": "noise-area-ustec",
+   "name": "Noise-area intraday momentum (Zarattini 2024)",
+   "asked": "Buy when price breaks above the 14-day noise band around the open, sell below; trail at VWAP; flat at the close.",
+   "rules": [
+    "Band per minute = avg |move from 09:30 open| of the last 14 days",
+    "Checks at HH:00 / HH:30 only",
+    "Long above upper band, short below lower band",
+    "Stop = band or VWAP (tighter)",
+    "Flat at 16:00 NY"
+   ],
+   "verdict": "PASS",
+   "symbols": "USTEC, US500, US30",
+   "period": "2022-01 .. 2026-09",
+   "trades_per_day": 1.0,
+   "headline": "USTEC +19.6 %/yr, Sharpe 1.41; after publication +15.7 %/yr, Sharpe 1.02",
+   "years": {
+    "2022": 0.065,
+    "2023": 0.066,
+    "2024": 0.037,
+    "2025": 0.049,
+    "2026": 0.019
+   },
+   "years_unit": "% per day",
+   "why": "Works on the Nasdaq-100 in every year; weaker on US500, absent on US30."
+  },
+  {
+   "id": "amd",
+   "name": "AMD / Power of 3",
+   "asked": "Asian range, London sweeps one side and closes back inside, trade the other way into New York.",
+   "rules": [
+    "Asian range 19:00-00:00 NY",
+    "Sweep + M5 close back inside 02:00-05:00 NY",
+    "Enter opposite, stop beyond the sweep",
+    "Target opposite side or 2R, out by 12:00 NY"
+   ],
+   "verdict": "FAILED",
+   "symbols": "gold, 6 FX, 4 indices",
+   "period": "2015-2026",
+   "headline": "~7,000 FX + gold trades: -0.03 R; best pick (gold) reversed to -0.08 R",
+   "why": "The London sweep is a coin flip."
+  },
+  {
+   "id": "macd-ema200",
+   "name": "MACD + 200 EMA",
+   "asked": "Buy a MACD cross below zero above the 200 EMA, target 1.5x risk.",
+   "rules": [
+    "MACD(12,26,9) crosses up below zero",
+    "Close above EMA200 (mirror short)",
+    "Stop 10-bar swing or EMA200",
+    "Target 1.5R, 50-bar cap"
+   ],
+   "verdict": "FAILED",
+   "symbols": "11 symbols x M5-H4",
+   "period": "2015-2026",
+   "headline": "About 0 R everywhere; 9/10 best picks failed the check",
+   "why": "Indicator rules on price alone keep landing at zero."
+  },
+  {
+   "id": "friday-low",
+   "name": "Friday lower high -> Monday visits Friday's low",
+   "asked": "If Friday's high stays below Thursday's, Friday's low is visited on Monday.",
+   "rules": [
+    "Condition: Friday high < Thursday high",
+    "Visit = Monday regular session trades below Friday's low",
+    "Trade: short at the open to Friday's low, 1:1 stop"
+   ],
+   "verdict": "REAL BUT NOT TRADABLE",
+   "symbols": "11 symbols",
+   "period": "2015-2026 (+1990s daily)",
+   "headline": "Visited 41 % vs 31 % otherwise; the short loses -0.07 R",
+   "why": "Monday simply opens closer to the low; at equal distance the odds are the same."
+  },
+  {
+   "id": "overnight-range",
+   "name": "Overnight range thirds + ADX",
+   "asked": "Open in the top/bottom third of the overnight range, trade the break with ADX > 20.",
+   "rules": [
+    "Range 18:00-09:30 NY",
+    "Open in top third -> long setup, bottom third -> short",
+    "M5 close beyond the range, ADX > 20",
+    "Stop at mid-range"
+   ],
+   "verdict": "FAILED",
+   "symbols": "US500, USTEC, US30",
+   "period": "2022-2023",
+   "headline": "+0.10 R, t 1.41 - not significant",
+   "why": "ADX adds nothing; the thirds add a little."
+  },
+  {
+   "id": "crowd-fade",
+   "name": "Fade the crypto crowd",
+   "asked": "When most Binance accounts are unusually long, short for 3 days (and the reverse).",
+   "rules": [
+    "All-account long/short ratio z >= 1.5 vs 90 days",
+    "Trade against it, hold 3 days",
+    "BTC + ETH"
+   ],
+   "verdict": "NEAR MISS",
+   "symbols": "BTC, ETH",
+   "period": "2024-2026 check",
+   "headline": "+69 bps per trade, positive all 3 years, p 0.045",
+   "why": "Retail extremes mean-revert; lumpy, ~49 % winners."
+  }
+ ]
+}
