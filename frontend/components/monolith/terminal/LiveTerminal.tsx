@@ -334,7 +334,7 @@ function SignalsPanel() {
       id="signals"
       title="Validated signals"
       className="border-b border-border"
-      right={<span className="m-label">Live record</span>}
+      right={<span className="m-label">{data?.is_mock ? "Example record" : "Live record"}</span>}
     >
       {error ? (
         <PanelError what="the signals" onRetry={() => void mutate()} />
@@ -401,7 +401,9 @@ function SignalsPanel() {
             ))}
           </ul>
           <p className="border-t border-border px-3 py-1.5 text-[12px] leading-[18px] text-muted-foreground">
-            Live records are short and shown as they are, losses included.
+            {data.is_mock
+              ? "Example figures, not real results: the live record feed is not connected yet."
+              : "Live records are short and shown as they are, losses included."}
           </p>
         </>
       )}
