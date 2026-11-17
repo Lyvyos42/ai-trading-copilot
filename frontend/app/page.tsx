@@ -1,400 +1,643 @@
+"use client";
+
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { IconSignal, IconArrowRight, IconShield, IconTrendUp, IconAgents, IconBacktest, IconTerminal } from "@/components/icons/GeoIcons";
+import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+/* ── Backend response types (real IEB + Telegram + Signal Lab schemas) ── */
+interface IebInstance {
+  instance_id: string;
+  state: string;
+  version?: string | null;
+  last_heartbeat?: string | null;
+  last_signal_received?: string | null;
+  modules_active?: string[];
+  backlog?: { signals?: number; outcomes?: number; executions?: number; telegram?: number };
+}
 
-const FEATURES = [
-  {
-    icon: IconAgents,
-    title: "Nine Rule-Based Checks",
-    description: "Fundamental, Technical, Sentiment, Macro, Order Flow, Regime, Correlation, Quant and Risk checks each vote long, short or no edge on every signal.",
-  },
-  {
-    icon: IconBacktest,
-    title: "25 Built-In Strategies",
-    description: "Rule-based momentum, mean-reversion, breakout and calendar strategies add their votes to the checks.",
-  },
-  {
-    icon: IconTrendUp,
-    title: "Multi-Asset Coverage",
-    description: "Stocks, ETFs, FX, commodities, crypto and futures.",
-  },
-  {
-    icon: IconTerminal,
-    title: "Explainable Signals",
-    description: "See which checks voted, which way, and the reasons behind each vote. No black boxes.",
-  },
-  {
-    icon: IconSignal,
-    title: "Score With a Record",
-    description: "The Consensus Score is the share of votes that agree, not a probability. Each signal shows how past signals in the same score band turned out.",
-  },
-  {
-    icon: IconShield,
-    title: "Risk Check",
-    description: "Hard veto rules check every signal. A half-Kelly size is suggested only when a measured backtest win rate exists.",
-  },
-];
+interface IebSignal {
+  signal_id: string;
+  module_id: string;
+  module_version?: string | null;
+  generated_at: string;
+  symbol: string;
+  timeframe?: string | null;
+  direction: string;
+  entry_reference: number;
+  stop_reference?: number | null;
+  tp1?: number | null;
+  expected_horizon?: string | null;
+  session?: string | null;
+  resolved: boolean;
+  exit_reason?: string | null;
+  r_multiple?: number | null;
+  exit_timestamp?: string | null;
+  on_telegram?: boolean;
+}
 
-const TIERS = [
-  {
-    name: "Free",
-    price: "$0",
-    period: null,
-    features: ["2 signals / day", "Consensus Score and reasoning", "Historical Outcome Rate by score band"],
-    cta: "Start Free",
-    highlight: false,
-    color: "hsl(var(--muted-foreground))",
-  },
-  {
-    name: "Retail",
-    price: "$49",
-    period: "/mo",
-    features: ["3 signals / day", "25 built-in rule-based strategies", "All asset classes", "Real-time data"],
-    cta: "Get Started",
-    highlight: false,
-    color: "hsl(var(--primary))",
-  },
-  {
-    name: "Pro",
-    price: "$149",
-    period: "/mo",
-    features: ["Everything in Retail", "10 signals / day", "Priority support"],
-    cta: "Go Pro",
-    highlight: true,
-    color: "hsl(var(--bull))",
-  },
-  {
-    name: "Enterprise",
-    price: "$499",
-    period: "/mo",
-    features: ["Everything in Pro", "30 signals / day", "Custom requirements on request"],
-    cta: "Contact Sales",
-    highlight: false,
-    color: "#f59e0b",
-    href: "mailto:quantneuraledge@gmail.com?subject=Enterprise%20Plan%20Inquiry",
-  },
-];
+interface TelegramRecord {
+  channel?: string;
+  posted: number;
+  open: number;
+  results: { target: number; stop: number; other: number; unknown?: number; no_stop?: number };
+  tp1_before_stop?: { k: number; n: number; rate: number | null };
+  r?: { n: number; mean: number | null; win_rate: number | null; avg_win: number | null; avg_loss: number | null };
+}
 
-const STATS = [
-  { value: "25", label: "Strategies" },
-  { value: "9",  label: "Checks" },
-  { value: "2",  label: "Free / Day" },
-];
+interface LabModuleRow {
+  module_id: string;
+  version: string;
+  status?: string | null;
+  signals: number;
+  resolved: number;
+  tp1_before_stop: number | null;
+  tp1_n: number;
+  mean_r: number | null;
+  r_lo?: number | null;
+  r_hi?: number | null;
+  r_n: number;
+  finding?: string;
+  next_step?: string;
+}
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function fmtPrice(px: number | null | undefined, symbol: string): string {
+  if (px == null || !Number.isFinite(px)) return "—";
+  const s = symbol.toUpperCase();
+  if (s.includes("JPY") || s.includes("XAU") || s.includes("US30") || s.includes("USTEC") || s.includes("NAS") || s.includes("DE40") || s.includes("GER") || s.includes("US500")) {
+    return px >= 1000 ? px.toFixed(1) : px.toFixed(3);
+  }
+  return px.toFixed(5);
+}
 
-export default function HomePage() {
+function fmtAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+export default function LiveTerminalPage() {
+  const [instances, setInstances] = useState<IebInstance[]>([]);
+  const [signals, setSignals] = useState<IebSignal[]>([]);
+  const [tg, setTg] = useState<TelegramRecord | null>(null);
+  const [modules, setModules] = useState<LabModuleRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [windowFilter, setWindowFilter] = useState<"7D" | "30D" | "ALL">("ALL");
+  const [feedFilter, setFeedFilter] = useState<"ALL" | "OPEN" | "WON" | "STOPPED">("ALL");
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [lastSync, setLastSync] = useState<string>("—");
+
+  const loadAll = useCallback(async () => {
+    try {
+      setError(null);
+      const [stRes, sigRes, tgRes, labRes] = await Promise.allSettled([
+        apiFetch<{ instances: IebInstance[] }>("/api/v1/ieb/status"),
+        apiFetch<{ signals: IebSignal[] }>("/api/v1/ieb/signals/recent?limit=200"),
+        apiFetch<TelegramRecord>("/api/v1/ieb/telegram-record"),
+        apiFetch<{ comparison: LabModuleRow[] }>("/api/v1/lab/modules"),
+      ]);
+      if (stRes.status === "fulfilled") setInstances(stRes.value.instances || []);
+      if (sigRes.status === "fulfilled") setSignals(sigRes.value.signals || []);
+      if (tgRes.status === "fulfilled") setTg(tgRes.value);
+      if (labRes.status === "fulfilled") setModules(labRes.value.comparison || []);
+      if (stRes.status === "rejected" && sigRes.status === "rejected" && tgRes.status === "rejected") {
+        setError("Backend API is waking up or unreachable. Retrying automatically...");
+      }
+      setLastSync(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+    const id = setInterval(loadAll, 30_000);
+    return () => clearInterval(id);
+  }, [loadAll]);
+
+  const primaryIeb = instances[0] || null;
+  const activeArms = primaryIeb?.modules_active?.length ?? 0;
+
+  /* ── Real settled signals sorted chronologically for R-Curve ── */
+  const settledChrono = useMemo(() => {
+    const now = Date.now();
+    const cutoff =
+      windowFilter === "7D" ? now - 7 * 86400_000 :
+      windowFilter === "30D" ? now - 30 * 86400_000 : 0;
+
+    return signals
+      .filter((s) => s.resolved && s.r_multiple != null && Number.isFinite(s.r_multiple))
+      .filter((s) => {
+        if (!cutoff) return true;
+        const ts = new Date(s.exit_timestamp || s.generated_at).getTime();
+        return ts >= cutoff;
+      })
+      .sort((a, b) => new Date(a.exit_timestamp || a.generated_at).getTime() - new Date(b.exit_timestamp || b.generated_at).getTime());
+  }, [signals, windowFilter]);
+
+  const equityPoints = useMemo(() => {
+    let cum = 0;
+    return settledChrono.map((s, idx) => {
+      const r = Number(s.r_multiple || 0);
+      cum += r;
+      return {
+        idx,
+        cumR: Number(cum.toFixed(3)),
+        r,
+        symbol: s.symbol,
+        module: s.module_id,
+        date: new Date(s.exit_timestamp || s.generated_at).toLocaleDateString([], { month: "short", day: "numeric" }),
+      };
+    });
+  }, [settledChrono]);
+
+  const recentStats = useMemo(() => {
+    const res = signals.filter((s) => s.resolved && s.r_multiple != null);
+    const wins = res.filter((s) => Number(s.r_multiple) > 0).length;
+    const netR = res.reduce((acc, s) => acc + Number(s.r_multiple || 0), 0);
+    const openN = signals.filter((s) => !s.resolved).length;
+    return {
+      total: signals.length,
+      resolved: res.length,
+      open: openN,
+      winRate: res.length ? (100 * wins) / res.length : 0,
+      netR,
+    };
+  }, [signals]);
+
+  /* ── Real Net R by Symbol ── */
+  const bySymbol = useMemo(() => {
+    const map = new Map<string, { symbol: string; netR: number; n: number; wins: number }>();
+    for (const s of settledChrono) {
+      const cur = map.get(s.symbol) || { symbol: s.symbol, netR: 0, n: 0, wins: 0 };
+      const r = Number(s.r_multiple || 0);
+      cur.netR += r;
+      cur.n += 1;
+      if (r > 0) cur.wins += 1;
+      map.set(s.symbol, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.netR - a.netR).slice(0, 8);
+  }, [settledChrono]);
+
+  /* ── Separate Module Cards (sorted by resolved count & mean_r) ── */
+  const moduleCards = useMemo(() => {
+    return [...modules]
+      .filter((m) => m.signals > 0)
+      .sort((a, b) => (b.resolved - a.resolved) || ((b.mean_r ?? -99) - (a.mean_r ?? -99)) || (b.signals - a.signals));
+  }, [modules]);
+
+  /* ── Right Rail Filtered Signals ── */
+  const filteredFeed = useMemo(() => {
+    return signals.filter((s) => {
+      if (feedFilter === "OPEN") return !s.resolved;
+      if (feedFilter === "WON") return s.resolved && (s.exit_reason === "target" || Number(s.r_multiple || 0) > 0);
+      if (feedFilter === "STOPPED") return s.resolved && (s.exit_reason === "stop" || Number(s.r_multiple || 0) < 0);
+      return true;
+    }).slice(0, 40);
+  }, [signals, feedFilter]);
+
+  /* ── SVG Equity Curve Geometry ── */
+  const chartSvg = useMemo(() => {
+    const W = 760, H = 220, PAD_L = 46, PAD_R = 16, PAD_T = 16, PAD_B = 26;
+    if (!equityPoints.length) return null;
+    const vals = equityPoints.map((p) => p.cumR);
+    const minV = Math.min(0, ...vals);
+    const maxV = Math.max(0.5, ...vals);
+    const span = Math.max(0.5, maxV - minV);
+    const xAt = (i: number) => PAD_L + (equityPoints.length === 1 ? (W - PAD_L - PAD_R) / 2 : (i / (equityPoints.length - 1)) * (W - PAD_L - PAD_R));
+    const yAt = (v: number) => PAD_T + ((maxV - v) / span) * (H - PAD_T - PAD_B);
+    const pts = equityPoints.map((p, i) => ({ ...p, x: xAt(i), y: yAt(p.cumR) }));
+    const lineD = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+    const zeroY = yAt(0);
+    const areaD = `${lineD} L${pts[pts.length - 1].x.toFixed(1)},${zeroY.toFixed(1)} L${pts[0].x.toFixed(1)},${zeroY.toFixed(1)} Z`;
+    return { W, H, PAD_L, PAD_R, PAD_T, PAD_B, pts, lineD, areaD, zeroY, minV, maxV };
+  }, [equityPoints]);
+
+  const activeHover = hoverIdx != null && chartSvg?.pts[hoverIdx] ? chartSvg.pts[hoverIdx] : chartSvg?.pts[chartSvg.pts.length - 1] ?? null;
+
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "hsl(var(--surface-0))" }}
-    >
-
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-20">
-
-        {/* Spatial background — grid of faint lines suggesting depth */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `
-              linear-gradient(hsl(0 0% 15% / 0.15) 1px, transparent 1px),
-              linear-gradient(90deg, hsl(0 0% 15% / 0.15) 1px, transparent 1px)
-            `,
-            backgroundSize: "60px 60px",
-            maskImage: "radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 100%)",
-          }}
-        />
-
-        {/* Status badge */}
-        <div className="flex justify-center mb-8">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1.5"
-            style={{
-              border: "1px solid hsl(var(--primary) / 0.25)",
-              borderRadius: "2px",
-              background: "hsl(var(--primary) / 0.04)",
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: "hsl(var(--bull))", animation: "pulse-live 1.6s ease-in-out infinite" }}
-            />
-            <span
-              className="text-[13px] font-bold tracking-[0.12em]"
-              style={{
-                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                color: "hsl(var(--primary))",
-              }}
-            >
-              RULE-BASED SIGNALS · CONSENSUS SCORE · PUBLIC RECORD
+    <div className="min-h-screen bg-[#070B12] text-slate-100 px-4 py-4 max-w-[1680px] mx-auto space-y-4">
+      {/* Top Status & Refresh Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-base font-bold tracking-wider uppercase font-mono text-white">
+              LIVE IEB &amp; TELEGRAM TERMINAL
+            </h1>
+            <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              REAL MEASUREMENTS
             </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Live InstitutionalEdge bridge telemetry, Telegram @NeuralICC forward record, and per-module expectancy.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs font-mono">
+          <span className="text-slate-400">Synced: <span className="text-slate-200">{lastSync}</span></span>
+          <button
+            onClick={loadAll}
+            className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition cursor-pointer"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2 rounded text-xs font-mono">
+          {error}
+        </div>
+      )}
+
+      {/* 1. TOP KPI STRIP */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: IEB Bridge */}
+        <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span>IEB BRIDGE STATUS</span>
+            <span className={cn(
+              "font-bold",
+              primaryIeb?.state === "CONNECTED" ? "text-emerald-400" :
+              primaryIeb?.state === "PAUSED" ? "text-amber-400" : "text-red-400"
+            )}>
+              {primaryIeb?.state ?? (loading ? "LOADING" : "OFFLINE")}
+            </span>
+          </div>
+          <div className="text-2xl font-bold font-mono text-white mt-1">
+            {activeArms} <span className="text-sm font-normal text-slate-400">ACTIVE ARMS</span>
+          </div>
+          <div className="text-[11px] font-mono text-slate-400 mt-1">
+            Instance: <span className="text-slate-200">{primaryIeb?.instance_id ?? "—"}</span> &bull; Heartbeat {fmtAgo(primaryIeb?.last_heartbeat)}
           </div>
         </div>
 
-        {/* Hero text */}
-        <div className="text-center max-w-3xl mx-auto mb-10 relative">
-          <h1
-            className="font-bold mb-5"
-            style={{
-              fontSize: "clamp(32px, 5vw, 52px)",
-              lineHeight: 1.1,
-              letterSpacing: "-0.04em",
-              color: "hsl(var(--foreground))",
-            }}
-          >
-            Rule-Based Signals
-            <br />
-            <span style={{ color: "hsl(var(--primary))" }}>Trading Copilot</span>
-          </h1>
-          <p
-            className="text-base leading-relaxed max-w-xl mx-auto"
-            style={{ color: "hsl(var(--muted-foreground))" }}
-          >
-            25 built-in strategies and nine rule-based checks vote on every signal.
-            You see the score, the votes and the reasons. No black boxes.
-          </p>
+        {/* Card 2: Telegram Record */}
+        <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span>TELEGRAM @NEURALICC</span>
+            <Link href="/telegram-record" className="text-cyan-400 hover:underline">AUDIT &rarr;</Link>
+          </div>
+          <div className="text-2xl font-bold font-mono text-cyan-300 mt-1">
+            {tg ? tg.posted : "—"} <span className="text-sm font-normal text-slate-400">POSTED</span>
+          </div>
+          <div className="text-[11px] font-mono text-slate-400 mt-1">
+            {tg ? (
+              <>
+                <span className="text-cyan-300">{tg.open} open</span> &bull;{" "}
+                <span className="text-emerald-400">{tg.results.target} TP1</span> &bull;{" "}
+                <span className="text-red-400">{tg.results.stop} SL</span>
+                {tg.r?.mean != null && (
+                  <> &bull; <span className={tg.r.mean >= 0 ? "text-emerald-400" : "text-red-400"}>{tg.r.mean >= 0 ? "+" : ""}{tg.r.mean.toFixed(3)}R</span></>
+                )}
+              </>
+            ) : "Loading Telegram record..."}
+          </div>
         </div>
 
-        {/* CTA buttons */}
-        <div className="flex flex-col sm:flex-row gap-2.5 justify-center mb-16">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 transition-all"
-            style={{
-              background: "hsl(var(--primary))",
-              border: "1px solid hsl(var(--primary))",
-              borderRadius: "2px",
-              color: "hsl(0 0% 98%)",
-              fontSize: "11px",
-              fontWeight: 700,
-              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            <IconTerminal size={13} color="currentColor" />
-            LAUNCH TERMINAL
-            <IconArrowRight size={13} color="currentColor" />
-          </Link>
-          <Link
-            href="/signals"
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 transition-all"
-            style={{
-              background: "transparent",
-              border: "1px solid hsl(var(--border-strong))",
-              borderRadius: "2px",
-              color: "hsl(var(--foreground))",
-              fontSize: "11px",
-              fontWeight: 700,
-              fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            <IconSignal size={13} color="currentColor" />
-            GENERATE SIGNAL
-          </Link>
+        {/* Card 3: Signal Lab */}
+        <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span>SIGNAL LAB MODULES</span>
+            <Link href="/signal-lab" className="text-cyan-400 hover:underline">OPEN LAB &rarr;</Link>
+          </div>
+          <div className="text-2xl font-bold font-mono text-white mt-1">
+            {moduleCards.length} <span className="text-sm font-normal text-slate-400">TRACKED</span>
+          </div>
+          <div className="text-[11px] font-mono text-slate-400 mt-1">
+            {moduleCards.filter((m) => m.resolved > 0).length} with settled outcomes &bull;{" "}
+            {moduleCards.reduce((acc, m) => acc + m.resolved, 0)} total resolved
+          </div>
         </div>
 
-        {/* Stats row */}
-        <div
-          className="grid grid-cols-3 gap-px max-w-xl mx-auto"
-          style={{
-            background: "hsl(var(--border))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: "2px",
-            overflow: "hidden",
-          }}
-        >
-          {STATS.map(({ value, label }) => (
-            <div
-              key={label}
-              className="flex flex-col items-center justify-center py-4 px-2"
-              style={{ background: "hsl(var(--surface-1))" }}
-            >
-              <div
-                className="text-2xl font-bold mb-0.5"
-                style={{
-                  fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                  color: "hsl(var(--primary))",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {value}
-              </div>
-              <div className="terminal-label">{label}</div>
-            </div>
-          ))}
+        {/* Card 4: Recent Feed Performance */}
+        <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span>RECENT 200 SIGNALS</span>
+            <span className="text-slate-300">{recentStats.open} OPEN</span>
+          </div>
+          <div className={cn(
+            "text-2xl font-bold font-mono mt-1",
+            recentStats.netR >= 0 ? "text-emerald-400" : "text-red-400"
+          )}>
+            {recentStats.netR >= 0 ? "+" : ""}{recentStats.netR.toFixed(2)}R
+          </div>
+          <div className="text-[11px] font-mono text-slate-400 mt-1">
+            Resolved: {recentStats.resolved} &bull; Win Rate: <span className="text-slate-200">{recentStats.winRate.toFixed(1)}%</span>
+          </div>
         </div>
       </section>
 
-      {/* ── Features ───────────────────────────────────────────────────────── */}
-      <section
-        className="max-w-7xl mx-auto px-6 py-20"
-        style={{ borderTop: "1px solid hsl(var(--border))" }}
-      >
-        <div className="mb-12">
-          <p
-            className="text-[13px] font-bold tracking-[0.18em] mb-3"
-            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
-          >
-            CAPABILITIES
-          </p>
-          <h2
-            className="font-bold max-w-lg"
-            style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
-          >
-            Rule-based checks, a Consensus Score, and the reasons behind every signal.
-          </h2>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-px"
-          style={{
-            background: "hsl(var(--border))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: "2px",
-            overflow: "hidden",
-          }}
-        >
-          {FEATURES.map(({ icon: Icon, title, description }) => (
-            <div
-              key={title}
-              className="p-5 group transition-colors feature-card"
-            >
-              <div
-                className="h-8 w-8 flex items-center justify-center mb-3"
-                style={{
-                  background: "hsl(var(--primary) / 0.08)",
-                  border: "1px solid hsl(var(--primary) / 0.2)",
-                  borderRadius: "2px",
-                  boxShadow: "inset 0 1px 0 hsl(var(--primary) / 0.15)",
-                }}
-              >
-                <Icon size={14} color="hsl(var(--primary))" strokeWidth={1.5} />
+      {/* 2. MAIN WORKSPACE: LEFT CHARTS (2/3) + RIGHT LIVE SIGNALS (1/3) */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        {/* LEFT COLUMN */}
+        <div className="xl:col-span-8 space-y-4">
+          {/* Chart 1: Cumulative Realized R-Curve */}
+          <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
+                  CUMULATIVE REALIZED R-CURVE (LIVE IEB SETTLEMENTS)
+                </h2>
+                {activeHover && (
+                  <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                    {activeHover.date} &bull; <span className="text-slate-200">{activeHover.symbol}</span> ({activeHover.module}) &bull;{" "}
+                    Trade: <span className={activeHover.r >= 0 ? "text-emerald-400" : "text-red-400"}>{activeHover.r >= 0 ? "+" : ""}{activeHover.r.toFixed(2)}R</span> &bull;{" "}
+                    Cum: <span className={activeHover.cumR >= 0 ? "text-cyan-300 font-bold" : "text-red-400 font-bold"}>{activeHover.cumR >= 0 ? "+" : ""}{activeHover.cumR.toFixed(2)}R</span>
+                  </p>
+                )}
               </div>
-              <h3
-                className="font-semibold mb-1.5"
-                style={{ fontSize: "13px", color: "hsl(var(--foreground))" }}
-              >
-                {title}
-              </h3>
-              <p
-                className="text-[13px] leading-relaxed"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              >
-                {description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Pricing ────────────────────────────────────────────────────────── */}
-      <section
-        className="max-w-7xl mx-auto px-6 py-20"
-        style={{ borderTop: "1px solid hsl(var(--border))" }}
-      >
-        <div className="mb-12">
-          <p
-            className="text-[13px] font-bold tracking-[0.18em] mb-3"
-            style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
-          >
-            PRICING
-          </p>
-          <h2
-            className="font-bold"
-            style={{ fontSize: "clamp(20px, 2.5vw, 28px)", letterSpacing: "-0.025em", color: "hsl(var(--foreground))" }}
-          >
-            Start free. Upgrade when you are ready.
-          </h2>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {TIERS.map(({ name, price, period, features, cta, highlight, color, ...rest }: any) => (
-            <div
-              key={name}
-              className="panel panel-ao relative flex flex-col"
-              style={{
-                borderColor: highlight ? "hsl(var(--bull) / 0.35)" : undefined,
-                background: highlight ? "hsl(var(--surface-2))" : undefined,
-              }}
-            >
-              {highlight && (
-                <div
-                  className="absolute top-0 left-0 right-0 h-px"
-                  style={{
-                    background: "linear-gradient(90deg, transparent, hsl(var(--bull) / 0.7) 50%, transparent)",
-                    zIndex: 2,
-                  }}
-                />
-              )}
-
-              <div className="p-5 flex-1">
-                <div className="mb-4">
-                  <div
-                    className="text-[13px] font-bold tracking-[0.12em] mb-2"
-                    style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color }}
-                  >
-                    {name.toUpperCase()}
-                  </div>
-                  <div className="flex items-baseline gap-0.5">
-                    <span
-                      className="text-3xl font-bold"
-                      style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", letterSpacing: "-0.03em", color: "hsl(var(--foreground))" }}
-                    >
-                      {price}
-                    </span>
-                    {period && (
-                      <span
-                        className="text-[13px]"
-                        style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--muted-foreground))" }}
-                      >
-                        {period}
-                      </span>
+              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded p-0.5 text-[11px] font-mono">
+                {(["7D", "30D", "ALL"] as const).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => { setWindowFilter(w); setHoverIdx(null); }}
+                    className={cn(
+                      "px-2.5 py-1 rounded transition cursor-pointer",
+                      windowFilter === w ? "bg-cyan-500/20 text-cyan-300 font-bold" : "text-slate-400 hover:text-slate-200"
                     )}
-                  </div>
-                </div>
-
-                <ul className="space-y-2 mb-5">
-                  {features.map((f: string) => (
-                    <li
-                      key={f}
-                      className="flex items-center gap-2 text-[13px]"
-                      style={{ color: "hsl(var(--muted-foreground))" }}
-                    >
-                      {/* Geometric bullet — small square, not a circle */}
-                      <div
-                        className="h-1 w-1 shrink-0"
-                        style={{ background: color, borderRadius: "0.5px" }}
-                      />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="px-5 pb-5">
-                <Link
-                  href={rest.href || (name === "Free" ? "/login" : "/pricing")}
-                  className="flex items-center justify-center gap-1.5 w-full py-2 transition-all text-[14px] font-bold tracking-[0.08em] uppercase"
-                  style={{
-                    fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
-                    border: `1px solid ${highlight ? "hsl(var(--bull))" : "hsl(var(--border-strong))"}`,
-                    borderRadius: "2px",
-                    background: highlight ? "hsl(var(--bull))" : "transparent",
-                    color: highlight ? "hsl(0 0% 5%)" : "hsl(var(--foreground))",
-                  }}
-                >
-                  {cta}
-                </Link>
+                  >
+                    {w}
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-      </section>
 
+            {chartSvg ? (
+              <svg
+                viewBox={`0 0 ${chartSvg.W} ${chartSvg.H}`}
+                className="w-full h-56 select-none"
+                onMouseLeave={() => setHoverIdx(null)}
+              >
+                <defs>
+                  <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.30" />
+                    <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+                {/* Zero reference line */}
+                <line
+                  x1={chartSvg.PAD_L} x2={chartSvg.W - chartSvg.PAD_R}
+                  y1={chartSvg.zeroY} y2={chartSvg.zeroY}
+                  stroke="#334155" strokeDasharray="4 4" strokeWidth="1"
+                />
+                <text x={chartSvg.PAD_L - 6} y={chartSvg.zeroY + 3} textAnchor="end" className="fill-slate-500 text-[10px] font-mono">0R</text>
+                <text x={chartSvg.PAD_L - 6} y={chartSvg.PAD_T + 8} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{chartSvg.maxV.toFixed(1)}R</text>
+                <text x={chartSvg.PAD_L - 6} y={chartSvg.H - chartSvg.PAD_B} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{chartSvg.minV.toFixed(1)}R</text>
+
+                <path d={chartSvg.areaD} fill="url(#eqFill)" />
+                <path d={chartSvg.lineD} fill="none" stroke="#22D3EE" strokeWidth="2" />
+
+                {chartSvg.pts.map((p, i) => (
+                  <g key={i}>
+                    <circle
+                      cx={p.x} cy={p.y} r={hoverIdx === i ? 4.5 : 2}
+                      className={cn(
+                        hoverIdx === i ? "fill-white stroke-cyan-400 stroke-2" : p.r >= 0 ? "fill-emerald-400/80" : "fill-red-400/80"
+                      )}
+                    />
+                    <rect
+                      x={p.x - 8} y={chartSvg.PAD_T} width={16} height={chartSvg.H - chartSvg.PAD_T - chartSvg.PAD_B}
+                      fill="transparent"
+                      onMouseEnter={() => setHoverIdx(i)}
+                    />
+                  </g>
+                ))}
+              </svg>
+            ) : (
+              <div className="h-56 flex items-center justify-center text-xs font-mono text-slate-500">
+                {loading ? "Loading settled R-curve..." : "No settled signals in this window yet."}
+              </div>
+            )}
+          </div>
+
+          {/* Chart 2: Outcome Distribution & Net R by Symbol */}
+          <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
+                OUTCOME DISTRIBUTION &amp; NET R BY SYMBOL
+              </h2>
+              <span className="text-[11px] font-mono text-slate-400">{settledChrono.length} settled trades</span>
+            </div>
+            {bySymbol.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {bySymbol.map((row) => {
+                  const wr = row.n ? (100 * row.wins) / row.n : 0;
+                  const pos = row.netR >= 0;
+                  return (
+                    <div key={row.symbol} className="bg-[#111927] border border-slate-800 rounded p-2.5 font-mono">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-white">{row.symbol}</span>
+                        <span className={pos ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                          {pos ? "+" : ""}{row.netR.toFixed(2)}R
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden my-2">
+                        <div
+                          className={cn("h-full rounded-full", pos ? "bg-emerald-400" : "bg-red-400")}
+                          style={{ width: `${Math.min(100, Math.max(8, wr))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>{row.wins}W / {row.n - row.wins}L</span>
+                        <span>{wr.toFixed(0)}% WR</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-xs font-mono text-slate-500">No symbol outcome breakdown available yet.</div>
+            )}
+          </div>
+
+          {/* Section 3: Separate Cards for Each Module (Expectancy & Win Rate) */}
+          <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
+                  MODULE EXPECTANCY &amp; WIN RATE (PER STRATEGY)
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Individual performance card for each tracked module from Signal Lab.
+                </p>
+              </div>
+              <Link href="/signal-lab" className="text-xs font-mono text-cyan-400 hover:underline">
+                Full Signal Lab &rarr;
+              </Link>
+            </div>
+
+            {moduleCards.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {moduleCards.map((m) => {
+                  const wrPct = m.tp1_before_stop != null ? m.tp1_before_stop * 100 : null;
+                  const meanR = m.mean_r;
+                  const rPos = meanR != null && meanR >= 0;
+                  return (
+                    <div
+                      key={`${m.module_id}@${m.version}`}
+                      className="bg-[#111927] border border-slate-800 hover:border-slate-700 rounded-lg p-3 flex flex-col justify-between gap-2 transition"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold font-mono text-white truncate" title={m.module_id}>
+                            {m.module_id}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                            v:{m.version} {m.status ? `• ${m.status}` : ""}
+                          </div>
+                        </div>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[11px] font-mono font-bold shrink-0",
+                          meanR == null ? "bg-slate-800 text-slate-400" :
+                          rPos ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                        )}>
+                          {meanR == null ? "—" : `${rPos ? "+" : ""}${meanR.toFixed(2)}R`}
+                        </span>
+                      </div>
+
+                      {/* Win Rate bar */}
+                      <div>
+                        <div className="flex justify-between text-[11px] font-mono mb-1">
+                          <span className="text-slate-400">Win Rate (TP1)</span>
+                          <span className="text-slate-200 font-semibold">
+                            {wrPct != null ? `${wrPct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              wrPct == null ? "bg-slate-600" : wrPct >= 50 ? "bg-emerald-400" : wrPct >= 35 ? "bg-amber-400" : "bg-red-400"
+                            )}
+                            style={{ width: `${wrPct != null ? Math.min(100, Math.max(4, wrPct)) : 0}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
+                        <span>{m.resolved}/{m.signals} resolved</span>
+                        <span className="truncate max-w-[140px]" title={m.finding || ""}>{m.finding || "accumulating"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-xs font-mono text-slate-500">
+                {loading ? "Loading module cards..." : "No modules recorded yet."}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: LIVE IEB & TELEGRAM SIGNALS */}
+        <aside className="xl:col-span-4 bg-[#0D131F] border border-slate-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
+              LIVE IEB &amp; TELEGRAM SIGNALS
+            </h2>
+            <span className="text-[11px] font-mono text-slate-400">{filteredFeed.length} shown</span>
+          </div>
+
+          <div className="flex items-center gap-1 mb-3 bg-slate-900 border border-slate-800 rounded p-0.5 text-[11px] font-mono">
+            {(["ALL", "OPEN", "WON", "STOPPED"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFeedFilter(f)}
+                className={cn(
+                  "flex-1 py-1 rounded transition cursor-pointer",
+                  feedFilter === f ? "bg-cyan-500/20 text-cyan-300 font-bold" : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-2.5 max-h-[820px] overflow-y-auto pr-1">
+            {filteredFeed.map((s) => {
+              const isLong = s.direction?.toUpperCase() === "LONG" || s.direction?.toUpperCase() === "BUY";
+              const rVal = s.r_multiple != null ? Number(s.r_multiple) : null;
+              const isWin = s.resolved && (s.exit_reason === "target" || (rVal != null && rVal > 0));
+              const isLoss = s.resolved && (s.exit_reason === "stop" || (rVal != null && rVal < 0));
+              const rr =
+                s.stop_reference != null && s.tp1 != null && Math.abs(s.entry_reference - s.stop_reference) > 0
+                  ? Math.abs(s.tp1 - s.entry_reference) / Math.abs(s.entry_reference - s.stop_reference)
+                  : null;
+
+              return (
+                <div
+                  key={s.signal_id}
+                  className={cn(
+                    "bg-[#111927] border rounded-lg p-3 font-mono text-xs transition",
+                    !s.resolved ? "border-cyan-500/30" : isWin ? "border-emerald-500/30" : isLoss ? "border-red-500/30" : "border-slate-800"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">{s.symbol}</span>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                        isLong ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                      )}>
+                        {isLong ? "BUY" : "SELL"}
+                      </span>
+                      {s.timeframe && <span className="text-[10px] text-slate-400">{s.timeframe}</span>}
+                    </div>
+
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-bold",
+                      !s.resolved ? "bg-cyan-500/15 text-cyan-300" :
+                      isWin ? "bg-emerald-500/15 text-emerald-400" :
+                      isLoss ? "bg-red-500/15 text-red-400" : "bg-slate-800 text-slate-300"
+                    )}>
+                      {!s.resolved ? "OPEN" : rVal != null ? `${rVal >= 0 ? "+" : ""}${rVal.toFixed(2)}R` : (s.exit_reason || "CLOSED").toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                    <span className="truncate max-w-[200px]" title={s.module_id}>{s.module_id}</span>
+                    <span>{fmtAgo(s.generated_at)}</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-slate-800/80 text-[11px]">
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">ENTRY</span>
+                      <span className="text-slate-200">{fmtPrice(s.entry_reference, s.symbol)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">SL</span>
+                      <span className="text-red-300">{fmtPrice(s.stop_reference, s.symbol)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">TP1 {rr != null ? `(${rr.toFixed(1)}R)` : ""}</span>
+                      <span className="text-emerald-300">{fmtPrice(s.tp1, s.symbol)}</span>
+                    </div>
+                  </div>
+
+                  {s.on_telegram && (
+                    <div className="mt-1.5 text-[10px] text-sky-400">
+                      Posted on Telegram @NeuralICC
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {!loading && filteredFeed.length === 0 && (
+              <div className="py-10 text-center text-xs font-mono text-slate-500">
+                No signals match this filter.
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
