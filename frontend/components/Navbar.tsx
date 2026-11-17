@@ -28,23 +28,11 @@ import {
 import { RESEARCH_PUBLIC } from "@/lib/visibility";
 
 const NAV_ITEMS = [
-  ...(RESEARCH_PUBLIC ? [{ href: "/lab", label: "TRUTH LAB", Icon: IconFlask }] : []),
-  { href: "/terminal",     label: "TERMINAL",     Icon: IconBands },
-  { href: "/dashboard",    label: "DASHBOARD",    Icon: IconTerminal },
-  { href: "/signals",      label: "SIGNALS",      Icon: IconSignal },
-  { href: "/performance",  label: "PERFORMANCE",  Icon: IconSignal },
-  { href: "/agent-performance", label: "ENSEMBLE", Icon: IconBacktest },
-  { href: "/signal-lab",   label: "SIGNAL LAB",   Icon: IconGrid },
-  { href: "/telegram-record", label: "TG RECORD", Icon: IconSignal },
-  { href: "/journal",      label: "JOURNAL",      Icon: IconPortfolio },
-  { href: "/news",         label: "INTEL",        Icon: IconIntel },
-  { href: "/portfolio",    label: "PORTFOLIO",    Icon: IconPortfolio },
-  { href: "/agents",       label: "ANALYSTS",       Icon: IconAgents },
-  { href: "/backtest",     label: "BACKTEST",     Icon: IconBacktest },
-  { href: "/calendar",     label: "CALENDAR",     Icon: IconCalendar },
-  { href: "/correlation",  label: "CORR MAP",     Icon: IconGrid },
-  { href: "/memory",       label: "MEMORY",       Icon: IconShield },
-  { href: "/guide",        label: "GUIDE",        Icon: IconShield },
+  { href: "/",                label: "TERMINAL",   Icon: IconTerminal },
+  { href: "/signal-lab",      label: "SIGNAL LAB", Icon: IconGrid },
+  { href: "/telegram-record", label: "TG RECORD",  Icon: IconSignal },
+  { href: "/news",            label: "INTEL",      Icon: IconIntel },
+  { href: "/guide",           label: "GUIDE",      Icon: IconShield },
 ];
 
 const TIER_LABEL: Record<UserTier, string> = {
@@ -86,7 +74,26 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
   const [mobileOpen,   setMobileOpen]   = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [signalsToday, setSignalsToday] = useState<number | null>(null);
+  const [iebBadge,     setIebBadge]     = useState<{ state: string; arms: number }>({ state: "CHECKING", arms: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const loadIeb = () => {
+      fetch(`${API}/api/v1/ieb/status`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (!alive || !d?.instances?.length) return;
+          const inst = d.instances[0];
+          setIebBadge({ state: inst.state || "OFFLINE", arms: (inst.modules_active || []).length });
+        })
+        .catch(() => { if (alive) setIebBadge(prev => ({ ...prev, state: prev.state === "CHECKING" ? "OFFLINE" : prev.state })); });
+    };
+    loadIeb();
+    const id = setInterval(loadIeb, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -224,7 +231,7 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center h-full overflow-x-auto scrollbar-none">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
-            const active  = pathname === href || pathname.startsWith(href + "/");
+            const active  = pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
             const isIntel = href === "/news";
             return (
               <Link
@@ -278,23 +285,34 @@ export function Navbar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
           {/* Divider */}
           <div className="hidden sm:block h-5 w-px" style={{ background: "hsl(var(--border-strong))" }} />
 
-          {/* Paper equity */}
-          <div
-            className="hidden lg:flex items-center gap-1.5 px-2 py-1"
+          {/* Live IEB Bridge Status */}
+          <Link
+            href="/signal-lab"
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 transition-colors hover:border-[hsl(var(--primary)/0.5)]"
             style={{
               border: "1px solid hsl(var(--border-strong))",
               borderRadius: "2px",
               background: "hsl(var(--surface-0))",
             }}
           >
-            <span className="terminal-label">PAPER</span>
             <span
-              className="text-[13px] font-bold"
-              style={{ fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace", color: "hsl(var(--primary))" }}
+              className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                iebBadge.state === "CONNECTED" ? "bg-emerald-400 animate-pulse" :
+                iebBadge.state === "PAUSED" ? "bg-amber-400" : "bg-red-400"
+              )}
+            />
+            <span className="terminal-label">IEB</span>
+            <span
+              className="text-[11px] font-bold tracking-wider"
+              style={{
+                fontFamily: "'BerkeleyMono', 'IBM Plex Mono', monospace",
+                color: iebBadge.state === "CONNECTED" ? "#34d399" : iebBadge.state === "PAUSED" ? "#fbbf24" : "#f87171",
+              }}
             >
-              $100,000
+              {iebBadge.state}{iebBadge.arms > 0 ? ` (${iebBadge.arms})` : ""}
             </span>
-          </div>
+          </Link>
 
           {/* Account area */}
           {!loading && (
