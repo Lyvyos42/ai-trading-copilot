@@ -13,7 +13,6 @@ interface IebInstance {
   last_heartbeat?: string | null;
   last_signal_received?: string | null;
   modules_active?: string[];
-  backlog?: { signals?: number; outcomes?: number; executions?: number; telegram?: number };
 }
 
 interface IebSignal {
@@ -42,7 +41,8 @@ interface TelegramRecord {
   open: number;
   results: { target: number; stop: number; other: number; unknown?: number; no_stop?: number };
   tp1_before_stop?: { k: number; n: number; rate: number | null };
-  r?: { n: number; mean: number | null; win_rate: number | null; avg_win: number | null; avg_loss: number | null };
+  r?: { n: number; mean: number | null; win_rate: number | null };
+  signals?: IebSignal[];
 }
 
 interface LabModuleRow {
@@ -59,6 +59,15 @@ interface LabModuleRow {
   r_n: number;
   finding?: string;
   next_step?: string;
+}
+
+interface CurvePt {
+  idx: number;
+  cumR: number;
+  r: number;
+  symbol: string;
+  module: string;
+  date: string;
 }
 
 function fmtPrice(px: number | null | undefined, symbol: string): string {
@@ -79,6 +88,26 @@ function fmtAgo(iso: string | null | undefined): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function MiniCurve({ pts }: { pts: CurvePt[] }) {
+  if (pts.length < 2) {
+    return <div className="h-10 flex items-center text-[10px] font-mono text-slate-500">Awaiting 2+ settled trades</div>;
+  }
+  const W = 220, H = 40, PAD = 4;
+  const vals = [0, ...pts.map((p) => p.cumR)];
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const xAt = (i: number) => PAD + (i / (pts.length - 1)) * (W - 2 * PAD);
+  const yAt = (v: number) => H - PAD - ((v - lo) / span) * (H - 2 * PAD);
+  const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(p.cumR).toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1].cumR;
+  const stroke = last >= 0 ? "#34d399" : "#f87171";
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-10">
+      <line x1={PAD} x2={W - PAD} y1={yAt(0)} y2={yAt(0)} stroke="#334155" strokeDasharray="3 3" strokeWidth="1" />
+      <path d={d} fill="none" stroke={stroke} strokeWidth="1.75" />
+    </svg>
+  );
+}
+
 export default function LiveTerminalPage() {
   const [instances, setInstances] = useState<IebInstance[]>([]);
   const [signals, setSignals] = useState<IebSignal[]>([]);
@@ -87,7 +116,7 @@ export default function LiveTerminalPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [windowFilter, setWindowFilter] = useState<"7D" | "30D" | "ALL">("ALL");
+  const [selectedModule, setSelectedModule] = useState<string>("");
   const [feedFilter, setFeedFilter] = useState<"ALL" | "OPEN" | "WON" | "STOPPED">("ALL");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<string>("—");
@@ -123,57 +152,75 @@ export default function LiveTerminalPage() {
   const primaryIeb = instances[0] || null;
   const activeArms = primaryIeb?.modules_active?.length ?? 0;
 
-  /* ── Real settled signals sorted chronologically for R-Curve ── */
-  const settledChrono = useMemo(() => {
-    const now = Date.now();
-    const cutoff =
-      windowFilter === "7D" ? now - 7 * 86400_000 :
-      windowFilter === "30D" ? now - 30 * 86400_000 : 0;
+  /* ── Combine unique recent + telegram settled signals per module ── */
+  const allSignals = useMemo(() => {
+    const map = new Map<string, IebSignal>();
+    for (const s of tg?.signals || []) map.set(s.signal_id, s);
+    for (const s of signals) map.set(s.signal_id, s);
+    return Array.from(map.values());
+  }, [signals, tg]);
 
-    return signals
-      .filter((s) => s.resolved && s.r_multiple != null && Number.isFinite(s.r_multiple))
-      .filter((s) => {
-        if (!cutoff) return true;
-        const ts = new Date(s.exit_timestamp || s.generated_at).getTime();
-        return ts >= cutoff;
-      })
-      .sort((a, b) => new Date(a.exit_timestamp || a.generated_at).getTime() - new Date(b.exit_timestamp || b.generated_at).getTime());
-  }, [signals, windowFilter]);
-
-  const equityPoints = useMemo(() => {
-    let cum = 0;
-    return settledChrono.map((s, idx) => {
-      const r = Number(s.r_multiple || 0);
-      cum += r;
-      return {
-        idx,
-        cumR: Number(cum.toFixed(3)),
-        r,
-        symbol: s.symbol,
-        module: s.module_id,
-        date: new Date(s.exit_timestamp || s.generated_at).toLocaleDateString([], { month: "short", day: "numeric" }),
-      };
+  const curvesByModule = useMemo(() => {
+    const grouped = new Map<string, IebSignal[]>();
+    for (const s of allSignals) {
+      if (!s.resolved || s.r_multiple == null || !Number.isFinite(s.r_multiple)) continue;
+      const arr = grouped.get(s.module_id) || [];
+      arr.push(s);
+      grouped.set(s.module_id, arr);
+    }
+    const out = new Map<string, CurvePt[]>();
+    Array.from(grouped.entries()).forEach(([mid, arr]) => {
+      arr.sort((a, b) => new Date(a.exit_timestamp || a.generated_at).getTime() - new Date(b.exit_timestamp || b.generated_at).getTime());
+      let cum = 0;
+      out.set(mid, arr.map((s, idx) => {
+        const r = Number(s.r_multiple || 0);
+        cum += r;
+        return {
+          idx,
+          cumR: Number(cum.toFixed(3)),
+          r,
+          symbol: s.symbol,
+          module: mid,
+          date: new Date(s.exit_timestamp || s.generated_at).toLocaleDateString([], { month: "short", day: "numeric" }),
+        };
+      }));
     });
-  }, [settledChrono]);
+    return out;
+  }, [allSignals]);
 
-  const recentStats = useMemo(() => {
-    const res = signals.filter((s) => s.resolved && s.r_multiple != null);
-    const wins = res.filter((s) => Number(s.r_multiple) > 0).length;
-    const netR = res.reduce((acc, s) => acc + Number(s.r_multiple || 0), 0);
-    const openN = signals.filter((s) => !s.resolved).length;
-    return {
-      total: signals.length,
-      resolved: res.length,
-      open: openN,
-      winRate: res.length ? (100 * wins) / res.length : 0,
-      netR,
-    };
-  }, [signals]);
+  /* ── Separate Module Cards (sorted by positive mean_r / resolved count) ── */
+  const moduleCards = useMemo(() => {
+    return [...modules]
+      .filter((m) => m.signals > 0)
+      .sort((a, b) => {
+        const aHas = (curvesByModule.get(a.module_id)?.length || 0) >= 2 ? 1 : 0;
+        const bHas = (curvesByModule.get(b.module_id)?.length || 0) >= 2 ? 1 : 0;
+        if (bHas !== aHas) return bHas - aHas;
+        return ((b.mean_r ?? -99) - (a.mean_r ?? -99)) || (b.resolved - a.resolved);
+      });
+  }, [modules, curvesByModule]);
 
-  /* ── Real Net R by Symbol ── */
+  const positiveModules = useMemo(
+    () => moduleCards.filter((m) => m.resolved >= 2 && (m.mean_r ?? -1) > 0),
+    [moduleCards]
+  );
+
+  /* ── Auto-select top positive module with >=2 settled points ── */
+  const activeModuleId = useMemo(() => {
+    if (selectedModule && curvesByModule.has(selectedModule)) return selectedModule;
+    const best = moduleCards.find((m) => (curvesByModule.get(m.module_id)?.length || 0) >= 2);
+    if (best) return best.module_id;
+    const firstKey = curvesByModule.keys().next().value;
+    return firstKey || "";
+  }, [selectedModule, moduleCards, curvesByModule]);
+
+  const activeCurve = useMemo(() => curvesByModule.get(activeModuleId) || [], [curvesByModule, activeModuleId]);
+
+  /* ── Real Net R by Symbol (across recent settled signals) ── */
   const bySymbol = useMemo(() => {
     const map = new Map<string, { symbol: string; netR: number; n: number; wins: number }>();
-    for (const s of settledChrono) {
+    for (const s of signals) {
+      if (!s.resolved || s.r_multiple == null || !Number.isFinite(s.r_multiple)) continue;
       const cur = map.get(s.symbol) || { symbol: s.symbol, netR: 0, n: 0, wins: 0 };
       const r = Number(s.r_multiple || 0);
       cur.netR += r;
@@ -182,14 +229,7 @@ export default function LiveTerminalPage() {
       map.set(s.symbol, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.netR - a.netR).slice(0, 8);
-  }, [settledChrono]);
-
-  /* ── Separate Module Cards (sorted by resolved count & mean_r) ── */
-  const moduleCards = useMemo(() => {
-    return [...modules]
-      .filter((m) => m.signals > 0)
-      .sort((a, b) => (b.resolved - a.resolved) || ((b.mean_r ?? -99) - (a.mean_r ?? -99)) || (b.signals - a.signals));
-  }, [modules]);
+  }, [signals]);
 
   /* ── Right Rail Filtered Signals ── */
   const filteredFeed = useMemo(() => {
@@ -201,22 +241,23 @@ export default function LiveTerminalPage() {
     }).slice(0, 40);
   }, [signals, feedFilter]);
 
-  /* ── SVG Equity Curve Geometry ── */
+  /* ── SVG Geometry for Selected Module's Independent Curve ── */
   const chartSvg = useMemo(() => {
     const W = 760, H = 220, PAD_L = 46, PAD_R = 16, PAD_T = 16, PAD_B = 26;
-    if (!equityPoints.length) return null;
-    const vals = equityPoints.map((p) => p.cumR);
-    const minV = Math.min(0, ...vals);
+    if (!activeCurve.length) return null;
+    const vals = [0, ...activeCurve.map((p) => p.cumR)];
+    const minV = Math.min(...vals);
     const maxV = Math.max(0.5, ...vals);
     const span = Math.max(0.5, maxV - minV);
-    const xAt = (i: number) => PAD_L + (equityPoints.length === 1 ? (W - PAD_L - PAD_R) / 2 : (i / (equityPoints.length - 1)) * (W - PAD_L - PAD_R));
+    const xAt = (i: number) => PAD_L + (activeCurve.length === 1 ? (W - PAD_L - PAD_R) / 2 : (i / (activeCurve.length - 1)) * (W - PAD_L - PAD_R));
     const yAt = (v: number) => PAD_T + ((maxV - v) / span) * (H - PAD_T - PAD_B);
-    const pts = equityPoints.map((p, i) => ({ ...p, x: xAt(i), y: yAt(p.cumR) }));
+    const pts = activeCurve.map((p, i) => ({ ...p, x: xAt(i), y: yAt(p.cumR) }));
     const lineD = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
     const zeroY = yAt(0);
     const areaD = `${lineD} L${pts[pts.length - 1].x.toFixed(1)},${zeroY.toFixed(1)} L${pts[0].x.toFixed(1)},${zeroY.toFixed(1)} Z`;
-    return { W, H, PAD_L, PAD_R, PAD_T, PAD_B, pts, lineD, areaD, zeroY, minV, maxV };
-  }, [equityPoints]);
+    const isPos = pts[pts.length - 1].cumR >= 0;
+    return { W, H, PAD_L, PAD_R, PAD_T, PAD_B, pts, lineD, areaD, zeroY, minV, maxV, isPos };
+  }, [activeCurve]);
 
   const activeHover = hoverIdx != null && chartSvg?.pts[hoverIdx] ? chartSvg.pts[hoverIdx] : chartSvg?.pts[chartSvg.pts.length - 1] ?? null;
 
@@ -230,11 +271,11 @@ export default function LiveTerminalPage() {
               LIVE IEB &amp; TELEGRAM TERMINAL
             </h1>
             <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              REAL MEASUREMENTS
+              INDEPENDENT MODULE CURVES
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Live InstitutionalEdge bridge telemetry, Telegram @NeuralICC forward record, and per-module expectancy.
+            Each strategy and module is measured independently—click any module card to inspect its standalone R-curve.
           </p>
         </div>
 
@@ -257,7 +298,6 @@ export default function LiveTerminalPage() {
 
       {/* 1. TOP KPI STRIP */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Card 1: IEB Bridge */}
         <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>IEB BRIDGE STATUS</span>
@@ -277,7 +317,6 @@ export default function LiveTerminalPage() {
           </div>
         </div>
 
-        {/* Card 2: Telegram Record */}
         <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>TELEGRAM @NEURALICC</span>
@@ -292,15 +331,11 @@ export default function LiveTerminalPage() {
                 <span className="text-cyan-300">{tg.open} open</span> &bull;{" "}
                 <span className="text-emerald-400">{tg.results.target} TP1</span> &bull;{" "}
                 <span className="text-red-400">{tg.results.stop} SL</span>
-                {tg.r?.mean != null && (
-                  <> &bull; <span className={tg.r.mean >= 0 ? "text-emerald-400" : "text-red-400"}>{tg.r.mean >= 0 ? "+" : ""}{tg.r.mean.toFixed(3)}R</span></>
-                )}
               </>
             ) : "Loading Telegram record..."}
           </div>
         </div>
 
-        {/* Card 3: Signal Lab */}
         <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>SIGNAL LAB MODULES</span>
@@ -310,62 +345,53 @@ export default function LiveTerminalPage() {
             {moduleCards.length} <span className="text-sm font-normal text-slate-400">TRACKED</span>
           </div>
           <div className="text-[11px] font-mono text-slate-400 mt-1">
-            {moduleCards.filter((m) => m.resolved > 0).length} with settled outcomes &bull;{" "}
-            {moduleCards.reduce((acc, m) => acc + m.resolved, 0)} total resolved
+            {moduleCards.reduce((acc, m) => acc + m.resolved, 0)} independent settlements recorded
           </div>
         </div>
 
-        {/* Card 4: Recent Feed Performance */}
         <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-3.5">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>RECENT 200 SIGNALS</span>
-            <span className="text-slate-300">{recentStats.open} OPEN</span>
+            <span>POSITIVE MODULES</span>
+            <span className="text-emerald-400 font-bold">{positiveModules.length} WINNERS</span>
           </div>
-          <div className={cn(
-            "text-2xl font-bold font-mono mt-1",
-            recentStats.netR >= 0 ? "text-emerald-400" : "text-red-400"
-          )}>
-            {recentStats.netR >= 0 ? "+" : ""}{recentStats.netR.toFixed(2)}R
+          <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
+            {positiveModules[0]?.mean_r != null ? `+${positiveModules[0].mean_r.toFixed(2)}R` : "—"}
+            <span className="text-xs font-normal text-slate-400 ml-1.5">TOP MEAN</span>
           </div>
-          <div className="text-[11px] font-mono text-slate-400 mt-1">
-            Resolved: {recentStats.resolved} &bull; Win Rate: <span className="text-slate-200">{recentStats.winRate.toFixed(1)}%</span>
+          <div className="text-[11px] font-mono text-slate-400 mt-1 truncate">
+            Leader: <span className="text-slate-200">{positiveModules[0]?.module_id ?? "—"}</span>
           </div>
         </div>
       </section>
 
       {/* 2. MAIN WORKSPACE: LEFT CHARTS (2/3) + RIGHT LIVE SIGNALS (1/3) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* LEFT COLUMN */}
         <div className="xl:col-span-8 space-y-4">
-          {/* Chart 1: Cumulative Realized R-Curve */}
+          {/* Chart 1: Selected Module's Independent R-Curve */}
           <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
-                  CUMULATIVE REALIZED R-CURVE (LIVE IEB SETTLEMENTS)
+                  MODULE OUTCOME CURVE: <span className="text-cyan-300">{activeModuleId || "—"}</span>
                 </h2>
                 {activeHover && (
                   <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-                    {activeHover.date} &bull; <span className="text-slate-200">{activeHover.symbol}</span> ({activeHover.module}) &bull;{" "}
+                    {activeHover.date} &bull; <span className="text-slate-200">{activeHover.symbol}</span> &bull;{" "}
                     Trade: <span className={activeHover.r >= 0 ? "text-emerald-400" : "text-red-400"}>{activeHover.r >= 0 ? "+" : ""}{activeHover.r.toFixed(2)}R</span> &bull;{" "}
-                    Cum: <span className={activeHover.cumR >= 0 ? "text-cyan-300 font-bold" : "text-red-400 font-bold"}>{activeHover.cumR >= 0 ? "+" : ""}{activeHover.cumR.toFixed(2)}R</span>
+                    Module Cum: <span className={activeHover.cumR >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>{activeHover.cumR >= 0 ? "+" : ""}{activeHover.cumR.toFixed(2)}R</span>
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded p-0.5 text-[11px] font-mono">
-                {(["7D", "30D", "ALL"] as const).map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => { setWindowFilter(w); setHoverIdx(null); }}
-                    className={cn(
-                      "px-2.5 py-1 rounded transition cursor-pointer",
-                      windowFilter === w ? "bg-cyan-500/20 text-cyan-300 font-bold" : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    {w}
-                  </button>
+
+              <select
+                value={activeModuleId}
+                onChange={(e) => { setSelectedModule(e.target.value); setHoverIdx(null); }}
+                className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-slate-200"
+              >
+                {Array.from(curvesByModule.keys()).sort().map((mid) => (
+                  <option key={mid} value={mid}>{mid} ({curvesByModule.get(mid)?.length || 0})</option>
                 ))}
-              </div>
+              </select>
             </div>
 
             {chartSvg ? (
@@ -375,12 +401,11 @@ export default function LiveTerminalPage() {
                 onMouseLeave={() => setHoverIdx(null)}
               >
                 <defs>
-                  <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.30" />
-                    <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.02" />
+                  <linearGradient id="modEqFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartSvg.isPos ? "#10B981" : "#EF4444"} stopOpacity="0.28" />
+                    <stop offset="100%" stopColor={chartSvg.isPos ? "#10B981" : "#EF4444"} stopOpacity="0.02" />
                   </linearGradient>
                 </defs>
-                {/* Zero reference line */}
                 <line
                   x1={chartSvg.PAD_L} x2={chartSvg.W - chartSvg.PAD_R}
                   y1={chartSvg.zeroY} y2={chartSvg.zeroY}
@@ -390,19 +415,19 @@ export default function LiveTerminalPage() {
                 <text x={chartSvg.PAD_L - 6} y={chartSvg.PAD_T + 8} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{chartSvg.maxV.toFixed(1)}R</text>
                 <text x={chartSvg.PAD_L - 6} y={chartSvg.H - chartSvg.PAD_B} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{chartSvg.minV.toFixed(1)}R</text>
 
-                <path d={chartSvg.areaD} fill="url(#eqFill)" />
-                <path d={chartSvg.lineD} fill="none" stroke="#22D3EE" strokeWidth="2" />
+                <path d={chartSvg.areaD} fill="url(#modEqFill)" />
+                <path d={chartSvg.lineD} fill="none" stroke={chartSvg.isPos ? "#34d399" : "#f87171"} strokeWidth="2.2" />
 
                 {chartSvg.pts.map((p, i) => (
                   <g key={i}>
                     <circle
-                      cx={p.x} cy={p.y} r={hoverIdx === i ? 4.5 : 2}
+                      cx={p.x} cy={p.y} r={hoverIdx === i ? 4.5 : 2.5}
                       className={cn(
-                        hoverIdx === i ? "fill-white stroke-cyan-400 stroke-2" : p.r >= 0 ? "fill-emerald-400/80" : "fill-red-400/80"
+                        hoverIdx === i ? "fill-white stroke-cyan-400 stroke-2" : p.r >= 0 ? "fill-emerald-400" : "fill-red-400"
                       )}
                     />
                     <rect
-                      x={p.x - 8} y={chartSvg.PAD_T} width={16} height={chartSvg.H - chartSvg.PAD_T - chartSvg.PAD_B}
+                      x={p.x - 10} y={chartSvg.PAD_T} width={20} height={chartSvg.H - chartSvg.PAD_T - chartSvg.PAD_B}
                       fill="transparent"
                       onMouseEnter={() => setHoverIdx(i)}
                     />
@@ -411,18 +436,107 @@ export default function LiveTerminalPage() {
               </svg>
             ) : (
               <div className="h-56 flex items-center justify-center text-xs font-mono text-slate-500">
-                {loading ? "Loading settled R-curve..." : "No settled signals in this window yet."}
+                {loading ? "Loading module outcome curve..." : "Select a module with settled trades to view its curve."}
               </div>
             )}
           </div>
 
-          {/* Chart 2: Outcome Distribution & Net R by Symbol */}
+          {/* Section 2: Separate Cards for Each Module (with Independent Mini Curve + Expectancy + Win Rate) */}
+          <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
+                  INDEPENDENT STRATEGY &amp; MODULE CARDS
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Separate curve, expectancy, and win rate per module. Click any card to inspect above.
+                </p>
+              </div>
+              <Link href="/signal-lab" className="text-xs font-mono text-cyan-400 hover:underline">
+                Full Signal Lab &rarr;
+              </Link>
+            </div>
+
+            {moduleCards.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {moduleCards.map((m) => {
+                  const wrPct = m.tp1_before_stop != null ? m.tp1_before_stop * 100 : null;
+                  const meanR = m.mean_r;
+                  const rPos = meanR != null && meanR >= 0;
+                  const pts = curvesByModule.get(m.module_id) || [];
+                  const selected = activeModuleId === m.module_id;
+                  return (
+                    <button
+                      key={`${m.module_id}@${m.version}`}
+                      type="button"
+                      onClick={() => { if (pts.length) { setSelectedModule(m.module_id); setHoverIdx(null); } }}
+                      className={cn(
+                        "text-left bg-[#111927] border rounded-lg p-3 flex flex-col justify-between gap-2 transition cursor-pointer",
+                        selected ? "border-cyan-400/70 ring-1 ring-cyan-400/30" : "border-slate-800 hover:border-slate-700"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2 w-full">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold font-mono text-white truncate" title={m.module_id}>
+                            {m.module_id}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                            v:{m.version} {m.status ? `• ${m.status}` : ""}
+                          </div>
+                        </div>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[11px] font-mono font-bold shrink-0",
+                          meanR == null ? "bg-slate-800 text-slate-400" :
+                          rPos ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                        )}>
+                          {meanR == null ? "—" : `${rPos ? "+" : ""}${meanR.toFixed(2)}R`}
+                        </span>
+                      </div>
+
+                      {/* Independent Mini Outcome Curve */}
+                      <MiniCurve pts={pts} />
+
+                      {/* Win Rate bar */}
+                      <div className="w-full">
+                        <div className="flex justify-between text-[11px] font-mono mb-1">
+                          <span className="text-slate-400">Win Rate (TP1)</span>
+                          <span className="text-slate-200 font-semibold">
+                            {wrPct != null ? `${wrPct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              wrPct == null ? "bg-slate-600" : wrPct >= 50 ? "bg-emerald-400" : wrPct >= 35 ? "bg-amber-400" : "bg-red-400"
+                            )}
+                            style={{ width: `${wrPct != null ? Math.min(100, Math.max(4, wrPct)) : 0}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between w-full text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
+                        <span>{m.resolved}/{m.signals} resolved</span>
+                        <span className="truncate max-w-[140px]" title={m.finding || ""}>{m.finding || "accumulating"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-xs font-mono text-slate-500">
+                {loading ? "Loading module cards..." : "No modules recorded yet."}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Outcome Distribution & Net R by Symbol */}
           <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
                 OUTCOME DISTRIBUTION &amp; NET R BY SYMBOL
               </h2>
-              <span className="text-[11px] font-mono text-slate-400">{settledChrono.length} settled trades</span>
+              <span className="text-[11px] font-mono text-slate-400">Recent 200 signals</span>
             </div>
             {bySymbol.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -455,85 +569,6 @@ export default function LiveTerminalPage() {
               <div className="py-8 text-center text-xs font-mono text-slate-500">No symbol outcome breakdown available yet.</div>
             )}
           </div>
-
-          {/* Section 3: Separate Cards for Each Module (Expectancy & Win Rate) */}
-          <div className="bg-[#0D131F] border border-slate-800 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-200">
-                  MODULE EXPECTANCY &amp; WIN RATE (PER STRATEGY)
-                </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Individual performance card for each tracked module from Signal Lab.
-                </p>
-              </div>
-              <Link href="/signal-lab" className="text-xs font-mono text-cyan-400 hover:underline">
-                Full Signal Lab &rarr;
-              </Link>
-            </div>
-
-            {moduleCards.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {moduleCards.map((m) => {
-                  const wrPct = m.tp1_before_stop != null ? m.tp1_before_stop * 100 : null;
-                  const meanR = m.mean_r;
-                  const rPos = meanR != null && meanR >= 0;
-                  return (
-                    <div
-                      key={`${m.module_id}@${m.version}`}
-                      className="bg-[#111927] border border-slate-800 hover:border-slate-700 rounded-lg p-3 flex flex-col justify-between gap-2 transition"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold font-mono text-white truncate" title={m.module_id}>
-                            {m.module_id}
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-400 mt-0.5">
-                            v:{m.version} {m.status ? `• ${m.status}` : ""}
-                          </div>
-                        </div>
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded text-[11px] font-mono font-bold shrink-0",
-                          meanR == null ? "bg-slate-800 text-slate-400" :
-                          rPos ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-                        )}>
-                          {meanR == null ? "—" : `${rPos ? "+" : ""}${meanR.toFixed(2)}R`}
-                        </span>
-                      </div>
-
-                      {/* Win Rate bar */}
-                      <div>
-                        <div className="flex justify-between text-[11px] font-mono mb-1">
-                          <span className="text-slate-400">Win Rate (TP1)</span>
-                          <span className="text-slate-200 font-semibold">
-                            {wrPct != null ? `${wrPct.toFixed(1)}%` : "—"}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              wrPct == null ? "bg-slate-600" : wrPct >= 50 ? "bg-emerald-400" : wrPct >= 35 ? "bg-amber-400" : "bg-red-400"
-                            )}
-                            style={{ width: `${wrPct != null ? Math.min(100, Math.max(4, wrPct)) : 0}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
-                        <span>{m.resolved}/{m.signals} resolved</span>
-                        <span className="truncate max-w-[140px]" title={m.finding || ""}>{m.finding || "accumulating"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-xs font-mono text-slate-500">
-                {loading ? "Loading module cards..." : "No modules recorded yet."}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* RIGHT COLUMN: LIVE IEB & TELEGRAM SIGNALS */}
@@ -560,7 +595,7 @@ export default function LiveTerminalPage() {
             ))}
           </div>
 
-          <div className="space-y-2.5 max-h-[820px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[960px] overflow-y-auto pr-1">
             {filteredFeed.map((s) => {
               const isLong = s.direction?.toUpperCase() === "LONG" || s.direction?.toUpperCase() === "BUY";
               const rVal = s.r_multiple != null ? Number(s.r_multiple) : null;

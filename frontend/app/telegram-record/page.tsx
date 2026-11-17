@@ -60,6 +60,7 @@ function CumulativeChart({ pts }: { pts: Rec["cumulative"] }) {
 export default function TelegramRecordPage() {
   const [rec, setRec] = useState<Rec | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMod, setSelectedMod] = useState<string>("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -73,15 +74,42 @@ export default function TelegramRecordPage() {
   }, []);
   useEffect(() => { load(); const id = setInterval(load, 60000); return () => clearInterval(id); }, [load]);
 
+  const moduleCurves = (() => {
+    const out: Record<string, { t: string; r: number; cum_r: number }[]> = {};
+    if (!rec?.signals) return out;
+    const byM: Record<string, Sig[]> = {};
+    for (const s of rec.signals) {
+      if (!s.resolved || s.r_multiple == null || !Number.isFinite(s.r_multiple)) continue;
+      (byM[s.module_id] ||= []).push(s);
+    }
+    for (const [m, arr] of Object.entries(byM)) {
+      arr.sort((a, b) => (a.exit_timestamp || a.generated_at).localeCompare(b.exit_timestamp || b.generated_at));
+      let cum = 0;
+      out[m] = arr.map((s) => {
+        const val = Number(s.r_multiple || 0);
+        cum += val;
+        return { t: s.exit_timestamp || s.generated_at, r: val, cum_r: Number(cum.toFixed(3)) };
+      });
+    }
+    return out;
+  })();
+
+  const activeMod = (() => {
+    if (selectedMod && moduleCurves[selectedMod]) return selectedMod;
+    const entries = Object.entries(moduleCurves).filter(([, pts]) => pts.length >= 2);
+    if (!entries.length) return Object.keys(moduleCurves)[0] || "";
+    entries.sort((a, b) => b[1][b[1].length - 1].cum_r - a[1][a[1].length - 1].cum_r);
+    return entries[0][0];
+  })();
+
   const tp = rec?.tp1_before_stop;
   return (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
       <header className="space-y-2">
         <h1 className="text-xl sm:text-2xl font-mono font-bold tracking-wide">TELEGRAM SIGNAL RECORD</h1>
         <p className="text-sm text-foreground/75 max-w-3xl leading-relaxed">
-          Every IEB signal posted to the public channel before its result was known, and every result - wins, losses and
-          unknown exits alike. Only posted signals are counted and nothing is removed afterwards. R is measured at the
-          module&apos;s own prices, before your broker&apos;s costs.
+          Every IEB signal posted to the public channel before its result was known, measured independently per module.
+          R is measured at the module&apos;s own prices, before your broker&apos;s costs.
         </p>
         <a href={rec?.channel || "https://t.me/NeuralICC"} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center min-h-[44px] px-4 rounded border border-primary/40 text-primary font-mono text-sm hover:bg-primary/10">
@@ -105,18 +133,29 @@ export default function TelegramRecordPage() {
               sub={`target / stop · ${rec.results.other ?? 0} module exit · ${rec.results.unknown ?? 0} unknown`} />
             <Tile label="TP1 before stop" value={tp?.n ? pct(tp.rate) : "-"}
               sub={tp?.n ? `${tp.k} of ${tp.n} · 95% ${pct(tp.lo)}-${pct(tp.hi)}${tp.adequate ? "" : " · insufficient sample"}` : "no target/stop results yet"} />
-            <Tile label="Total result" value={`${rr(rec.total_r)} R`} tone={rec.total_r > 0 ? "bull" : rec.total_r < 0 ? "bear" : undefined}
-              sub={rec.r.n ? `mean ${rr(rec.r.mean)} R over ${rec.r.n}${rec.r.lo != null ? ` · 95% ${rr(rec.r.lo)}..${rr(rec.r.hi)}` : ""}` : "no known results yet"} />
+            <Tile label="Modules tracked" value={String(Object.keys(rec.by_module).length)}
+              sub={`${Object.values(rec.by_module).filter((g) => (g.mean_r ?? -1) > 0 && g.r_n >= 2).length} positive mean R`} />
           </section>
 
           <section className="terminal-panel p-4 sm:p-5">
-            <h2 className="terminal-label mb-3">Cumulative result (R, before costs)</h2>
-            <CumulativeChart pts={rec.cumulative} />
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="terminal-label">Independent module curve: <span className="text-primary">{activeMod || "-"}</span></h2>
+              <select
+                value={activeMod}
+                onChange={(e) => setSelectedMod(e.target.value)}
+                className="bg-background border border-border rounded px-2.5 py-1 text-xs font-mono"
+              >
+                {Object.keys(moduleCurves).sort().map((m) => (
+                  <option key={m} value={m}>{m} ({moduleCurves[m].length})</option>
+                ))}
+              </select>
+            </div>
+            <CumulativeChart pts={moduleCurves[activeMod] || []} />
           </section>
 
           {Object.keys(rec.by_module).length > 0 && (
             <section className="terminal-panel p-4 sm:p-5">
-              <h2 className="terminal-label mb-3">By module</h2>
+              <h2 className="terminal-label mb-3">By module (click row to view curve)</h2>
               <div className="overflow-x-auto -mx-4 sm:mx-0">
                 <table className="w-full min-w-[560px] text-[13px] font-mono">
                   <thead><tr className="text-left terminal-label">
@@ -124,11 +163,19 @@ export default function TelegramRecordPage() {
                     <th className="px-2 font-semibold text-right">Known results</th><th className="px-2 font-semibold text-right">TP1 first</th>
                     <th className="px-2 font-semibold text-right">Mean R (95%)</th></tr></thead>
                   <tbody>
-                    {Object.entries(rec.by_module).map(([m, g]) => (
-                      <tr key={m} className="border-t border-border/40">
+                    {Object.entries(rec.by_module)
+                      .sort((a, b) => (b[1].mean_r ?? -99) - (a[1].mean_r ?? -99))
+                      .map(([m, g]) => (
+                      <tr
+                        key={m}
+                        onClick={() => { if (moduleCurves[m]?.length) setSelectedMod(m); }}
+                        className={cn("border-t border-border/40 cursor-pointer hover:bg-white/5", activeMod === m && "bg-primary/10")}
+                      >
                         <td className="py-2 px-2">{m}</td><td className="px-2 text-right">{g.signals}</td><td className="px-2 text-right">{g.r_n}</td>
                         <td className="px-2 text-right">{pct(g.tp1_before_stop)} <span className="text-muted-foreground">/{g.tp1_n}</span></td>
-                        <td className="px-2 text-right">{rr(g.mean_r)} <span className="text-muted-foreground">{g.r_lo == null ? "" : `${rr(g.r_lo)}..${rr(g.r_hi)}`}</span></td>
+                        <td className={cn("px-2 text-right", (g.mean_r ?? 0) > 0 ? "text-bull" : (g.mean_r ?? 0) < 0 ? "text-bear" : "")}>
+                          {rr(g.mean_r)} <span className="text-muted-foreground">{g.r_lo == null ? "" : `${rr(g.r_lo)}..${rr(g.r_hi)}`}</span>
+                        </td>
                       </tr>))}
                   </tbody>
                 </table>
